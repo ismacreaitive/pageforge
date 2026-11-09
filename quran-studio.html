@@ -75,7 +75,7 @@
   <div class="box">
     <div class="label" style="margin:0">🔍 Search the ayah you recited</div>
     <div class="row"><input type="text" id="qFind" placeholder="e.g. allazina aamanu wa lam yalbisu · patience and prayer · 2:255" autocomplete="off" spellcheck="false"><button class="mini mic" id="micBtn" style="flex:none" title="Say or recite it">🎤</button><button class="mini" id="qFindBtn" style="flex:none">Search</button></div>
-    <div class="row" style="align-items:center"><div class="ptext" style="margin:0;flex:1">Type, or press 🎤 and recite a few words. <b>Spelling mistakes are fine.</b></div><select id="micLang" style="flex:none;width:auto"><option value="ar-SA">🎤 Arabic</option><option value="en-US">🎤 English</option></select></div>
+    <div class="row" style="align-items:center"><div class="ptext" style="margin:0;flex:1">Type, or press 🎤 and recite. It keeps listening through pauses; press ⏹ when you finish. <b>Spelling mistakes are fine.</b></div><select id="micLang" style="flex:none;width:auto"><option value="ar-SA">🎤 Arabic</option><option value="en-US">🎤 English</option></select></div>
     <div class="qres hidden" id="qRes"></div>
     <div class="row" style="align-items:center"><div class="ptext" id="qSel" style="margin:0;flex:1"></div><button class="mini" id="toMinus" style="flex:none" title="One ayah less">− 1 ayah</button><button class="mini" id="toPlus" style="flex:none" title="One more ayah">+ 1 ayah</button></div>
     <details><summary class="ptext" style="cursor:pointer;margin:0">Choose by number instead</summary>
@@ -637,7 +637,8 @@ $('qFindBtn').onclick=findAyah;
 $('qFind').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); findAyah(); } });
 $('qRes').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
-  if(b.dataset.sel){ const [s,a,c]=b.dataset.sel.split(':').map(Number); setSel(s,a,c); toast('Selected. Now press "Get the ayat".'); }
+  if(b.dataset.localVoice){ startLocalVoiceSearch(); }
+  else if(b.dataset.sel){ const [s,a,c]=b.dataset.sel.split(':').map(Number); setSel(s,a,c); toast('Selected. Now press "Get the ayat".'); }
   else if(b.dataset.start){ const [s,a]=b.dataset.start.split(':').map(Number); setSel(s,a,a); toast('Start set to '+s+':'+a+'. If you recited more, find your last ayah and tap "End here".'); }
   else if(b.dataset.end){
     const [s,a]=b.dataset.end.split(':').map(Number), cs=+$('qSurah').value, cf=+$('qFrom').value||1;
@@ -647,18 +648,157 @@ $('qRes').addEventListener('click',e=>{
   }
 });
 
-/* ---------- 🎤 voice search (Google Chrome's own speech recognition) ---------- */
-let rec=null;
+/* ---------- 🎤 voice search ---------- */
+let rec=null, localASR=null, localASRLoad=null, localRecorder=null, localVoiceStarting=false, voiceSpeechActive=false, voiceSpeechStop=null;
+function voiceNotice(message,offerLocal=false){
+  const box=$('qRes');
+  box.classList.remove('hidden');
+  box.innerHTML='<div class="muted">'+esc(message)+'</div>'+(offerLocal
+    ? '<button class="mini" data-local-voice="1">🎙️ Use on-device Quran voice search</button><div class="credit">Runs in this browser. The first use downloads a small speech model; later uses can work without the browser speech service.</div>'
+    : '');
+  toast(message);
+}
+async function loadLocalVoiceASR(){
+  if(localASR) return localASR;
+  if(!localASRLoad) localASRLoad=(async()=>{
+    const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+    T.env.allowLocalModels=false;
+    T.env.useBrowserCache=true;
+    return await T.pipeline('automatic-speech-recognition','onnx-community/whisper-tiny',{
+      device:'wasm',
+      dtype:'q8',
+      progress_callback:p=>{
+        if(p && p.status==='progress' && p.total) toast('Downloading the small voice model… '+Math.round(p.loaded/1048576)+' of '+Math.round(p.total/1048576)+' MB');
+      }
+    });
+  })().then(pipe=>(localASR=pipe)).catch(e=>{ localASRLoad=null; throw e; });
+  return localASRLoad;
+}
+async function transcribeLocalVoice(blob){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC || !window.OfflineAudioContext) throw new Error('This browser cannot convert the microphone recording for on-device recognition.');
+  const ac=new AC();
+  let decoded;
+  try{ decoded=await ac.decodeAudioData(await blob.arrayBuffer()); }finally{ await ac.close(); }
+  const rate=16000, frames=Math.max(1,Math.ceil(decoded.duration*rate)), off=new OfflineAudioContext(1,frames,rate);
+  const src=off.createBufferSource(); src.buffer=decoded; src.connect(off.destination); src.start();
+  const audio=(await off.startRendering()).getChannelData(0);
+  const pipe=await loadLocalVoiceASR();
+  const language=$('micLang').value==='ar-SA' ? 'arabic' : 'english';
+  const result=await pipe(audio,{ language, task:'transcribe' });
+  return String(result && result.text || '').trim();
+}
+async function startLocalVoiceSearch(){
+  if(localVoiceStarting) return;
+  if(localRecorder){ if(localRecorder.state==='recording') localRecorder.stop(); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    voiceNotice('This browser does not support microphone recording. Try the microphone in Edge or type your search.');
+    return;
+  }
+  localVoiceStarting=true;
+  if(rec){ const old=rec; rec=null; old.onend=null; try{ old.abort(); }catch{} }
+  const btn=$('micBtn');
+  btn.disabled=true; btn.classList.add('on'); btn.textContent='…';
+  voiceNotice('Allow microphone access, then recite a few words and press the microphone button to finish.');
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({ audio:true });
+    const chunks=[], mimeType=MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+    const recorder=localRecorder=new MediaRecorder(stream,mimeType ? { mimeType } : undefined);
+    recorder.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    recorder.onerror=e=>voiceNotice('Microphone recording failed: '+(e.error && e.error.message || 'unknown error'));
+    recorder.onstop=async()=>{
+      localRecorder=null;
+      stream.getTracks().forEach(track=>track.stop());
+      btn.disabled=true; btn.textContent='…';
+      try{
+        const blob=new Blob(chunks,{ type:recorder.mimeType||'audio/webm' });
+        if(blob.size<1000) throw new Error('No speech recording was captured. Try again and speak for a few seconds.');
+        voiceNotice('Preparing on-device speech recognition…');
+        const text=await transcribeLocalVoice(blob);
+        if(!text) throw new Error('No words were recognized. Try again closer to the microphone.');
+        $('qFind').value=text;
+        await findAyah();
+      }catch(e){ voiceNotice('On-device voice search failed: '+(e.message||'unknown error'),true); }
+      finally{ btn.disabled=false; btn.classList.remove('on'); btn.textContent='🎤'; }
+    };
+    recorder.start();
+    btn.disabled=false; btn.textContent='⏹';
+    toast('Recording… recite a few words, then press ⏹');
+  }catch(e){
+    if(stream) stream.getTracks().forEach(track=>track.stop());
+    voiceNotice('Could not access the microphone: '+(e.message||e.name||'permission denied'));
+    btn.disabled=false; btn.classList.remove('on'); btn.textContent='🎤';
+  }finally{ localVoiceStarting=false; }
+}
 $('micBtn').onclick=()=>{
+  if(localRecorder){ if(localRecorder.state==='recording') localRecorder.stop(); return; }
+  if(voiceSpeechActive){
+    if(voiceSpeechStop) voiceSpeechStop();
+    return;
+  }
   const SR=window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ toast('Voice search works in Google Chrome or Microsoft Edge. You can still type.'); return; }
-  if(rec){ try{ rec.stop(); }catch{} return; }
-  rec=new SR(); rec.lang=$('micLang').value; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
-  let text='';
-  rec.onresult=e=>{ text=[...e.results].map(r=>r[0].transcript).join(' ').trim(); $('qFind').value=text; };
-  rec.onerror=e=>{ toast(e.error==='not-allowed' ? 'Allow the microphone for this page (click the 🔒 next to the address), then try again.' : e.error==='no-speech' ? 'Nothing was heard. Press 🎤 and recite a few words.' : 'Voice search problem: '+e.error); };
-  rec.onend=()=>{ rec=null; $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤'; if(text) findAyah(); };
-  try{ rec.start(); $('micBtn').classList.add('on'); $('micBtn').textContent='⏺'; toast('Listening… recite or say a few words of the ayah'); }catch{ rec=null; }
+  if(!SR){ voiceNotice('Browser speech recognition is unavailable.',true); return; }
+  let committed='';
+  voiceSpeechActive=true;
+  $('micBtn').classList.add('on'); $('micBtn').textContent='⏹';
+  const finish=()=>{
+    voiceSpeechActive=false; voiceSpeechStop=null; rec=null;
+    $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤';
+    $('qFind').value=committed;
+    if(committed) findAyah();
+    else voiceNotice('No words were recognized. Try again and press ⏹ after you finish reciting.');
+  };
+  let failed=false;
+  voiceSpeechStop=()=>{
+    voiceSpeechActive=false;
+    if(rec){ const current=rec; rec=null; try{ current.stop(); }catch{ finish(); } }
+    else finish();
+  };
+  const startSession=()=>{
+    if(!voiceSpeechActive) return;
+    let activeRec, sessionFinal='', sessionInterim='';
+    try{
+      activeRec=new SR(); rec=activeRec;
+      activeRec.lang=$('micLang').value; activeRec.interimResults=true; activeRec.continuous=true; activeRec.maxAlternatives=1;
+      activeRec.onresult=e=>{
+        sessionFinal=[...e.results].filter(r=>r.isFinal).map(r=>r[0].transcript).join(' ').trim();
+        sessionInterim=[...e.results].filter(r=>!r.isFinal).map(r=>r[0].transcript).join(' ').trim();
+        $('qFind').value=[committed,sessionFinal,sessionInterim].filter(Boolean).join(' ');
+      };
+      activeRec.onerror=e=>{
+        if(e.error==='no-speech' || e.error==='aborted') return;
+        const messages={
+          'not-allowed':'Allow microphone access for this page in your browser settings, then try again.',
+          'service-not-allowed':'Voice search is disabled by the browser. Try Google Chrome or Microsoft Edge.',
+          'audio-capture':'No microphone was found. Connect or select a microphone, then try again.',
+          'network':'Chrome voice service failed. Use the on-device recognizer below instead.',
+          'language-not-supported':'This speech language is not supported. Choose the other language or type your search.'
+        };
+        failed=true; voiceSpeechActive=false;
+        if(rec===activeRec) rec=null;
+        try{ activeRec.abort(); }catch{}
+        $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤';
+        voiceNotice(messages[e.error] || 'Voice search problem: '+e.error,e.error==='network');
+      };
+      activeRec.onend=()=>{
+        if(rec===activeRec) rec=null;
+        const heard=sessionFinal || sessionInterim;
+        if(heard) committed=[committed,heard].filter(Boolean).join(' ');
+        $('qFind').value=committed;
+        if(failed){ voiceSpeechStop=null; $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤'; }
+        else if(!voiceSpeechActive) finish();
+        else setTimeout(startSession,200);
+      };
+      activeRec.start();
+    }catch(e){
+      voiceSpeechActive=false; rec=null;
+      $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤';
+      voiceNotice('Could not start voice search: '+(e.message || e.name || 'unknown error'));
+    }
+  };
+  toast('Listening… recite at your own pace. Press ⏹ when you finish.');
+  startSession();
 };
 
 function tokenize(ar,num){
