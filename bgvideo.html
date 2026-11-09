@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CutOut Video — Remove & Replace Video Backgrounds</title>
+<link rel="stylesheet" href="forge.css">
+<style>
+.wrap{position:relative;display:inline-block;line-height:0}
+#video{display:block;max-width:100%;max-height:calc(100vh - 200px);border-radius:6px;background:#000}
+#preview{position:absolute;inset:0;width:100%;height:100%;border-radius:6px;pointer-events:none;display:none}
+#overlay{position:absolute;inset:0;cursor:crosshair;touch-action:none}
+.zone{position:absolute;border:2px solid #3ecf8e;background:rgba(62,207,142,.18);cursor:move}
+.zone.rm{border-color:#ff6b6b;background:rgba(255,107,107,.18)}
+.zone.sel{box-shadow:0 0 0 2px #fff}
+.zone span{position:absolute;top:-21px;left:-2px;font-size:11px;line-height:1;padding:4px 6px;border-radius:6px 6px 6px 0;background:#3ecf8e;color:#111;font-weight:700;white-space:nowrap}
+.zone.rm span{background:#ff6b6b;color:#fff}
+.zone .handle{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;background:#fff;border:3px solid #3ecf8e;border-radius:50%;cursor:nwse-resize}
+.zone.rm .handle{border-color:#ff6b6b}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button,.seg2 button{padding:7px 4px;font-size:12px}
+.seg button.on,.seg2 button.on{border-color:var(--accent);color:var(--accent);background:#1f2633}
+.swatches{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.sw{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);padding:0;cursor:pointer}
+.sw.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+input[type=color]{width:34px;height:28px;border:none;background:none;padding:0;cursor:pointer}
+.pick{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel-2);font-size:13px}
+.pick:hover{border-color:var(--accent)}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel-2);display:flex;flex-direction:column;gap:8px}
+.zrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+#zoneList{display:flex;flex-direction:column;gap:6px}
+.toggle{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text);font-size:12px}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">🧍</div>CutOut Video <small>remove &amp; replace video backgrounds · free · runs on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🧍</div><strong>Drop your video here</strong><span>or click to choose · works best with people</span></label>
+  <div class="file-info" id="fileInfo">No video selected</div>
+  <div><div class="label">Who is in the video?</div>
+    <select id="model"><option value="people">People (fast, recommended)</option><option value="any">Anything (slower, keeps clothing better)</option></select>
+  </div>
+  <div><div class="label">New background</div>
+    <div class="seg" id="bgMode"><button data-m="blur" class="on">Blur</button><button data-m="color">Colour</button><button data-m="green">Green screen</button><button data-m="photo">🏞️ Photo</button><button data-m="video">🎬 Video</button></div>
+  </div>
+  <div class="swatches hidden" id="colorBox">
+    <button class="sw on" data-c="#ffffff" style="background:#ffffff"></button><button class="sw" data-c="#000000" style="background:#000000"></button>
+    <button class="sw" data-c="#f1f3f5" style="background:#f1f3f5"></button><button class="sw" data-c="#5b8cff" style="background:#5b8cff"></button>
+    <button class="sw" data-c="#ffd60a" style="background:#ffd60a"></button><input type="color" id="colorPick" value="#ffffff">
+  </div>
+  <div class="hidden" id="imgBox"><label class="pick">🏞️ Choose a background photo from your PC<input type="file" id="bgInput" accept="image/*" hidden></label><div class="ptext" id="bgName">No background photo yet</div></div>
+  <div class="hidden" id="vidBox"><label class="pick">🎬 Choose a background video from your PC<input type="file" id="bgVidInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden></label><div class="ptext" id="bgVidName">No background video yet · it loops if it is shorter than yours</div></div>
+  <label class="slider" id="blurBox">Blur amount <input type="range" id="blurAmt" min="4" max="40" value="18"></label>
+  <label class="slider">Edge sharpness <input type="range" id="hard" min="0" max="80" value="35"></label>
+  <label class="slider">Steady edges <input type="range" id="steady" min="0" max="80" value="40"></label>
+
+  <div class="box">
+    <div class="label" style="margin:0">Fix areas (optional)</div>
+    <div class="ptext" style="margin:0">If the AI cuts off part of you (like an arm), or keeps something it should remove, draw a zone over it.</div>
+    <button id="zoneEditBtn">✏️ Draw fix zones</button>
+    <div class="stack hidden" id="zoneOpts" style="gap:8px">
+      <div class="seg2" id="zoneType"><button data-z="keep" class="on">🟩 Always keep</button><button data-z="remove">🟥 Always remove</button></div>
+      <div class="ptext" style="margin:0">Drag on the video to draw a zone. Drag a zone to move it; drag its white dot to resize. Select a zone and press Delete to remove it.</div>
+      <div id="zoneList"></div>
+    </div>
+  </div>
+
+  <div><div class="label">Output size</div><select id="outSize"><option value="0">Same as original</option><option value="1080" selected>1080p</option><option value="720">720p (faster)</option></select></div>
+  <label class="check"><input type="checkbox" id="testRun" checked> Quick test: first 10 seconds only</label>
+  <label class="check hidden" id="diskWrap"><input type="checkbox" id="toDisk"> Save straight to disk (long videos)</label>
+  <button class="primary big" id="runBtn" disabled>Replace background</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download video</button><video id="resultVideo" controls playsinline></video></div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Your video appears here</span><span style="display:flex;gap:10px;align-items:center"><button class="mini hidden" id="holdBtn">Hold to see original</button><label class="toggle"><input type="checkbox" id="showResult" checked> Show result</label></span></div>
+  <div class="stage"><div class="empty" id="empty">🧍<br>Open a video to start</div><div class="wrap hidden" id="wrap"><video id="video" controls playsinline preload="auto"></video><canvas id="preview"></canvas><div id="overlay" class="hidden"></div></div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+let Bridge={ dock(){}, setResult(){}, take:async()=>null };
+try{ Bridge=await import('./forge-bridge.js'); }catch(e){ console.warn('Tool bar unavailable',e); }
+Bridge.dock('bgvideo');
+const $=id=>document.getElementById(id);
+const video=$('video'), preview=$('preview'), pctx=preview.getContext('2d'), overlay=$('overlay');
+let TFP=null, MBP=null, MB=null;
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const MODELS={
+  people:{ id:'Xenova/modnet', task:'background-removal', read:'alpha', f16:false, side:512 },
+  any:{ id:'d30social/ormbg-ortweb', task:'image-segmentation', read:'mask', f16:true, side:768 }
+};
+let file=null, url=null, busy=false, cancelled=false, conv=null, ai=null, bgMode='blur', bgColor='#ffffff', bgBmp=null, bgVidFile=null, bgVidUrl=null, holding=false;
+let pvTimer=0, pvToken=0, resultBlob=null, resultUrl=null, resultName='', wakeLock=null;
+let zones=[], zSel=null, zNext=1, zEdit=false, zType='keep', zDrag=null;
+const work={};
+const bgv=document.createElement('video'); bgv.muted=true; bgv.playsInline=true; bgv.preload='auto';
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtSize(b){ return b>1073741824?(b/1073741824).toFixed(2)+' GB':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtClock(s){ if(!isFinite(s)) return '0:00'; s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+function fmtTime(s){ s=Math.round(s); if(s<60) return s+'s'; const m=Math.floor(s/60); return m<60 ? m+'m '+(s%60)+'s' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const cv=(w,h,o)=>{ const c=new OffscreenCanvas(w,h); return [c,c.getContext('2d',o)]; };
+const opts=()=>{ const h=+$('hard').value; return { mode:bgMode, color:bgColor, blur:+$('blurAmt').value, steady:+$('steady').value/100, lo:h*1.1, hi:255-h*0.9, zones:zones.map(z=>({ ...z })) }; };
+function seekEl(el,t){ return new Promise(res=>{ let d=false; const fin=()=>{ if(!d){ d=true; res(); } }; el.addEventListener('seeked',fin,{once:true}); setTimeout(fin,3000); el.currentTime=t; }); }
+if(location.protocol==='file:') showNote('This page was opened by double-clicking the file, so the AI cannot load. Open it with Live Server in VS Code, or on your Netlify site.');
+
+/* ---------- AI ---------- */
+async function gpuInfo(){ try{ if(!('gpu' in navigator)) return null; const a=await navigator.gpu.requestAdapter(); return a ? { f16:a.features.has('shader-f16') } : null; }catch{ return null; } }
+async function getAI(key,forceWasm){
+  if(ai && ai.key===key && !(forceWasm && ai.device!=='wasm')) return ai;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  const cfg=MODELS[key], gpu=forceWasm ? null : await gpuInfo();
+  const progress_callback=p=>{ if(p.status==='progress' && typeof p.progress==='number' && /\.onnx/.test(p.file||'')) setP(p.progress/100,'Downloading the AI model (first time only)… '+Math.round(p.progress)+'%'); };
+  const tries=gpu ? [{ device:'webgpu', dtype:cfg.f16 && gpu.f16 ? 'fp16' : 'fp32' },{ device:'wasm', dtype:'fp32' }] : [{ device:'wasm', dtype:'fp32' }];
+  let pipe=null, device='', err=null;
+  for(const t of tries){ try{ pipe=await TF.pipeline(cfg.task,cfg.id,{ device:t.device, dtype:t.dtype, revision:'main', progress_callback }); device=t.device; break; }catch(e){ err=e; console.warn(e); } }
+  if(!pipe) throw err || new Error('the AI model could not load');
+  if(ai && ai.pipe){ try{ await ai.pipe.dispose(); }catch{} }
+  ai={ key, TF, cfg, pipe, device }; return ai;
+}
+
+/* ---------- fix zones (applied to the AI mask with soft edges) ---------- */
+function applyZones(m,sw,sh,zs){
+  if(!zs || !zs.length) return;
+  const F=Math.max(1.5,Math.min(sw,sh)*0.006);
+  for(const z of zs){
+    const x0=z.x*sw, y0=z.y*sh, x1=(z.x+z.w)*sw, y1=(z.y+z.h)*sh, t=z.type==='keep' ? 255 : 0;
+    const ix0=Math.max(0,Math.floor(x0-F)), ix1=Math.min(sw-1,Math.ceil(x1+F)), iy0=Math.max(0,Math.floor(y0-F)), iy1=Math.min(sh-1,Math.ceil(y1+F));
+    for(let y=iy0;y<=iy1;y++) for(let x=ix0;x<=ix1;x++){
+      const d=Math.min(x-x0,x1-x,y-y0,y1-y), w=clamp((d+F)/(2*F),0,1);
+      if(w>0){ const i=y*sw+x; m[i]=m[i]*(1-w)+t*w; }
+    }
+  }
+}
+
+/* ---------- one frame: AI mask → steady edges → fix zones → new background ---------- */
+async function maskFrame(src,W,H,A,state,o){
+  const k=Math.min(1,A.cfg.side/Math.max(W,H)), sw=Math.max(8,Math.round(W*k)), sh=Math.max(8,Math.round(H*k));
+  if(!work.sc || work.sc.width!==sw || work.sc.height!==sh){
+    [work.sc,work.sx]=cv(sw,sh,{willReadFrequently:true}); [work.mc,work.mx]=cv(sw,sh,{willReadFrequently:true});
+    [work.ac,work.ax]=cv(sw,sh); work.aimg=new ImageData(sw,sh); state.prev=null;
+  }
+  work.sx.drawImage(src,0,0,sw,sh);
+  const raw=A.TF.RawImage.fromCanvas ? await A.TF.RawImage.fromCanvas(work.sc) : await A.TF.RawImage.fromBlob(await work.sc.convertToBlob());
+  const out=await A.pipe(raw), res=A.cfg.read==='mask' ? (out && out[0] && out[0].mask) : (out && out[0]);
+  if(!res) throw new Error('the AI returned no result');
+  work.mx.clearRect(0,0,sw,sh); work.mx.drawImage(res.toCanvas(),0,0,sw,sh);
+  const d=work.mx.getImageData(0,0,sw,sh).data, off=A.cfg.read==='alpha' ? 3 : 0, n=sw*sh, m=new Float32Array(n);
+  for(let i=0;i<n;i++) m[i]=d[i*4+off];
+  if(state.prev && state.prev.length===n && o.steady>0){ const a=o.steady, p=state.prev; for(let i=0;i<n;i++) m[i]=m[i]*(1-a)+p[i]*a; }
+  state.prev=m.slice();
+  const ad=work.aimg.data, sc=255/(o.hi-o.lo);
+  for(let i=0;i<n;i++) m[i]=(m[i]-o.lo)*sc;
+  applyZones(m,sw,sh,o.zones);
+  for(let i=0;i<n;i++) ad[i*4+3]=m[i];
+  work.ax.putImageData(work.aimg,0,0);
+  return work.ac;
+}
+function coverDraw(g,img,W,H){
+  const iw=img.videoWidth||img.width, ih=img.videoHeight||img.height; if(!iw || !ih) return;
+  const k=Math.max(W/iw,H/ih), w=iw*k, h=ih*k; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+}
+function composite(g,W,H,frame,maskC,o,bgFrame){
+  if(!work.fg || work.fg.width!==W || work.fg.height!==H) [work.fg,work.fgx]=cv(W,H);
+  const f=work.fgx;
+  f.globalCompositeOperation='copy'; f.drawImage(frame,0,0,W,H);
+  f.globalCompositeOperation='destination-in'; f.imageSmoothingEnabled=true; f.imageSmoothingQuality='high'; f.drawImage(maskC,0,0,W,H);
+  f.globalCompositeOperation='source-over';
+  g.save(); g.globalCompositeOperation='source-over'; g.globalAlpha=1;
+  if(o.mode==='color' || o.mode==='green'){ g.fillStyle=o.mode==='green' ? '#00b140' : o.color; g.fillRect(0,0,W,H); }
+  else if(o.mode==='photo' && bgBmp) coverDraw(g,bgBmp,W,H);
+  else if(o.mode==='video' && bgFrame) coverDraw(g,bgFrame,W,H);
+  else{ const r=Math.max(2,Math.round(Math.max(W,H)*o.blur/1000)); g.filter='blur('+r+'px)'; g.drawImage(frame,-r*2,-r*2,W+r*4,H+r*4); g.filter='none'; }
+  g.restore();
+  g.drawImage(work.fg,0,0);
+}
+async function maskSafe(src,W,H,state,o){
+  try{ return await maskFrame(src,W,H,ai,state,o); }
+  catch(e){ if(cancelled || ai.device!=='webgpu') throw e; console.warn('Graphics card failed, switching to processor',e); await getAI(ai.key,true); return await maskFrame(src,W,H,ai,state,o); }
+}
+
+/* ---------- background video (decoded frame by frame, loops when shorter) ---------- */
+async function openBgVideo(W,H){
+  const input=new MB.Input({ source:new MB.BlobSource(bgVidFile), formats:MB.ALL_FORMATS });
+  const track=await input.getPrimaryVideoTrack();
+  if(!track || !(await track.canDecode())) throw new Error('the background video cannot be read here. Convert it to MP4 first');
+  const first=await track.getFirstTimestamp(), dur=Math.max(0.1,(await track.computeDuration())-first);
+  const [hold,hx]=cv(W,H);
+  return { input, first, dur, hold, hx, sink:new MB.CanvasSink(track,{ width:W, height:H, fit:'cover', poolSize:2 }), iter:null, next:null, has:false, pos:-1 };
+}
+async function restartBg(bs){ if(bs.iter){ try{ await bs.iter.return(); }catch{} } bs.iter=bs.sink.canvases(bs.first); const r=await bs.iter.next(); bs.next=r.done ? null : r.value; }
+async function bgFrameAt(bs,t){
+  if(!bs.iter) await restartBg(bs);
+  const target=bs.first+(t % bs.dur);
+  if(target<bs.pos-0.001) await restartBg(bs);
+  while(bs.next && (!bs.has || bs.next.timestamp<=target+0.001)){ bs.hx.drawImage(bs.next.canvas,0,0); bs.has=true; const r=await bs.iter.next(); bs.next=r.done ? null : r.value; }
+  bs.pos=target; return bs.has ? bs.hold : null;
+}
+async function closeBg(bs){ if(!bs) return; try{ if(bs.iter) await bs.iter.return(); }catch{} try{ bs.input.dispose?.(); }catch{} }
+
+/* ---------- loading ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+function loadFile(f){
+  if(!f || busy) return;
+  if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name)) return toast('Please choose a video file');
+  file=f; if(url) URL.revokeObjectURL(url); url=URL.createObjectURL(f);
+  ['note','prog','doneBox'].forEach(hide); $('fileInfo').textContent='Opening '+f.name+'…'; video.src=url; loadMB().catch(()=>{});
+  $('diskWrap').classList.toggle('hidden',!('showSaveFilePicker' in window)); $('toDisk').checked=f.size>500*1048576 && 'showSaveFilePicker' in window;
+}
+video.addEventListener('loadedmetadata',()=>{
+  hide('empty'); show('wrap'); show('holdBtn'); $('runBtn').disabled=false;
+  $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+video.videoWidth+'×'+video.videoHeight+' · '+fmtClock(video.duration);
+  $('hint').textContent='Pause anywhere to preview the new background';
+  schedulePreview();
+});
+video.addEventListener('error',()=>{ if(file) showNote('Your browser cannot open this video. Convert it to MP4 first with the Video Toolkit.'); });
+
+/* ---------- preview (when paused) ---------- */
+function schedulePreview(){
+  preview.style.display='none'; pvToken++;
+  if(!file || !video.videoWidth || holding || !$('showResult').checked) return;
+  if(!video.paused){ $('hint').textContent='▶ Playing the original. Pause anywhere to preview.'; return; }
+  clearTimeout(pvTimer); pvTimer=setTimeout(runPreview,250);
+}
+async function runPreview(){
+  if(busy || !video.paused) return;
+  const tok=++pvToken, W=video.videoWidth, H=video.videoHeight, t0=performance.now();
+  try{
+    if(!ai || ai.key!==$('model').value){ show('prog'); await getAI($('model').value); hide('prog'); if(tok!==pvToken) return; }
+    $('hint').textContent='✨ Updating the preview…';
+    const [fc,fx]=cv(W,H,{willReadFrequently:true}); fx.drawImage(video,0,0,W,H);
+    const o=opts(), m=await maskSafe(fc,W,H,{},o);
+    if(o.mode==='video' && bgVidUrl && bgv.duration) await seekEl(bgv,video.currentTime % bgv.duration);
+    if(tok!==pvToken || !video.paused) return;
+    if(preview.width!==W || preview.height!==H){ preview.width=W; preview.height=H; }
+    composite(pctx,W,H,fc,m,o,o.mode==='video' && bgVidUrl ? bgv : null); preview.style.display='block';
+    const secs=(performance.now()-t0)/1000, len=$('testRun').checked ? Math.min(10,video.duration) : video.duration;
+    $('hint').textContent=zEdit ? 'Draw zones on the video. The preview updates when you let go.' : 'Preview ready · this frame took '+secs.toFixed(1)+'s, so the '+($('testRun').checked?'10-second test':'whole video')+' takes about '+fmtTime(secs*30*len)+' (estimate)';
+  }catch(e){ hide('prog'); if(tok===pvToken) showNote('Preview failed: '+(e.message||e)+'.'); }
+}
+['pause','seeked','play'].forEach(ev=>video.addEventListener(ev,schedulePreview));
+['hard','steady','blurAmt','model','showResult'].forEach(id=>$(id).addEventListener('change',schedulePreview));
+const hb=$('holdBtn');
+hb.addEventListener('pointerdown',()=>{ holding=true; preview.style.display='none'; });
+['pointerup','pointerleave','pointercancel'].forEach(ev=>hb.addEventListener(ev,()=>{ if(holding){ holding=false; schedulePreview(); } }));
+
+/* ---------- drawing fix zones ---------- */
+function renderZones(){
+  overlay.innerHTML=zones.map((z,i)=>'<div class="zone'+(z.type==='remove'?' rm':'')+(z.id===zSel?' sel':'')+'" data-id="'+z.id+'" style="left:'+(z.x*100)+'%;top:'+(z.y*100)+'%;width:'+(z.w*100)+'%;height:'+(z.h*100)+'%"><span>'+(z.type==='keep'?'Keep ':'Remove ')+(i+1)+'</span><div class="handle"></div></div>').join('');
+  $('zoneList').innerHTML=zones.length ? zones.map((z,i)=>'<div class="zrow" data-id="'+z.id+'"><span>'+(z.type==='keep'?'🟩 Keep':'🟥 Remove')+' zone '+(i+1)+'</span><button class="mini zdel" title="Delete zone">✕</button></div>').join('') : '<div class="ptext" style="margin:0">No zones yet.</div>';
+}
+$('zoneEditBtn').onclick=()=>{
+  if(!file) return toast('Open a video first');
+  zEdit=!zEdit; video.pause();
+  overlay.classList.toggle('hidden',!zEdit); $('zoneOpts').classList.toggle('hidden',!zEdit);
+  $('zoneEditBtn').textContent=zEdit ? '✅ Done drawing zones' : '✏️ Draw fix zones'+(zones.length ? ' ('+zones.length+')' : '');
+  $('hint').textContent=zEdit ? 'Drag on the video to draw a zone' : 'Pause anywhere to preview the new background';
+  renderZones(); schedulePreview();
+};
+$('zoneType').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; zType=b.dataset.z; $('zoneType').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); };
+$('zoneList').addEventListener('click',e=>{ const r=e.target.closest('.zrow'); if(!r || !e.target.classList.contains('zdel')) return; zones=zones.filter(z=>z.id!==+r.dataset.id); renderZones(); schedulePreview(); });
+function zpt(e){ const r=overlay.getBoundingClientRect(); return { x:clamp((e.clientX-r.left)/r.width,0,1), y:clamp((e.clientY-r.top)/r.height,0,1) }; }
+overlay.addEventListener('pointerdown',e=>{
+  if(busy) return;
+  const p=zpt(e), el=e.target.closest('.zone'), handle=e.target.closest('.handle');
+  if(el){ const z=zones.find(x=>x.id===+el.dataset.id); zSel=z.id; zDrag={ type:handle?'resize':'move', z, sx:p.x, sy:p.y, o:{ x:z.x, y:z.y, w:z.w, h:z.h } }; }
+  else{ const z={ id:zNext++, type:zType, x:p.x, y:p.y, w:0, h:0 }; zones.push(z); zSel=z.id; zDrag={ type:'create', z, sx:p.x, sy:p.y }; }
+  overlay.setPointerCapture(e.pointerId); e.preventDefault(); renderZones(); preview.style.display='none';
+});
+overlay.addEventListener('pointermove',e=>{
+  if(!zDrag) return; const p=zpt(e), z=zDrag.z;
+  if(zDrag.type==='create'){ z.x=Math.min(zDrag.sx,p.x); z.y=Math.min(zDrag.sy,p.y); z.w=Math.abs(p.x-zDrag.sx); z.h=Math.abs(p.y-zDrag.sy); }
+  else if(zDrag.type==='move'){ z.x=clamp(zDrag.o.x+p.x-zDrag.sx,0,1-z.w); z.y=clamp(zDrag.o.y+p.y-zDrag.sy,0,1-z.h); }
+  else{ z.w=clamp(zDrag.o.w+p.x-zDrag.sx,0.01,1-z.x); z.h=clamp(zDrag.o.h+p.y-zDrag.sy,0.01,1-z.y); }
+  renderZones();
+});
+function endZone(){
+  if(!zDrag) return;
+  if(zDrag.type==='create' && (zDrag.z.w<0.01 || zDrag.z.h<0.01)) zones=zones.filter(z=>z!==zDrag.z);
+  zDrag=null; renderZones(); schedulePreview();
+}
+overlay.addEventListener('pointerup',endZone);
+overlay.addEventListener('pointercancel',endZone);
+document.addEventListener('keydown',e=>{
+  if(!zEdit || !zSel || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key==='Delete' || e.key==='Backspace'){ zones=zones.filter(z=>z.id!==zSel); zSel=null; renderZones(); schedulePreview(); }
+});
+
+/* ---------- background controls ---------- */
+$('bgMode').onclick=e=>{
+  const b=e.target.closest('button'); if(!b) return; bgMode=b.dataset.m;
+  $('bgMode').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  $('colorBox').classList.toggle('hidden',bgMode!=='color'); $('imgBox').classList.toggle('hidden',bgMode!=='photo');
+  $('vidBox').classList.toggle('hidden',bgMode!=='video'); $('blurBox').classList.toggle('hidden',bgMode!=='blur');
+  if(bgMode==='photo' && !bgBmp) $('bgInput').click();
+  if(bgMode==='video' && !bgVidFile) $('bgVidInput').click();
+  schedulePreview();
+};
+$('colorBox').addEventListener('click',e=>{ const s=e.target.closest('.sw'); if(!s) return; bgColor=s.dataset.c; $('colorBox').querySelectorAll('.sw').forEach(x=>x.classList.toggle('on',x===s)); schedulePreview(); });
+$('colorPick').addEventListener('input',()=>{ bgColor=$('colorPick').value; schedulePreview(); });
+$('bgInput').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; try{ bgBmp=await createImageBitmap(f); $('bgName').textContent='🏞️ '+f.name; schedulePreview(); }catch{ toast('Could not open that photo'); } };
+$('bgVidInput').onchange=e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  bgVidFile=f; if(bgVidUrl) URL.revokeObjectURL(bgVidUrl); bgVidUrl=URL.createObjectURL(f); bgv.src=bgVidUrl;
+  $('bgVidName').textContent='🎬 '+f.name+' · loops if shorter than your video';
+  bgv.addEventListener('loadeddata',schedulePreview,{ once:true });
+  bgv.addEventListener('error',()=>toast('Your browser cannot open that video. Convert it to MP4 first.'),{ once:true });
+};
+
+/* ---------- render ---------- */
+function setBusy(on){
+  busy=on; $('runBtn').disabled=on || !file; on ? show('cancelBtn') : hide('cancelBtn');
+  ['model','hard','steady','blurAmt','outSize','testRun','toDisk','zoneEditBtn'].forEach(id=>$(id).disabled=on);
+  drop.style.pointerEvents=on?'none':''; keepAwake(on);
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(conv){ try{ await conv.cancel(); }catch{} } };
+$('runBtn').onclick=async()=>{
+  if(!file || busy) return;
+  if(!('VideoEncoder' in window)) return showNote('This needs Google Chrome or Microsoft Edge on a computer.');
+  if(bgMode==='photo' && !bgBmp) return showNote('Choose a background photo first, or pick another background.');
+  if(bgMode==='video' && !bgVidFile) return showNote('Choose a background video first, or pick another background.');
+  if(zEdit) $('zoneEditBtn').click();
+  video.pause(); pvToken++; preview.style.display='none'; cancelled=false; setBusy(true); hide('note'); hide('doneBox'); show('prog'); setP(0,'Loading…');
+  const useDisk=$('toDisk').checked && 'showSaveFilePicker' in window; let writable=null, bs=null;
+  try{
+    MB=await loadMB(); await getAI($('model').value);
+    const o=opts(), state={}, W0=video.videoWidth, H0=video.videoHeight, target=+$('outSize').value, short0=Math.min(W0,H0), k=(target && target<short0) ? target/short0 : 1;
+    resultName=file.name.replace(/\.[^.]+$/,'')+'-newbg'+($('testRun').checked?'-test':'')+'.mp4';
+    if(useDisk){ const h=await window.showSaveFilePicker({ suggestedName:resultName, types:[{ description:'MP4 video', accept:{ 'video/mp4':['.mp4'] } }] }); writable=await h.createWritable(); }
+    const input=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    const output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:useDisk ? false : 'in-memory' }), target:useDisk ? new MB.StreamTarget(writable,{ chunked:true }) : new MB.BufferTarget() });
+    let fc=null, fx=null, oc=null, ox=null;
+    const vopts={ forceTranscode:true, allowTransformationMetadata:false, quality:new MB.Quality('high'),
+      process:async(sample)=>{
+        const W=sample.displayWidth, H=sample.displayHeight;
+        if(!fc || fc.width!==W || fc.height!==H){ [fc,fx]=cv(W,H,{willReadFrequently:true}); [oc,ox]=cv(W,H); }
+        sample.draw(fx,0,0);
+        const m=await maskSafe(fc,W,H,state,o);
+        let bgf=null;
+        if(o.mode==='video'){ if(!bs) bs=await openBgVideo(W,H); bgf=await bgFrameAt(bs,sample.timestamp); }
+        composite(ox,W,H,fc,m,o,bgf);
+        return oc;
+      } };
+    if(k<1){ vopts.width=Math.round(W0*k/2)*2; vopts.height=Math.round(H0*k/2)*2; vopts.fit='fill'; }
+    const copts={ input, output, video:vopts };
+    if($('testRun').checked && video.duration>10) copts.trim={ end:10 };
+    conv=await MB.Conversion.init(copts);
+    if(!conv.isValid) throw new Error('this video cannot be processed here ('+(conv.discardedTracks||[]).map(d=>d.reason).join(', ')+'). Convert it to MP4 first');
+    const t0=performance.now();
+    conv.onProgress=p=>{ const secs=(performance.now()-t0)/1000; setP(p,'Replacing the background… '+Math.round(p*100)+'%'+(p>0.02?' · about '+fmtTime(secs/p*(1-p))+' left':'')+(ai.device==='wasm'?' · processor mode (slower)':'')); };
+    await conv.execute();
+    const took=fmtTime((performance.now()-t0)/1000);
+    if(useDisk){ try{ await writable.close(); }catch{} setP(1,'Finished in '+took); showNote('Done! Your video was saved to the file you chose.','ok'); }
+    else{
+      resultBlob=new Blob([output.target.buffer],{type:'video/mp4'});
+      if(resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl=URL.createObjectURL(resultBlob); $('resultVideo').src=resultUrl;
+      setP(1,'Finished in '+took+' · '+fmtSize(resultBlob.size)); show('doneBox');
+      Bridge.setResult(resultBlob,resultName);
+      showNote($('testRun').checked ? 'Test done! If you like it, untick "Quick test" and run the whole video.' : 'Done! Play it below, then click Download.','ok');
+    }
+  }catch(err){
+    const c=err && (err.name==='AbortError' || err.name==='ConversionCanceledError' || /cancel/i.test(err.message||''));
+    showNote(c ? 'Cancelled.' : 'Something went wrong: '+(err.message||err)+'.');
+    if(writable){ try{ await writable.abort(); }catch{} }
+  }finally{ await closeBg(bs); conv=null; setBusy(false); }
+};
+$('downloadBtn').onclick=()=>{ if(!resultBlob) return; const a=document.createElement('a'); a.href=resultUrl; a.download=resultName; document.body.appendChild(a); a.click(); a.remove(); };
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

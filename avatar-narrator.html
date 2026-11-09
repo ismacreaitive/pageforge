@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<!-- avatar-narrator.html — v4 — StoryForge Pack 2 · 🗣️ Avatar Narrator (free providers + real AI voice).
+
+CHANGES IN v4 (debugging pass):
+1) FIXED real bug: in Magic Hour "own voice" mode with a local file upload, voice duration was being
+   read from the internal Magic Hour `file_path` (confirmed via their docs to be a relative reference
+   like "api-assets/id/1234.mp3", NOT a fetchable URL) instead of the original local File/URL. This
+   caused getMediaDuration() to fail silently mid-generation. Now duration is read from the correct
+   source depending on narration mode: the original file/URL for "own voice", the generated speech URL
+   for "clone" (since that's the actual audio being timed against).
+2) ADDED live "what's missing" status line under the Generate button, updated on every input change,
+   instead of a silently-disabled button with only static help text below it.
+3) ADDED auto-split-on-click: if Generate is pressed before "Split into beats" has been clicked, it now
+   auto-splits and tells the user via toast, instead of just staying disabled with no actionable signal.
+4) ADDED a ~0.35s crossfade transition between broll cutaways and the talking avatar (both directions),
+   instead of a hard cut, per request.
+5) KNOWN UNRESOLVED RISK, not fixed because it can't be fixed from pure client-side code: this page calls
+   api.magichour.ai directly from the browser. Whether that API sends the CORS headers required to permit
+   browser-origin calls was not confirmed. If it does not, every Magic Hour request will fail with a
+   network error regardless of any fix here — only a small server-side proxy could resolve that, which is
+   outside the scope of a single static HTML file. The existing CORS-detection message below is left in
+   place so this shows up as a clear, specific error rather than a silent failure.
+6) NOT ADDED: Gemini or Grok as alternate "providers" — neither offers photo-to-talking-video / lip-sync
+   generation (they're chat/text models), so they are not a fit for this specific job. Only Magic Hour and
+   a Hugging Face SadTalker-style Space do the actual avatar animation here.
+
+Everything else (beats/b-roll/compositing pipeline, both provider paths) is unchanged from v3. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Avatar Narrator</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 60px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:110px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:13px/1.5 system-ui,sans-serif;resize:vertical}
+input[type=text],input[type=password],select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px;font:inherit;width:100%}
+input[type=file]{width:100%;color:var(--muted);font-size:12px}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:140px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%;margin-top:8px}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.45;cursor:default}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.provCard,.modeCard{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;cursor:pointer}
+.provCard.on,.modeCard.on{border-color:var(--accent);background:rgba(212,175,55,0.08)}
+.provCard b,.modeCard b{display:block;margin-bottom:2px}
+.beatBox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px}
+.beatBox .idx{font-weight:800;color:var(--accent);margin-bottom:4px}
+.thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--line)}
+.findbtn{background:#222c3d;border:1px solid var(--line);color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.preview{width:160px;border-radius:10px;border:1px solid var(--line);margin-top:8px}
+#progWrap{margin-top:10px}
+#progLabel{font-size:12px;color:var(--muted);margin-bottom:6px}
+#progBar{height:6px;border-radius:3px;background:#2a3548;overflow:hidden}
+#progFill{height:100%;width:0%;background:var(--accent);transition:width .25s}
+#missingNote{font-size:12px;margin-top:6px}
+#resultCard video{width:100%;border-radius:10px;background:#000}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🗣️ Avatar Narrator <small>v4</small></h1>
+  <small>Upload a photo, pick how it should be voiced, write a script — the photo "talks", with real b-roll cutting in while it narrates.</small>
+
+  <div class="card">
+    <h2>1. Provider</h2>
+    <small>Both can cost $0. If one hits a limit, switch to the other without losing anything below.</small>
+    <div class="provCard" id="provMagicHour" data-p="magichour">
+      <b>✨ Magic Hour</b>
+      <small>Real company, real API, free account (no card). Free output is watermarked. Supports AI narration (see below).</small>
+    </div>
+    <div class="provCard" id="provHuggingFace" data-p="huggingface">
+      <b>🤗 Hugging Face (community, free forever)</b>
+      <small>No signup, no key, no limit, ever — but unofficial, can be slow or go down. Own voice recording only.</small>
+    </div>
+
+    <div id="magicHourFields" class="hidden" style="margin-top:10px">
+      <input type="password" id="mhKey" placeholder="Magic Hour API key">
+      <small style="display:block;margin-top:6px">Get one free at magichour.ai → Developer Hub.</small>
+
+      <div style="margin-top:10px">
+        <small><b>Narration</b> — pick one, no default:</small>
+        <div class="modeCard" id="mhModeOwn" data-m="own">
+          <b>🎙️ My own voice recording</b>
+          <small>Upload a full recording of you reading the script.</small>
+        </div>
+        <div class="modeCard" id="mhModeClone" data-m="clone">
+          <b>🤖 AI reads my script, in my own cloned voice</b>
+          <small>Upload one short sample of your voice (10–30s is plenty) once — the AI speaks your typed script in a clone of that voice. Not a named celebrity voice; it's yours.</small>
+        </div>
+      </div>
+
+      <div id="mhOwnVoiceFields" class="hidden" style="margin-top:10px">
+        <input type="file" id="voiceFile" accept="audio/*">
+        <small style="display:block;margin-top:6px">Or paste a hosted audio URL instead:</small>
+        <input type="text" id="voiceUrl" placeholder="https://... (optional)" style="margin-top:6px">
+      </div>
+      <div id="mhCloneFields" class="hidden" style="margin-top:10px">
+        <input type="file" id="voiceSampleFile" accept="audio/*">
+        <small style="display:block;margin-top:6px">Or paste a hosted sample URL instead:</small>
+        <input type="text" id="voiceSampleUrl" placeholder="https://... (optional)" style="margin-top:6px">
+        <small id="charCountNote" style="display:block;margin-top:6px"></small>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <select id="mhResolution"><option value="480p" selected>480p (cheaper, safer on free credits)</option><option value="720p">720p</option></select>
+        <select id="mhMode">
+          <option value="realistic" selected>Realistic (best likeness, up to 300s)</option>
+          <option value="prompted">Prompted (can guide the scene, up to 60s)</option>
+        </select>
+      </div>
+      <input type="text" id="mhPrompt" placeholder="Scene prompt (only used in Prompted mode)" class="hidden" style="margin-top:6px">
+    </div>
+
+    <div id="huggingFaceFields" class="hidden" style="margin-top:10px">
+      <input type="text" id="hfSpace" placeholder="HF Space (owner/space-name)" value="Madras1/sadtalker-api">
+      <small style="display:block;margin-top:6px">Default is one working example found during research. If it's down or rejects the files, swap in another SadTalker/talking-photo Space's "owner/space-name" from huggingface.co/spaces — no new code needed.</small>
+      <input type="text" id="hfApiName" placeholder="API endpoint name (default /predict)" value="/predict" style="margin-top:6px">
+      <input type="password" id="hfToken" placeholder="Optional: free HF account token (higher queue priority)" style="margin-top:6px">
+      <input type="file" id="hfVoiceFile" accept="audio/*" style="margin-top:6px">
+      <small style="display:block;margin-top:6px">Own voice recording only here — or paste a hosted audio URL:</small>
+      <input type="text" id="hfVoiceUrl" placeholder="https://... (optional)" style="margin-top:6px">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. The photo</h2>
+    <input type="file" id="photoFile" accept="image/*">
+    <img id="photoPreview" class="preview hidden">
+    <small style="display:block;margin-top:8px">Or paste a hosted image URL instead:</small>
+    <input type="text" id="photoUrl" placeholder="https://... (optional)" style="margin-top:6px">
+  </div>
+
+  <div class="card">
+    <h2>3. Script</h2>
+    <small id="scriptHelp">Type roughly what you say in your recording, in beats separated by a blank line — this times the b-roll and captions.</small>
+    <textarea id="scriptText" placeholder="Bismillah. Today we're talking about something that changed how I see patience...
+
+For years I thought patience meant just waiting quietly...
+
+But the Qur'an shows us something deeper..."></textarea>
+    <div class="row"><button class="btn" id="parseBeatsBtn" type="button">↻ Split into beats</button></div>
+    <small style="display:block;margin-top:6px">⚠️ Finish editing the script before filling in b-roll below — re-splitting discards any b-roll already set. Timing is estimated from each beat's share of word count, not exact speech alignment.</small>
+    <div class="row">
+      <input type="password" id="pexelsKey" placeholder="Pexels API key (free — pexels.com/api) for b-roll">
+    </div>
+    <div id="beatList"></div>
+    <div class="checkrow"><input type="checkbox" id="showBeatText"><label for="showBeatText">Show each beat's text on screen while it plays (approximate timing)</label></div>
+  </div>
+
+  <div class="card">
+    <h2>Output shape</h2>
+    <select id="shape"><option value="tall" selected>Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+  </div>
+
+  <div class="row"><button class="btn gold" id="generateBtn" type="button" disabled>🗣️ Generate talking video</button></div>
+  <div id="missingNote"></div>
+
+  <div id="progWrap" class="hidden"><div id="progLabel">Starting…</div><div id="progBar"><div id="progFill"></div></div></div>
+
+  <div id="resultCard" class="card hidden">
+    <h2>✓ Ready</h2>
+    <video id="finalVideo" controls playsinline></video>
+    <div class="row"><button class="btn gold" id="downloadFinal" type="button">⬇ Download</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3600); }
+/* ===== remember keys/fields on this device ===== */
+(function(){
+  const map={ mhKey:'sf_avatar_mh_key', pexelsKey:'sf_pexels_key', hfToken:'sf_avatar_hf_token', hfSpace:'sf_avatar_hf_space', hfApiName:'sf_avatar_hf_apiname' };
+  Object.entries(map).forEach(([id,key])=>{
+    const saved=localStorage.getItem(key);
+    if(saved) $(id).value=saved;
+    $(id).addEventListener('input', ()=>localStorage.setItem(key, $(id).value));
+  });
+})();
+/* ===== provider + mode selection ===== */
+let provider=null, mhNarrationMode=null;
+function selectProvider(p){
+  provider=p;
+  $('provMagicHour').classList.toggle('on', p==='magichour');
+  $('provHuggingFace').classList.toggle('on', p==='huggingface');
+  $('magicHourFields').classList.toggle('hidden', p!=='magichour');
+  $('huggingFaceFields').classList.toggle('hidden', p!=='huggingface');
+  updateScriptHelp();
+  updateGenerateEnabled();
+}
+$('provMagicHour').onclick=()=>selectProvider('magichour');
+$('provHuggingFace').onclick=()=>selectProvider('huggingface');
+
+function selectMhMode(m){
+  mhNarrationMode=m;
+  $('mhModeOwn').classList.toggle('on', m==='own');
+  $('mhModeClone').classList.toggle('on', m==='clone');
+  $('mhOwnVoiceFields').classList.toggle('hidden', m!=='own');
+  $('mhCloneFields').classList.toggle('hidden', m!=='clone');
+  updateScriptHelp();
+  updateGenerateEnabled();
+}
+$('mhModeOwn').onclick=()=>selectMhMode('own');
+$('mhModeClone').onclick=()=>selectMhMode('clone');
+$('mhMode').addEventListener('change', ()=>{ $('mhPrompt').classList.toggle('hidden', $('mhMode').value!=='prompted'); });
+
+function updateScriptHelp(){
+  if(provider==='magichour' && mhNarrationMode==='clone'){
+    $('scriptHelp').textContent='This is what the AI will actually say, in your cloned voice — write the real script, in beats separated by a blank line.';
+  } else {
+    $('scriptHelp').textContent='Type roughly what you say in your recording, in beats separated by a blank line — this times the b-roll and captions (it is not spoken by an AI in this mode).';
+  }
+}
+
+/* ===== inputs ===== */
+let photoFile=null, voiceFile=null, voiceSampleFile=null, hfVoiceFile=null;
+$('photoFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  photoFile=f;
+  const img=$('photoPreview'); img.src=URL.createObjectURL(f); img.classList.remove('hidden');
+  updateGenerateEnabled();
+});
+$('voiceFile').addEventListener('change', e=>{ voiceFile=(e.target.files && e.target.files[0]) || null; updateGenerateEnabled(); });
+$('voiceSampleFile').addEventListener('change', e=>{ voiceSampleFile=(e.target.files && e.target.files[0]) || null; updateGenerateEnabled(); });
+$('hfVoiceFile').addEventListener('change', e=>{ hfVoiceFile=(e.target.files && e.target.files[0]) || null; updateGenerateEnabled(); });
+$('scriptText').addEventListener('input', ()=>{
+  if(provider==='magichour' && mhNarrationMode==='clone'){
+    const len=$('scriptText').value.trim().length;
+    $('charCountNote').textContent = len+'/1000 characters (Voice Cloner limit — over this gets cut off, and you will be warned plainly, not silently truncated)';
+  }
+  updateGenerateEnabled();
+});
+
+/* ===== live "what's missing" status + enable logic ===== */
+function updateGenerateEnabled(){
+  const hasPhoto = !!(photoFile || $('photoUrl').value.trim());
+  const hasScript = !!$('scriptText').value.trim();
+  const missing=[];
+  let ready=false;
+
+  if(!provider){
+    missing.push('pick a provider (Magic Hour or Hugging Face)');
+  } else if(provider==='magichour'){
+    const hasKey=!!$('mhKey').value.trim();
+    if(!hasKey) missing.push('a Magic Hour API key');
+    if(!mhNarrationMode){
+      missing.push('pick a narration mode');
+    } else if(mhNarrationMode==='own'){
+      const hasVoice = !!(voiceFile || $('voiceUrl').value.trim());
+      ready = hasKey && hasVoice;
+      if(hasKey && !hasVoice) missing.push('your voice recording (file or URL)');
+    } else if(mhNarrationMode==='clone'){
+      const hasSample = !!(voiceSampleFile || $('voiceSampleUrl').value.trim());
+      ready = hasKey && hasSample;
+      if(hasKey && !hasSample) missing.push('a voice sample (file or URL)');
+    }
+  } else if(provider==='huggingface'){
+    const hasSpace=!!$('hfSpace').value.trim();
+    const hasVoice=!!(hfVoiceFile || $('hfVoiceUrl').value.trim());
+    ready = hasSpace && hasVoice;
+    if(!hasSpace) missing.push('a Hugging Face Space name');
+    if(hasSpace && !hasVoice) missing.push('your voice recording (file or URL)');
+  }
+
+  if(!hasPhoto) missing.push('a photo');
+  if(!hasScript) missing.push('a script');
+  if(hasScript && !beats.length) missing.push('"Split into beats" — click it, or Generate will auto-split for you');
+
+  $('generateBtn').disabled = !(hasPhoto && hasScript && ready && beats.length);
+  const note=$('missingNote');
+  if(missing.length){ note.textContent='Still needed: '+missing.join(', ')+'.'; note.style.color='var(--muted)'; }
+  else { note.textContent='✓ Everything is set — ready to generate.'; note.style.color='#6fcf97'; }
+}
+['photoUrl','voiceUrl','voiceSampleUrl','hfVoiceUrl','scriptText','mhKey','hfSpace'].forEach(id=>$(id).addEventListener('input', updateGenerateEnabled));
+updateGenerateEnabled();
+
+/* ===== beats (unchanged logic, still called from splitBeats) ===== */
+let beats=[];
+function splitBeats(){
+  const raw=$('scriptText').value.replace(/\r/g,'').split(/\n\s*\n+/).map(s=>s.trim()).filter(Boolean);
+  beats=raw.map(text=>({ text, words: text.split(/\s+/).filter(Boolean).length, visualQuery:'', brollImg:null, brollURL:null, _page:0 }));
+  renderBeats();
+  updateGenerateEnabled();
+}
+$('parseBeatsBtn').onclick=splitBeats;
+
+function shapeOrientationParam(){ const s=$('shape').value; if(s==='tall') return 'portrait'; if(s==='square') return 'square'; return 'landscape'; }
+async function pexelsFindPhoto(query, page){
+  const key=$('pexelsKey').value.trim();
+  if(!key || !query) return null;
+  try{
+    const res=await fetch('https://api.pexels.com/v1/search?query='+encodeURIComponent(query)+'&per_page=1&page='+(page||1)+'&orientation='+shapeOrientationParam(),{ headers:{'Authorization':key} });
+    if(!res.ok) return null;
+    const json=await res.json().catch(()=>null);
+    if(!json || !json.photos || !json.photos.length) return null;
+    return json.photos[0];
+  }catch(err){ return null; }
+}
+function loadImageFromUrl(url){
+  return new Promise((resolve,reject)=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>resolve(img); img.onerror=reject; img.src=url; });
+}
+async function findBrollForBeat(beat){
+  const q=(beat.visualQuery||'').trim(); if(!q) return false;
+  beat._page=(beat._page||0)+1;
+  const photo=await pexelsFindPhoto(q, ((beat._page-1)%5)+1);
+  if(!photo) return false;
+  try{ const img=await loadImageFromUrl(photo.src.large); beat.brollImg=img; beat.brollURL=photo.src.tiny||photo.src.small; return true; }
+  catch(err){ return false; }
+}
+function renderBeats(){
+  const box=$('beatList'); box.innerHTML='';
+  beats.forEach((beat,i)=>{
+    const el=document.createElement('div');
+    el.className='beatBox';
+    el.innerHTML=`
+      <div class="idx">Beat ${i+1} — ${beat.words} words</div>
+      <small>${beat.text.replace(/</g,'&lt;').slice(0,140)}${beat.text.length>140?'…':''}</small>
+      <div class="row" style="margin-top:6px">
+        <input type="text" data-act="vq" placeholder="b-roll search term, e.g. sunrise over mosque" value="${(beat.visualQuery||'').replace(/"/g,'&quot;')}">
+        <button class="findbtn" data-act="find">${beat.brollImg?'🔁 Try another':'🔍 Find real photo'}</button>
+      </div>
+      <div class="row" style="align-items:center">
+        ${beat.brollURL?`<img class="thumb" src="${beat.brollURL}">`:''}
+        <input type="file" accept="image/*" data-act="upload">
+        ${beat.brollURL?`<button class="findbtn" data-act="clear">Remove</button>`:''}
+      </div>`;
+    el.querySelector('[data-act=vq]').onchange=e=>{ beat.visualQuery=e.target.value; };
+    el.querySelector('[data-act=find]').onclick=async (e)=>{
+      beat.visualQuery=el.querySelector('[data-act=vq]').value;
+      if(!$('pexelsKey').value.trim()){ toast('Add a Pexels API key first'); return; }
+      if(!(beat.visualQuery||'').trim()){ toast('Add a search term for this beat first'); return; }
+      e.target.disabled=true; e.target.textContent='Searching…';
+      const ok=await findBrollForBeat(beat);
+      if(!ok) toast('No results — try a different term');
+      renderBeats();
+    };
+    el.querySelector('[data-act=upload]').onchange=e=>{
+      const f=e.target.files && e.target.files[0]; if(!f) return;
+      const img=new Image(); const url=URL.createObjectURL(f);
+      img.onload=()=>{ beat.brollImg=img; beat.brollURL=url; renderBeats(); };
+      img.src=url;
+    };
+    const clearBtn=el.querySelector('[data-act=clear]');
+    if(clearBtn) clearBtn.onclick=()=>{ beat.brollImg=null; beat.brollURL=null; renderBeats(); };
+    box.appendChild(el);
+  });
+}
+
+/* ===== helpers ===== */
+function setProgress(label, pct){ $('progWrap').classList.remove('hidden'); $('progLabel').textContent=label; $('progFill').style.width=Math.max(0,Math.min(100,pct))+'%'; }
+function extFromFile(file){
+  const m=(file.name||'').match(/\.([a-zA-Z0-9]+)$/);
+  if(m) return m[1].toLowerCase();
+  const map={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','audio/mpeg':'mp3','audio/wav':'wav','audio/mp4':'m4a','audio/x-m4a':'m4a','audio/webm':'webm','audio/ogg':'ogg'};
+  return map[file.type]||'bin';
+}
+function getMediaDuration(fileOrUrl){
+  return new Promise((resolve,reject)=>{
+    const el=document.createElement('audio');
+    el.src = (fileOrUrl instanceof File) ? URL.createObjectURL(fileOrUrl) : fileOrUrl;
+    el.onloadedmetadata=()=>resolve(el.duration);
+    el.onerror=()=>reject(new Error('Could not read the audio file'));
+  });
+}
+async function fetchAsBlob(url){
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('Could not download the result — HTTP '+res.status);
+  return res.blob();
+}
+
+/* ===== MAGIC HOUR (verified against their official OpenAPI spec) ===== */
+function mhHeaders(key){ return { 'Authorization':'Bearer '+key, 'Content-Type':'application/json' }; }
+async function mhUploadFile(file, type, key){
+  const ext=extFromFile(file);
+  const res=await fetch('https://api.magichour.ai/v1/files/upload-urls', {
+    method:'POST', headers: mhHeaders(key),
+    body: JSON.stringify({ items:[{ type, extension: ext }] })
+  });
+  const json=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error((json.message||('Upload URL request failed — HTTP '+res.status)));
+  const item=json.items && json.items[0];
+  if(!item) throw new Error('No upload URL returned');
+  const putRes=await fetch(item.upload_url, { method:'PUT', body:file });
+  if(!putRes.ok) throw new Error('File upload failed — HTTP '+putRes.status);
+  return item.file_path;
+}
+function mhErrorMessage(json, status){
+  const code=json.code;
+  const map={
+    insufficient_credits:"Out of free credits — check your Magic Hour dashboard, or switch to the Hugging Face provider above.",
+    subscription_required:"Magic Hour says this needs a subscription — your free account may not include this specific option.",
+    plan_upgrade_required:"Magic Hour says this needs a higher plan.",
+    unauthorized:"Magic Hour rejected the API key — check it was copied correctly.",
+    unprocessable_entity:"Magic Hour rejected the request values — "+(json.message||''),
+    invalid_request:"Magic Hour rejected the request — "+(json.message||'')
+  };
+  return map[code] || json.message || ('Magic Hour request failed — HTTP '+status);
+}
+async function mhCreateJob(endpoint, payload, key){
+  const res=await fetch('https://api.magichour.ai'+endpoint, { method:'POST', headers: mhHeaders(key), body: JSON.stringify(payload) });
+  const json=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(mhErrorMessage(json, res.status));
+  return json.id;
+}
+async function mhPoll(kind, id, key, onProgress){
+  const path = kind==='video' ? '/v1/video-projects/' : '/v1/audio-projects/';
+  let tries=0;
+  while(true){
+    const res=await fetch('https://api.magichour.ai'+path+id, { headers:{ 'Authorization':'Bearer '+key } });
+    const json=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(mhErrorMessage(json, res.status));
+    if(json.status==='error') throw new Error((json.error && json.error.message) || 'Magic Hour reported an error');
+    if(json.status==='canceled') throw new Error('The job was canceled');
+    if(json.status==='complete'){
+      const d=json.downloads && json.downloads[0];
+      if(!d || !d.url) throw new Error('Marked complete but no download URL came back');
+      return d.url;
+    }
+    tries++;
+    onProgress(json.status||'queued', tries);
+    await new Promise(r=>setTimeout(r,3000));
+  }
+}
+async function generateViaMagicHour(){
+  const key=$('mhKey').value.trim();
+  const mode=$('mhMode').value;
+  const maxLen = mode==='realistic' ? 300 : 60;
+
+  let audioPath;
+  if(mhNarrationMode==='clone'){
+    const scriptJoined=beats.map(b=>b.text).join(' ');
+    if(scriptJoined.length>1000){
+      toast('Script is '+scriptJoined.length+' characters — Voice Cloner only accepts 1000. Using the first 1000 and cutting the rest.');
+    }
+    const prompt=scriptJoined.slice(0,1000);
+
+    let samplePath;
+    if(voiceSampleFile){ setProgress('Uploading voice sample…', 10); samplePath=await mhUploadFile(voiceSampleFile, 'audio', key); }
+    else samplePath=$('voiceSampleUrl').value.trim();
+
+    setProgress('Cloning your voice and generating speech…', 18);
+    const audioId=await mhCreateJob('/v1/ai-voice-cloner', { assets:{ audio_file_path: samplePath }, style:{ prompt } }, key);
+    const audioUrl=await mhPoll('audio', audioId, key, (status,tries)=>{
+      setProgress('Generating speech… ('+status+', '+(tries*3)+'s)', Math.min(45, 20+tries*2));
+    });
+    audioPath=audioUrl; /* direct URL accepted by talking-photo too */
+  } else {
+    if(voiceFile){ setProgress('Uploading voice recording…', 15); audioPath=await mhUploadFile(voiceFile, 'audio', key); }
+    else audioPath=$('voiceUrl').value.trim();
+  }
+
+  setProgress('Reading recording length…', 50);
+  /* FIXED: for "own" mode, measure duration from the ORIGINAL file/URL, never from the internal
+     Magic Hour file_path (e.g. "api-assets/id/1234.mp3") — that path is only valid inside later
+     Magic Hour API calls, not as a fetchable <audio> src, confirmed against their docs. For "clone"
+     mode, audioPath IS the finished generated-speech download URL, which is the correct thing to
+     time against. */
+  let voiceDuration;
+  if(mhNarrationMode==='clone'){
+    voiceDuration = await getMediaDuration(audioPath);
+  } else {
+    voiceDuration = await getMediaDuration(voiceFile || $('voiceUrl').value.trim());
+  }
+  const endSeconds = Math.min(voiceDuration, maxLen);
+  if(voiceDuration > maxLen) toast('Recording is longer than this mode allows ('+maxLen+'s) — only the first '+maxLen+'s will be used.');
+
+  let imagePath;
+  if(photoFile){ setProgress('Uploading photo…', 58); imagePath=await mhUploadFile(photoFile, 'image', key); }
+  else imagePath=$('photoUrl').value.trim();
+
+  const payload={
+    start_seconds:0, end_seconds: endSeconds,
+    assets:{ image_file_path: imagePath, audio_file_path: audioPath },
+    style:{ generation_mode: mode, prompt: mode==='prompted' ? ($('mhPrompt').value.trim()||undefined) : undefined },
+    resolution: $('mhResolution').value
+  };
+
+  setProgress('Submitting talking photo…', 65);
+  const id=await mhCreateJob('/v1/ai-talking-photo', payload, key);
+
+  const resultUrl=await mhPoll('video', id, key, (status,tries)=>{
+    setProgress('Magic Hour is generating… ('+status+', '+(tries*3)+'s)', Math.min(85, 67+tries*2));
+  });
+
+  setProgress('Downloading result…', 88);
+  return fetchAsBlob(resultUrl);
+}
+
+/* ===== HUGGING FACE (unchanged from v3) ===== */
+async function generateViaHuggingFace(){
+  const spaceName=$('hfSpace').value.trim();
+  const apiName=$('hfApiName').value.trim() || '/predict';
+  const token=$('hfToken').value.trim();
+
+  setProgress('Connecting to the Space…', 10);
+  const { Client, handle_file } = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
+  const app = await Client.connect(spaceName, token ? { token } : undefined);
+
+  const imageInput = photoFile ? handle_file(photoFile) : $('photoUrl').value.trim();
+  const audioInput = hfVoiceFile ? handle_file(hfVoiceFile) : $('hfVoiceUrl').value.trim();
+
+  setProgress("Waiting on the free shared queue — can take 10 seconds to a couple of minutes, longer if the Space is asleep…", 30);
+
+  const TIMEOUT_MS=180000;
+  const predictPromise = app.predict(apiName, [imageInput, audioInput]);
+  const timeoutPromise = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timed out waiting on the Hugging Face Space — it may be overloaded or asleep. Try again, or swap in a different Space name above.')), TIMEOUT_MS));
+  const result = await Promise.race([predictPromise, timeoutPromise]);
+
+  setProgress('Reading the result…', 80);
+  const data=result && result.data;
+  const first = Array.isArray(data) ? data[0] : data;
+  let videoUrl =
+    (first && typeof first==='object' && first.url) ? first.url :
+    (first && typeof first==='object' && first.video && first.video.url) ? first.video.url :
+    (typeof first==='string') ? first : null;
+  if(!videoUrl) throw new Error("Got a response but couldn't find a video URL in it — this Space's output may be shaped differently than expected. Check its \"Use via API\" page on huggingface.co, or try a different Space.");
+
+  return fetchAsBlob(videoUrl);
+}
+
+/* ===== build / compositing ===== */
+function shapeWH(){ const s=$('shape').value; if(s==='tall') return [1080,1920]; if(s==='square') return [1080,1080]; return [1920,1080]; }
+function drawCover(ctx, media, naturalW, naturalH, x,y,w,h){
+  if(!naturalW||!naturalH) return;
+  const scale=Math.max(w/naturalW, h/naturalH);
+  const sw=w/scale, sh=h/scale, sx=(naturalW-sw)/2, sy=(naturalH-sh)/2;
+  ctx.drawImage(media, sx, sy, sw, sh, x, y, w, h);
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font; const words=text.split(/\s+/); const lines=[]; let cur='';
+  for(const w of words){ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t; }
+  if(cur) lines.push(cur); return lines;
+}
+function drawBeatText(ctx, W, H, text){
+  const fs=Math.round(W*0.045);
+  const font='700 '+fs+'px system-ui, sans-serif';
+  const maxW=W*0.86;
+  const lines=wrapText(ctx, text, maxW, font).slice(0,4);
+  const lh=fs*1.3;
+  const boxH=lines.length*lh+24;
+  const boxY=H-boxH-H*0.06, boxX=W*0.07, boxW=W*0.86;
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  const r=14;
+  ctx.beginPath();
+  ctx.moveTo(boxX+r,boxY); ctx.arcTo(boxX+boxW,boxY,boxX+boxW,boxY+boxH,r);
+  ctx.arcTo(boxX+boxW,boxY+boxH,boxX,boxY+boxH,r); ctx.arcTo(boxX,boxY+boxH,boxX,boxY,r); ctx.arcTo(boxX,boxY,boxX+boxW,boxY,r);
+  ctx.closePath(); ctx.fill();
+  ctx.font=font; ctx.fillStyle='#ffffff'; ctx.textAlign='center';
+  let ty=boxY+16+fs*0.85;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, ty); ty+=lh; });
+}
+
+$('generateBtn').onclick=async ()=>{
+  if(!provider){ toast('Pick a provider first'); return; }
+  if(provider==='magichour' && !mhNarrationMode){ toast('Pick a narration mode first'); return; }
+  if(!beats.length){
+    if($('scriptText').value.trim()){
+      splitBeats();
+      toast('Split your script into beats — review b-roll below if you want, then hit Generate again.');
+      return;
+    }
+    toast('Write a script first'); return;
+  }
+
+  $('generateBtn').disabled=true;
+  $('resultCard').classList.add('hidden');
+  setProgress('Preparing…', 2);
+
+  try{
+    const avatarBlob = provider==='magichour' ? await generateViaMagicHour() : await generateViaHuggingFace();
+    const avatarURL=URL.createObjectURL(avatarBlob);
+
+    setProgress('Compositing with b-roll…', 92);
+    const finalBlob=await compositeWithBroll(avatarURL);
+
+    $('finalVideo').src=URL.createObjectURL(finalBlob);
+    $('resultCard').classList.remove('hidden');
+    setProgress('✓ Done', 100);
+    toast('✓ Video ready');
+    window._avatarFinalBlob=finalBlob;
+  }catch(err){
+    console.error(err);
+    const msg=(err && err.message) || 'something went wrong';
+    const looksLikeCors = /Failed to fetch|NetworkError/i.test(msg) || err instanceof TypeError;
+    setProgress(looksLikeCors ? "Blocked — this browser could not reach the provider's API directly (possible network/CORS restriction on their end)." : ('Failed — '+msg), 0);
+    toast('Generation failed — see note below the button');
+  }finally{
+    $('generateBtn').disabled=false;
+  }
+};
+
+async function compositeWithBroll(avatarURL){
+  const video=document.createElement('video');
+  video.src=avatarURL; video.playsInline=true; video.muted=false;
+  await new Promise((res,rej)=>{ video.onloadedmetadata=res; video.onerror=rej; });
+  const duration=video.duration;
+  if(!isFinite(duration) || duration<=0) throw new Error('Downloaded video has no readable duration — try again');
+
+  const totalWords=beats.reduce((s,b)=>s+b.words,0) || 1;
+  let cursor=0;
+  const windows=beats.map(b=>{
+    const share=b.words/totalWords;
+    const start=cursor, end=cursor+share*duration;
+    cursor=end;
+    return { beat:b, start, end };
+  });
+
+  const [W,H]=shapeWH();
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+
+  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const dest=audioCtx.createMediaStreamDestination();
+  const src=audioCtx.createMediaElementSource(video);
+  src.connect(dest);
+
+  const canvasStream=cv.captureStream(30);
+  const combined=new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  const mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  const chunks=[];
+  mr.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  const stopPromise=new Promise(resolve=>{ mr.onstop=()=>resolve(new Blob(chunks,{type:mr.mimeType})); });
+
+  const showText=$('showBeatText').checked;
+  mr.start(300);
+  video.currentTime=0;
+
+  try{
+    await video.play();
+  }catch(err){
+    try{ mr.stop(); }catch(e2){}
+    throw new Error('Could not start video playback for recording — '+(err.message||err.name||'the browser blocked it')+'. Try again, or tap the page once first.');
+  }
+
+  /* 0.35s crossfade into and out of each broll cutaway, instead of a hard cut */
+  const TRANS=0.35;
+  function drawVisual(win, alpha){
+    if(alpha<=0) return;
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    if(win && win.beat.brollImg) drawCover(ctx, win.beat.brollImg, win.beat.brollImg.naturalWidth, win.beat.brollImg.naturalHeight, 0,0,W,H);
+    else drawCover(ctx, video, video.videoWidth, video.videoHeight, 0,0,W,H);
+    ctx.restore();
+  }
+
+  let lastT=-1, lastProgressAt=performance.now();
+  await new Promise((resolve,reject)=>{
+    function step(){
+      if(video.ended || video.currentTime>=duration-0.03){ video.pause(); resolve(); return; }
+      const now=performance.now();
+      if(video.currentTime>lastT+0.01){ lastT=video.currentTime; lastProgressAt=now; }
+      else if(now-lastProgressAt>8000){
+        video.pause();
+        reject(new Error('Video playback stalled during recording — try again'));
+        return;
+      }
+      const t=video.currentTime;
+      let idx=windows.findIndex(w=>t>=w.start && t<w.end);
+      if(idx<0) idx=windows.length-1;
+      const win=windows[idx];
+
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+
+      const distToEnd = win.end - t;
+      const distToStart = t - win.start;
+      if(distToEnd < TRANS && idx < windows.length-1){
+        const progress = 1 - (distToEnd/TRANS);
+        drawVisual(win, 1-progress);
+        drawVisual(windows[idx+1], progress);
+      } else if(distToStart < TRANS && idx > 0){
+        const progress = 1 - (distToStart/TRANS);
+        drawVisual(win, 1-progress);
+        drawVisual(windows[idx-1], progress);
+      } else {
+        drawVisual(win, 1);
+      }
+
+      if(showText && win) drawBeatText(ctx, W, H, win.beat.text);
+      requestAnimationFrame(step);
+    }
+    step();
+  });
+
+  mr.stop();
+  return stopPromise;
+}
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'avatar-narrator-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+$('downloadFinal').onclick=()=>{
+  if(!window._avatarFinalBlob) return;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(window._avatarFinalBlob); a.download=fileBase()+(/mp4/i.test(window._avatarFinalBlob.type)?'.mp4':'.webm'); a.click();
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<!-- charts.html — v2 — StoryForge Pack 2 · 📊 Charts. v2: rebuilt as a full sequence instead of one static chart, since a single chart finished growing in under 2s and left nothing to actually record. New structure: optional Intro card (custom hook text) -> optional 3-2-1 countdown with a filling ring -> each chart scene (grows, holds, fades out) -> optional Outro card -> loops back to Intro for continuous preview. Multiple charts now supported in one video ("scenes") — clicking a preset or using AI-generate appends a new scene rather than overwriting, so clicking several presets in a row builds a multi-chart video (e.g. companions, then Qur'an stats) in seconds. Each scene shows an "i / n" indicator when more than one. Pressing REC always resets the animation clock to zero at that instant, so every recorded take is a clean full pass from the intro regardless of when you press it. v1: single chart, vertical ranked list (Tall/Square) or growing columns (Wide), 4 themes, 3 motion effects, ambient sound, manual no-key AI-generate flow, PNG + REC. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Charts</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:14px/1.5 system-ui;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=file]{padding:6px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.5;cursor:default}
+.step{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.step .num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .body{flex:1}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.scenehead{display:flex;gap:8px;align-items:center;margin-top:0}
+.scenehead b{flex:1}
+.scenehead .btn{flex:0 0 auto;width:auto;padding:6px 10px;font-size:13px}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>📊 Charts <small>v2</small></h1>
+  <small>Intro → countdown → one or more animated charts → outro, looping for preview</small>
+
+  <div class="card">
+    <h2>Add a chart from a preset</h2>
+    <small>Well-known, verifiable figures. Click one — or several — to add them as scenes below.</small>
+    <div class="pills" id="presetPills" style="margin-top:8px">
+      <div class="p" data-v="rakahs">Rakahs per Daily Prayer</div>
+      <div class="p" data-v="surahs">Longest Surahs by Ayah Count</div>
+      <div class="p" data-v="caliphs">Rightly-Guided Caliphs — Years</div>
+      <div class="p" data-v="sample">Compare Anything (sample)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✨ Generate a chart with any AI</h2>
+    <small>No key, no setup. Describe a topic, copy the prompt, paste it into ChatGPT, Gemini, Claude — whichever you already use — then bring the answer back here as a new scene.</small>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="body">
+        <textarea id="genTopic" style="min-height:50px" placeholder="e.g. Pillars of Islam, population by region, surah lengths"></textarea>
+        <div class="row">
+          <select id="genCount">
+            <option value="4">4 items</option>
+            <option value="5" selected>5 items</option>
+            <option value="6">6 items</option>
+            <option value="8">8 items</option>
+          </select>
+          <input id="genUnit" placeholder="Unit (optional) e.g. years">
+        </div>
+        <div class="row">
+          <button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="body"><small>Paste that into any AI chat app and send it. Copy its full reply.</small></div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <textarea id="aiPaste" style="min-height:90px" placeholder="Paste the AI reply here…"></textarea>
+        <div class="row"><button class="btn gold" id="usePasteBtn" type="button">✓ Add as a new scene</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Charts in this video</h2>
+    <small id="sceneHint">Each one plays in order, then the video ends on the outro.</small>
+    <div id="scenesContainer" style="margin-top:4px"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="addSceneBtn" type="button">+ Add another blank chart</button>
+    </div>
+    <div class="checkrow">
+      <input type="checkbox" id="sortDesc" checked>
+      <label for="sortDesc">Auto-sort each chart by value, highest first</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro</h2>
+    <input id="introText" placeholder="Intro text (leave blank to skip)" value="Did You Know?">
+    <input id="outroText" placeholder="Outro text (leave blank to skip)" style="margin-top:8px" value="Follow for More ✨">
+    <div class="checkrow">
+      <input type="checkbox" id="showCountdown" checked>
+      <label for="showCountdown">Show 3-2-1 countdown before the first chart</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="steady">Steady growth</option><option value="bounce">Bounce pop</option><option value="glow">Glowing tip</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="speed"><option value="normal" selected>Normal</option><option value="fast">Fast</option><option value="slow">Slow</option></select>
+      <select id="holdTime">
+        <option value="1800">Short hold</option>
+        <option value="2800" selected>Normal hold</option>
+        <option value="4000">Long hold</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview video</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', accentLight:'#e9cf78', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', accentLight:'#c3dcff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', accentLight:'#f3c594', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', accentLight:'#f3c3d0', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+const FADE = 300; // ms fade-in at the start of each phase
+
+/* ===== presets (hand-checked, verifiable figures, no API involved) ===== */
+const PRESETS = {
+  rakahs: { title:"Rakahs per Daily Prayer", unit:"rakahs", data:
+`Fajr: 2
+Dhuhr: 4
+Asr: 4
+Maghrib: 3
+Isha: 4` },
+  surahs: { title:"Longest Surahs by Ayah Count", unit:"ayahs", data:
+`Al-Baqarah: 286
+Ash-Shu'ara: 227
+Al-A'raf: 206
+Aal-e-Imran: 200
+An-Nisa: 176` },
+  caliphs: { title:"The Rightly-Guided Caliphs — Years in Office", unit:"years (approx.)", data:
+`Abu Bakr: 2
+Umar ibn al-Khattab: 10
+Uthman ibn Affan: 12
+Ali ibn Abi Talib: 5` },
+  sample: { title:"Compare Anything", unit:"", data:
+`Option A: 40
+Option B: 65
+Option C: 85
+Option D: 30` }
+};
+
+/* ===== scene management ===== */
+function addScene(title, unit, data){
+  const el=document.createElement('div');
+  el.className='card'; el.style.background='var(--panel2)'; el.dataset.scene='1';
+  el.innerHTML =
+    '<div class="scenehead"><b>Chart <span class="sceneNum"></span></b>'+
+    '<button class="btn" type="button" data-remove>Remove</button></div>'+
+    '<input data-title placeholder="Chart title" style="margin-top:8px" value="'+escapeAttr(title||'')+'">'+
+    '<input data-unit placeholder="Unit shown after each value (optional)" style="margin-top:8px" value="'+escapeAttr(unit||'')+'">'+
+    '<textarea data-data style="margin-top:8px;min-height:110px" placeholder="Label: value">'+escapeHtml(data||'')+'</textarea>';
+  el.querySelector('[data-remove]').onclick=()=>{ el.remove(); renumberScenes(); };
+  $('scenesContainer').appendChild(el);
+  renumberScenes();
+}
+function renumberScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  blocks.forEach((b,i)=>{
+    b.querySelector('.sceneNum').textContent=String(i+1);
+    b.querySelector('[data-remove]').style.display = blocks.length>1 ? '' : 'none';
+  });
+}
+$('presetPills').addEventListener('click', e=>{
+  const p=e.target.closest('.p'); if(!p) return;
+  const data=PRESETS[p.dataset.v]; if(!data) return;
+  addScene(data.title, data.unit, data.data);
+  toast('✓ Added as a new chart scene');
+});
+$('addSceneBtn').onclick=()=>{ addScene('', '', ''); toast('✓ Blank chart added'); };
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+/* ===== manual AI workflow: build prompt → clipboard, no API call of any kind ===== */
+function buildPrompt(){
+  const topic=$('genTopic').value.trim();
+  const count=+$('genCount').value;
+  if(!topic){ return null; }
+  return `You are preparing data for a bar-chart comparison video about: "${topic}"
+
+Rules — follow exactly:
+1. Output ONLY lines in this exact format: Label: value
+2. Provide ${count} items.
+3. "value" must be a plain number only, no units and no symbols — for example "Fajr: 2", not "Fajr: 2 rakahs".
+4. Use only well-known, widely-agreed facts and figures. If you are not confident of a precise number, use your best commonly-cited estimate rather than a guess that looks exact.
+5. Never write the literal wording of a Qur'an ayah or a hadith anywhere in a label.
+6. No intro, no explanation, no markdown code fences, no extra commentary — output only the lines themselves.`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e2){ return false; }
+  }
+}
+$('copyPromptBtn').onclick=async ()=>{
+  const prompt=buildPrompt();
+  if(!prompt){ toast('Describe a topic first'); return; }
+  const ok=await copyText(prompt);
+  toast(ok ? '✓ Copied — paste it into any AI chat' : 'Could not copy automatically — select and copy manually');
+  if(!ok){
+    $('aiPaste').value='';
+    $('aiPaste').placeholder='Copy failed — here is the prompt, select all and copy it yourself:\n\n'+prompt;
+  }
+};
+$('usePasteBtn').onclick=()=>{
+  let text=$('aiPaste').value.trim();
+  if(!text){ toast('Paste the AI reply first'); return; }
+  text=text.replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
+  const lineCount=text.split('\n').map(l=>l.trim()).filter(Boolean).length;
+  const title=$('genTopic').value.trim() || 'Generated Chart';
+  const unit=$('genUnit').value.trim();
+  addScene(title, unit, text);
+  $('aiPaste').value='';
+  toast('✓ Added as a new chart scene ('+lineCount+' line(s))');
+};
+
+function parseBarsFrom(text){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const ci=line.indexOf(':');
+    if(ci===-1) return null;
+    const label=line.slice(0,ci).trim();
+    let rest=line.slice(ci+1).trim();
+    let valuePart=rest, caption='';
+    const pi=rest.indexOf('|');
+    if(pi!==-1){ valuePart=rest.slice(0,pi).trim(); caption=rest.slice(pi+1).trim(); }
+    const value=parseFloat(valuePart.replace(/,/g,''));
+    if(!label || isNaN(value)) return null;
+    return { label, value, caption };
+  }).filter(Boolean);
+}
+function collectScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const sortOn=$('sortDesc').checked;
+  const scenes=[]; let totalSkipped=0;
+  blocks.forEach(b=>{
+    const title=b.querySelector('[data-title]').value.trim() || 'Untitled Chart';
+    const unit=b.querySelector('[data-unit]').value.trim();
+    const raw=b.querySelector('[data-data]').value;
+    const rawCount=raw.split('\n').map(l=>l.trim()).filter(Boolean).length;
+    let parsed=parseBarsFrom(raw);
+    totalSkipped += (rawCount-parsed.length);
+    if(sortOn) parsed=parsed.slice().sort((a,c)=>c.value-a.value);
+    if(parsed.length) scenes.push({title,unit,bars:parsed});
+  });
+  return {scenes, totalSkipped};
+}
+
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function fmtNum(v){
+  if(Number.isInteger(v)) return String(v);
+  return String(Math.round(v*100)/100);
+}
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function easeOutCubic(t){ t=Math.max(0,Math.min(1,t)); return 1-Math.pow(1-t,3); }
+function easeOutBack(t){ const c1=1.70158, c3=c1+1, tt=t-1; return 1+c3*Math.pow(tt,3)+c1*Math.pow(tt,2); }
+function roundRect(ctx,x,y,w,h,r){
+  if(w<=0||h<=0) return;
+  r=Math.max(0,Math.min(r, w/2, h/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function roundRectTop(ctx,x,y,w,h,r){
+  if(w<=0||h<=0) return;
+  r=Math.max(0,Math.min(r, w/2, h));
+  ctx.beginPath();
+  ctx.moveTo(x, y+h);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w, y+h);
+  ctx.closePath();
+}
+
+/* ===== ambient sound (same proven pattern as Calendar / Timeline) ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+
+/* ===== layouts: Tall/Square = vertical ranked list, Wide = classic growing columns ===== */
+const VBAR = {
+  tall:   { titleY:110, titleFs:48, startY:230, bottomPad:90, trackXpad:80, baseRowH:190, labelFs:34, valueFs:32, barH:64, barR:20 },
+  square: { titleY:90,  titleFs:36, startY:180, bottomPad:60, trackXpad:70, baseRowH:128, labelFs:26, valueFs:24, barH:46, barR:14 }
+};
+const HBAR = { titleY:100, titleFs:46, sideMargin:140, topY:220, baselineY:840, minColW:70, maxColW:220, baseGroupW:300, colR:18, labelFs:28, valueFs:34 };
+const SPEEDS={ fast:{stagger:110,grow:600}, normal:{stagger:200,grow:900}, slow:{stagger:340,grow:1400} };
+
+let cv,ctx,W,H,startTs=null,rafId,SPEEDCFG=SPEEDS.normal,TL=null;
+let mr,chunks=[],blob,pngBlob;
+
+function drawVerticalBars(elapsed, L, th, scene){
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  const titleLines=wrapText(ctx, scene.title, W*0.88, '900 '+L.titleFs+'px system-ui');
+  titleLines.forEach((l,i)=> ctx.fillText(l, W/2, L.titleY+i*(L.titleFs*1.15)));
+  const contentTop = L.startY + Math.max(0,titleLines.length-1)*(L.titleFs*1.15);
+
+  const count=scene.bars.length;
+  const available = H - contentTop - L.bottomPad;
+  const rowH = available/count;
+  const scale = Math.max(0.4, Math.min(1, rowH/L.baseRowH));
+  const maxVal = Math.max.apply(null, scene.bars.map(b=>b.value).concat([0.0001]));
+  const unit = scene.unit;
+  const motion = $('motion').value;
+
+  for(let i=0;i<count;i++){
+    const b=scene.bars[i];
+    const y = contentTop + i*rowH;
+    const labelFs=L.labelFs*scale, valueFs=L.valueFs*scale, barH=L.barH*scale, barR=L.barR*scale;
+    const trackX=L.trackXpad, trackW=W-2*L.trackXpad;
+    const labelY=y+labelFs*0.95;
+
+    ctx.textAlign='left';
+    ctx.fillStyle=th.text; ctx.font='800 '+labelFs+'px system-ui';
+    ctx.fillText(b.label, trackX, labelY);
+
+    let barTopY = labelY + labelFs*0.55;
+    if(b.caption){
+      ctx.fillStyle=th.textDim; ctx.font='500 '+(labelFs*0.72)+'px system-ui';
+      ctx.fillText(b.caption, trackX, labelY+labelFs*0.9);
+      barTopY = labelY + labelFs*1.5;
+    }
+
+    roundRect(ctx, trackX, barTopY, trackW, barH, barR);
+    ctx.fillStyle = hexAlpha(th.line, 0.55);
+    ctx.fill();
+
+    const delay=i*SPEEDCFG.stagger;
+    const rawP=(elapsed-delay)/SPEEDCFG.grow;
+    const p = motion==='bounce' ? Math.max(0,Math.min(1.15,rawP)) : Math.max(0,Math.min(1,rawP));
+    const eased = motion==='bounce' ? easeOutBack(p) : easeOutCubic(p);
+    const targetW = trackW*(b.value/maxVal);
+    const fillW = Math.max(0, Math.min(trackW, targetW*eased));
+
+    const barGrad=ctx.createLinearGradient(trackX,barTopY,trackX,barTopY+barH);
+    barGrad.addColorStop(0, th.accentLight); barGrad.addColorStop(1, th.accent);
+    roundRect(ctx, trackX, barTopY, fillW, barH, barR);
+    ctx.fillStyle=barGrad;
+    ctx.fill();
+
+    if(motion==='glow' && rawP<1 && fillW>4){
+      ctx.save();
+      ctx.shadowColor=th.accent; ctx.shadowBlur=22*scale;
+      roundRect(ctx, trackX+Math.max(0,fillW-6*scale), barTopY, Math.min(6*scale,fillW), barH, barR);
+      ctx.fillStyle='#fff'; ctx.globalAlpha=0.85; ctx.fill();
+      ctx.restore();
+    }
+
+    const valueText = unit ? fmtNum(b.value)+' '+unit : fmtNum(b.value);
+    ctx.font='800 '+valueFs+'px system-ui';
+    const vw=ctx.measureText(valueText).width;
+    const barCenterY = barTopY + barH/2 + valueFs*0.32;
+    if(trackX+fillW+14+vw <= W-8){
+      ctx.textAlign='left'; ctx.fillStyle=th.text;
+      ctx.fillText(valueText, trackX+fillW+14, barCenterY);
+    } else {
+      ctx.textAlign='right'; ctx.fillStyle=th.bg1;
+      ctx.fillText(valueText, trackX+fillW-14, barCenterY);
+    }
+  }
+}
+
+function drawColumns(elapsed, th, scene){
+  const L=HBAR, motion=$('motion').value;
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  ctx.fillText(scene.title, W/2, L.titleY);
+
+  const count=scene.bars.length;
+  const totalAvailW = W - 2*L.sideMargin;
+  const groupW = totalAvailW/count;
+  const colW = Math.max(L.minColW, Math.min(L.maxColW, groupW*0.55));
+  const scale = Math.max(0.45, Math.min(1, groupW/L.baseGroupW));
+  const maxVal = Math.max.apply(null, scene.bars.map(b=>b.value).concat([0.0001]));
+  const unit = scene.unit;
+  const baselineY=L.baselineY, topY=L.topY, maxBarH=baselineY-topY;
+
+  ctx.strokeStyle=th.line; ctx.lineWidth=4; ctx.beginPath();
+  ctx.moveTo(L.sideMargin, baselineY); ctx.lineTo(W-L.sideMargin, baselineY); ctx.stroke();
+
+  for(let i=0;i<count;i++){
+    const b=scene.bars[i];
+    const cx = L.sideMargin + groupW*i + groupW/2;
+
+    const delay=i*SPEEDCFG.stagger;
+    const rawP=(elapsed-delay)/SPEEDCFG.grow;
+    const p = motion==='bounce' ? Math.max(0,Math.min(1.15,rawP)) : Math.max(0,Math.min(1,rawP));
+    const eased = motion==='bounce' ? easeOutBack(p) : easeOutCubic(p);
+    const targetH = maxBarH*(b.value/maxVal);
+    const barH = Math.max(0, Math.min(maxBarH, targetH*eased));
+    const barX = cx-colW/2, barY = baselineY-barH;
+
+    const barGrad=ctx.createLinearGradient(0,barY,0,baselineY);
+    barGrad.addColorStop(0, th.accentLight); barGrad.addColorStop(1, th.accent);
+    roundRectTop(ctx, barX, barY, colW, barH, L.colR*scale);
+    ctx.fillStyle=barGrad; ctx.fill();
+
+    if(motion==='glow' && rawP<1 && barH>4){
+      ctx.save();
+      ctx.shadowColor=th.accent; ctx.shadowBlur=20*scale;
+      roundRectTop(ctx, barX, barY, colW, Math.min(8*scale,barH), L.colR*scale);
+      ctx.fillStyle='#fff'; ctx.globalAlpha=0.85; ctx.fill();
+      ctx.restore();
+    }
+
+    const valueText = unit ? fmtNum(b.value)+' '+unit : fmtNum(b.value);
+    ctx.textAlign='center'; ctx.fillStyle=th.text; ctx.font='800 '+(L.valueFs*scale)+'px system-ui';
+    ctx.fillText(valueText, cx, barY-14*scale);
+
+    const labelLines=wrapText(ctx, b.label, groupW-10, '700 '+(L.labelFs*scale)+'px system-ui');
+    ctx.fillStyle=th.textDim; ctx.font='700 '+(L.labelFs*scale)+'px system-ui';
+    labelLines.slice(0,2).forEach((line,li)=>{
+      ctx.fillText(line, cx, baselineY+28*scale+li*(L.labelFs*scale*1.2));
+    });
+  }
+}
+
+function drawIntro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.textAlign='center';
+  const hook=$('introText').value.trim();
+  const fs=Math.round(W*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, hook, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60, y+10); ctx.lineTo(W/2+60, y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawOutro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.textAlign='center';
+  const txt=$('outroText').value.trim();
+  const fs=Math.round(W*0.065);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, txt, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60, y+10); ctx.lineTo(W/2+60, y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdown(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save();
+  ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2, -Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+
+function buildTimeline(scenes){
+  const HOLD=+$('holdTime').value;
+  const hookText=$('introText').value.trim();
+  const outroText=$('outroText').value.trim();
+  const showCountdown=$('showCountdown').checked;
+  const introMs = hookText ? 2600 : 0;
+  const countdownMs = showCountdown ? 3000 : 0;
+  const sceneTL = scenes.map(sc=>{
+    const growMs=SPEEDCFG.stagger*Math.max(0,sc.bars.length-1)+SPEEDCFG.grow+300;
+    const total=growMs+HOLD;
+    return { title:sc.title, unit:sc.unit, bars:sc.bars, growMs, total };
+  });
+  const outroMs = outroText ? 3000 : 0;
+  const total = introMs+countdownMs+sceneTL.reduce((a,s)=>a+s.total,0)+outroMs;
+  return { introMs, countdownMs, scenes:sceneTL, outroMs, total };
+}
+function phaseAt(t){
+  let rem=t;
+  if(rem<TL.introMs) return {phase:'intro', localT:rem};
+  rem-=TL.introMs;
+  if(rem<TL.countdownMs) return {phase:'countdown', localT:rem};
+  rem-=TL.countdownMs;
+  for(let i=0;i<TL.scenes.length;i++){
+    const s=TL.scenes[i];
+    if(rem<s.total) return {phase:'chart', sceneIndex:i, localT:rem};
+    rem-=s.total;
+  }
+  return {phase:'outro', localT:rem};
+}
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  let elapsed=ts-startTs;
+  if(TL.total>0) elapsed = elapsed % TL.total;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  const ph=phaseAt(elapsed);
+  if(ph.phase==='intro'){ drawIntro(ph.localT, th); }
+  else if(ph.phase==='countdown'){ drawCountdown(ph.localT, th); }
+  else if(ph.phase==='chart'){
+    const scene=TL.scenes[ph.sceneIndex];
+    const shapeKey=$('shape').value;
+    const fadeAlpha=Math.min(1, ph.localT/FADE);
+    ctx.save(); ctx.globalAlpha=fadeAlpha;
+    if(shapeKey==='wide'){ drawColumns(ph.localT, th, scene); } else { drawVerticalBars(ph.localT, VBAR[shapeKey], th, scene); }
+    if(TL.scenes.length>1){
+      ctx.textAlign='right'; ctx.fillStyle=th.textDim; ctx.font='700 '+Math.round(W*0.022)+'px system-ui';
+      ctx.fillText((ph.sceneIndex+1)+' / '+TL.scenes.length, W-30, 46);
+    }
+    ctx.restore();
+  } else {
+    drawOutro(ph.localT, th);
+  }
+}
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const {scenes, totalSkipped} = collectScenes();
+  if(!scenes.length){ toast('Add at least one chart with valid "Label: value" lines'); return; }
+  if(totalSkipped>0){ toast(totalSkipped+' line(s) skipped across your charts — check "Label: value" format'); }
+  SPEEDCFG = SPEEDS[$('speed').value] || SPEEDS.normal;
+  TL = buildTimeline(scenes);
+  startTs=null;
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  $('player').classList.add('show');
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  startTs=null;
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'chart-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+
+/* default starter scene so the sequence is immediately usable */
+addScene(PRESETS.rakahs.title, PRESETS.rakahs.unit, PRESETS.rakahs.data);
+</script>
+</body>
+</html>

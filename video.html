@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClearFrame — AI Watermark & Logo Remover</title>
+<link rel="stylesheet" href="forge.css">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.all.min.js"></script>
+<style>
+.howto{font-size:13px;line-height:1.6;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.howto b{color:var(--text)}
+#boxList{display:flex;flex-direction:column;gap:10px}
+.boxcard{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel-2);display:flex;flex-direction:column;gap:9px;cursor:pointer}
+.boxcard.sel{border-color:var(--warn)}
+.bc-head{display:flex;justify-content:space-between;align-items:center}
+.bc-head button{padding:3px 8px}
+.row.small{font-size:12px;color:var(--muted);flex-wrap:wrap}
+.row.small>*{flex:none}
+.row.small input{width:70px}
+.shape{font-size:12px;color:var(--muted);line-height:1.4}
+.shape.ok{color:var(--ok)}
+.wrap{position:relative;display:inline-block;line-height:0}
+#video{display:block;max-width:100%;max-height:calc(100vh - 230px);border-radius:6px;background:#000}
+#preview{position:absolute;inset:0;width:100%;height:100%;border-radius:6px;pointer-events:none;display:none}
+#overlay{position:absolute;inset:0;cursor:crosshair;touch-action:none}
+.box{position:absolute;border:2px solid var(--accent);cursor:move;background-size:100% 100%;background-repeat:no-repeat}
+.box.sel{border-color:var(--warn)}
+.box.off{border-style:dashed;opacity:.45}
+.box span{position:absolute;top:-21px;left:-2px;background:var(--accent);color:#fff;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px 6px 6px 0;font-weight:700}
+.box.sel span{background:var(--warn);color:#111}
+.handle{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;background:#fff;border:3px solid var(--accent);border-radius:50%;cursor:nwse-resize}
+.controls{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.controls input[type=range]{flex:1}
+#time{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+.toggle{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text);font-size:12px}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">▶</div>ClearFrame <small>AI watermark &amp; logo remover for your own videos · free · runs on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🎬</div><strong>Drop your video here</strong><span>or click to choose · MP4, MOV, WebM</span></label>
+  <div class="file-info" id="fileInfo">No video selected</div>
+
+  <div class="howto">
+    <b>1.</b> Drag the box tightly around the watermark (or draw a new one).<br>
+    <b>2.</b> Click <b>🎯 Find exact shape</b> so only the watermark itself is rebuilt.<br>
+    <b>3.</b> Pause anywhere to check the result, then click <b>Remove watermark</b>.
+  </div>
+
+  <div><div class="label">AI eraser</div>
+    <select id="engine"><option value="migan">Fast AI (best for videos, about 30 MB)</option><option value="lama">Best-quality AI (slower, about 200 MB)</option></select>
+  </div>
+
+  <div id="boxList"></div>
+  <button id="addBoxBtn" disabled>+ Add another box</button>
+
+  <div class="stack">
+    <div class="label" style="margin:0">Invisible blending</div>
+    <label class="slider">Steady fill <input type="range" id="steady" min="0" max="90" value="60"><b id="steadyVal">60</b></label>
+    <label class="slider">Soft edge <input type="range" id="edge" min="0" max="6" value="2"><b id="edgeVal">2px</b></label>
+    <label class="check"><input type="checkbox" id="grain" checked> Match the video's natural grain</label>
+  </div>
+
+  <div><div class="label">Output quality</div>
+    <select id="quality"><option value="high">High (recommended)</option><option value="very-high">Maximum (bigger file)</option><option value="medium">Smaller file</option></select>
+  </div>
+  <label class="check hidden" id="diskWrap"><input type="checkbox" id="toDisk"> Save straight to disk (best for long videos)</label>
+
+  <button class="primary big" id="runBtn" disabled>Remove watermark</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="progressBox"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download clean video</button><video id="resultVideo" controls playsinline></video></div>
+</aside>
+<section class="out">
+  <div class="out-head">
+    <span id="hint">Your video appears here</span>
+    <span style="display:flex;gap:10px;align-items:center"><button class="mini hidden" id="holdBtn">Hold to see original</button><label class="toggle"><input type="checkbox" id="showResult" checked> Show result</label></span>
+  </div>
+  <div class="stage">
+    <div class="empty" id="empty">🎬<br>Open a video to start</div>
+    <div class="wrap hidden" id="wrap"><video id="video" playsinline preload="auto"></video><canvas id="preview"></canvas><div id="overlay"></div></div>
+  </div>
+  <div class="controls hidden" id="controls"><button id="playBtn">▶</button><input type="range" id="seek" min="0" max="1" step="0.01" value="0"><span id="time">0:00 / 0:00</span></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import * as Bridge from './forge-bridge.js';
+Bridge.dock('video');
+const $=id=>document.getElementById(id);
+const video=$('video'), preview=$('preview'), overlay=$('overlay'), ort=window.ort;
+const pctx=preview.getContext('2d',{willReadFrequently:true});
+let MBP=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+if(ort) ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+const ENGINES={
+  migan:{ file:'migan_pipeline_v2.onnx', label:'fast AI eraser (about 30 MB)', urls:['https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx','https://huggingface.co/edgetools/migan/resolve/main/migan_pipeline_v2.onnx'] },
+  lama:{ file:'lama_fp32.onnx', label:'best-quality AI eraser (about 200 MB)', urls:['https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx','https://huggingface.co/edgetools/lama/resolve/main/lama_fp32.onnx'] }
+};
+let file=null, url=null, boxes=[], selId=null, nextId=1, shapeSeq=0, busy=false, conv=null, cancelled=false, detecting=false, holding=false;
+let resultBlob=null, resultUrl=null, wakeLock=null, loadToken=0, drag=null;
+let sess=null, sessKey='', sessEP='', pvTimer=0, pvToken=0;
+const pvCache=new Map();
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3000); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtSize(b){ return b>1073741824?(b/1073741824).toFixed(2)+' GB':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtClock(s){ if(!isFinite(s)) return '0:00'; s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+function fmtTime(s){ s=Math.round(s); if(s<60) return s+'s'; const m=Math.floor(s/60); return m<60 ? m+'m '+(s%60)+'s' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+const outName=()=>(file ? file.name.replace(/\.[^.]+$/,'') : 'video')+'-clean.mp4';
+const getBox=id=>boxes.find(b=>b.id===id);
+const isActive=(b,t)=>t>=(b.from||0)-0.001 && (b.to==null || t<=b.to+0.001);
+const lum=(d,i)=>(d[i*4]*2+d[i*4+1]*5+d[i*4+2])/8;
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+if(!('VideoEncoder' in window)) showNote('This browser cannot process video. Please open this page in Google Chrome or Microsoft Edge on a computer.');
+const settings=()=>({ engine:$('engine').value, steady:+$('steady').value/100, edge:+$('edge').value, grain:$('grain').checked });
+
+/* ---------- classic methods (kept as options) ---------- */
+function boxBlur(img,r,passes){
+  const w=img.width, h=img.height, d=img.data; r=Math.max(1,Math.min(r,Math.floor(Math.max(w,h)/2)));
+  const tmp=new Uint8ClampedArray(d.length), div=2*r+1;
+  for(let p=0;p<passes;p++){
+    for(let y=0;y<h;y++){ const row=y*w*4; for(let c=0;c<3;c++){ let s=0; for(let k=-r;k<=r;k++) s+=d[row+clamp(k,0,w-1)*4+c]; for(let x=0;x<w;x++){ tmp[row+x*4+c]=s/div; s+=d[row+Math.min(w-1,x+r+1)*4+c]-d[row+Math.max(0,x-r)*4+c]; } } }
+    for(let x=0;x<w;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-r;k<=r;k++) s+=tmp[(clamp(k,0,h-1)*w+x)*4+c]; for(let y=0;y<h;y++){ d[(y*w+x)*4+c]=s/div; s+=tmp[(Math.min(h-1,y+r+1)*w+x)*4+c]-tmp[(Math.max(0,y-r)*w+x)*4+c]; } } }
+  }
+  for(let i=3;i<d.length;i+=4) d[i]=255;
+}
+function smartFill(img,rx,ry,w,h){
+  const d=img.data, IW=img.width, IH=img.height;
+  const gl=Math.min(2,rx), gr=Math.min(2,IW-(rx+w)), gt=Math.min(2,ry), gb=Math.min(2,IH-(ry+h));
+  if(!(gl>0||gr>0||gt>0||gb>0)) return;
+  const lx=rx-gl, rX=rx+w-1+gr, ty=ry-gt, by=ry+h-1+gb, out=new Uint8ClampedArray(w*h*4);
+  for(let j=0;j<h;j++){ const Y=ry+j; for(let i=0;i<w;i++){ const X=rx+i; let s0=0,s1=0,s2=0,ws=0,k,wt;
+    if(gl>0){ k=(Y*IW+lx)*4; wt=1/(i+gl); s0+=d[k]*wt; s1+=d[k+1]*wt; s2+=d[k+2]*wt; ws+=wt; }
+    if(gr>0){ k=(Y*IW+rX)*4; wt=1/(w-i-1+gr); s0+=d[k]*wt; s1+=d[k+1]*wt; s2+=d[k+2]*wt; ws+=wt; }
+    if(gt>0){ k=(ty*IW+X)*4; wt=1/(j+gt); s0+=d[k]*wt; s1+=d[k+1]*wt; s2+=d[k+2]*wt; ws+=wt; }
+    if(gb>0){ k=(by*IW+X)*4; wt=1/(h-j-1+gb); s0+=d[k]*wt; s1+=d[k+1]*wt; s2+=d[k+2]*wt; ws+=wt; }
+    const o=(j*w+i)*4; out[o]=s0/ws; out[o+1]=s1/ws; out[o+2]=s2/ws; out[o+3]=255; } }
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const o=(j*w+i)*4, k=((ry+j)*IW+rx+i)*4; d[k]=out[o]; d[k+1]=out[o+1]; d[k+2]=out[o+2]; d[k+3]=255; }
+}
+function pixelate(img,rx,ry,w,h,bs){
+  const d=img.data, IW=img.width;
+  for(let by=0;by<h;by+=bs) for(let bx=0;bx<w;bx+=bs){
+    const bw=Math.min(bs,w-bx), bh=Math.min(bs,h-by), n=bw*bh; let r=0,g=0,b=0;
+    for(let j=0;j<bh;j++) for(let i=0;i<bw;i++){ const k=((ry+by+j)*IW+rx+bx+i)*4; r+=d[k]; g+=d[k+1]; b+=d[k+2]; }
+    r/=n; g/=n; b/=n;
+    for(let j=0;j<bh;j++) for(let i=0;i<bw;i++){ const k=((ry+by+j)*IW+rx+bx+i)*4; d[k]=r; d[k+1]=g; d[k+2]=b; d[k+3]=255; }
+  }
+}
+function removeRegion(ctx,W,H,x,y,w,h,mode,strength){
+  const size=Math.min(w,h), radius=Math.max(2,Math.round(strength/10*size*0.5)), m=mode==='blur'?radius:3;
+  const sx=Math.max(0,x-m), sy=Math.max(0,y-m), ex=Math.min(W,x+w+m), ey=Math.min(H,y+h+m);
+  const img=ctx.getImageData(sx,sy,ex-sx,ey-sy), rx=x-sx, ry=y-sy;
+  if(mode==='fill'){ smartFill(img,rx,ry,w,h); boxBlur(img,Math.max(1,Math.round(size*0.02*strength)),2); }
+  else if(mode==='blur') boxBlur(img,radius,3);
+  else pixelate(img,rx,ry,w,h,Math.max(4,Math.round(size/(13-strength))));
+  ctx.putImageData(img,sx,sy,rx,ry,w,h);
+}
+
+/* ---------- AI models ---------- */
+async function fetchModel(e,onProg){
+  const urls=['models/'+e.file,...e.urls];
+  let c=null; try{ c=await caches.open('forge-models-v1'); }catch{}
+  for(const u of urls){
+    try{
+      if(c){ const hit=await c.match(u); if(hit) return new Uint8Array(await hit.arrayBuffer()); }
+      const res=await fetch(u);
+      if(!res.ok || /text\/html/.test(res.headers.get('content-type')||'')) continue;
+      const total=+res.headers.get('content-length')||0, reader=res.body.getReader(), parts=[]; let got=0;
+      for(;;){ const { done, value }=await reader.read(); if(done) break; parts.push(value); got+=value.length; if(total) onProg(got/total); }
+      const blob=new Blob(parts); if(blob.size<100000) continue;
+      if(c){ try{ await c.put(u,new Response(blob)); }catch{} }
+      return new Uint8Array(await blob.arrayBuffer());
+    }catch{}
+  }
+  throw new Error('the AI eraser could not be downloaded. Check your internet connection');
+}
+async function getSession(key,forceWasm){
+  if(!ort) throw new Error('the AI engine did not load. Check your internet and refresh the page');
+  if(sess && sessKey===key && !(forceWasm && sessEP!=='wasm')) return sess;
+  const e=ENGINES[key];
+  const bytes=await fetchModel(e,p=>setP(p,'Downloading the '+e.label+' (first time only)… '+Math.round(p*100)+'%'));
+  setP(0,'Starting the AI eraser…');
+  if(sess){ try{ await sess.release(); }catch{} sess=null; }
+  const eps=(!forceWasm && 'gpu' in navigator) ? ['webgpu','wasm'] : ['wasm'];
+  let err=null;
+  for(const ep of eps){ try{ sess=await ort.InferenceSession.create(bytes,{ executionProviders:[ep], graphOptimizationLevel:'all' }); sessEP=ep; break; }catch(er){ err=er; } }
+  if(!sess) throw err || new Error('the AI eraser could not start');
+  sessKey=key; return sess;
+}
+
+/* ---------- mask geometry (computed once per box, then reused every frame) ---------- */
+function boxPx(b,W,H){
+  const x=clamp(Math.floor(b.x*W),0,W), y=clamp(Math.floor(b.y*H),0,H);
+  return { x, y, w:clamp(Math.ceil((b.x+b.w)*W),0,W)-x, h:clamp(Math.ceil((b.y+b.h)*H),0,H)-y };
+}
+function distT(seed,w,h){
+  const d=new Float32Array(w*h);
+  for(let i=0;i<d.length;i++) d[i]=seed[i]?0:1e9;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=y*w+x; let v=d[i]; if(!v) continue;
+    if(x>0) v=Math.min(v,d[i-1]+1);
+    if(y>0){ v=Math.min(v,d[i-w]+1); if(x>0) v=Math.min(v,d[i-w-1]+1.414); if(x<w-1) v=Math.min(v,d[i-w+1]+1.414); }
+    d[i]=v; }
+  for(let y=h-1;y>=0;y--) for(let x=w-1;x>=0;x--){ const i=y*w+x; let v=d[i]; if(!v) continue;
+    if(x<w-1) v=Math.min(v,d[i+1]+1);
+    if(y<h-1){ v=Math.min(v,d[i+w]+1); if(x<w-1) v=Math.min(v,d[i+w+1]+1.414); if(x>0) v=Math.min(v,d[i+w-1]+1.414); }
+    d[i]=v; }
+  return d;
+}
+function prep(b,W,H,cache,S){
+  const r=boxPx(b,W,H), G=b.grow, E=S.edge;
+  const key=[W,H,r.x,r.y,r.w,r.h,G,E,b.shapeId||0].join(',');
+  const old=cache.get('p'+b.id); if(old && old.key===key) return old;
+  const side=Math.round(Math.max(r.w,r.h)*2.4+2*(G+E)), cw=Math.min(W,Math.max(96,side)), ch=Math.min(H,Math.max(96,side));
+  const cx=clamp(Math.round(r.x+r.w/2-cw/2),0,W-cw), cy=clamp(Math.round(r.y+r.h/2-ch/2),0,H-ch);
+  const n=cw*ch, core=new Uint8Array(n), s=b.shape;
+  for(let y=r.y;y<r.y+r.h;y++) for(let x=r.x;x<r.x+r.w;x++){
+    let on=1;
+    if(s){ const sx=Math.floor(x*s.W/W)-s.rect.x, sy=Math.floor(y*s.H/H)-s.rect.y; on=(sx>=0 && sy>=0 && sx<s.rect.w && sy<s.rect.h) ? s.mask[sy*s.rect.w+sx] : 0; }
+    if(on) core[(y-cy)*cw+(x-cx)]=1;
+  }
+  const d=distT(core,cw,ch), hole=new Uint8Array(n), idx=[], alpha=[], ring=[];
+  for(let i=0;i<n;i++){
+    const v=d[i];
+    if(v<=G+E){ hole[i]=1; idx.push(i); alpha.push(v<=G ? 1 : 1-(v-G)/(E+1)); }
+    else if(v<=G+E+8 && (i&1)===0) ring.push(i);
+  }
+  const P={ key, cx, cy, cw, ch, hole, idx:Int32Array.from(idx), alpha:Float32Array.from(alpha), ring:Int32Array.from(ring) };
+  cache.set('p'+b.id,P);
+  return P;
+}
+
+/* ---------- AI inpainting ---------- */
+async function inpaintMigan(px,w,h,hole){
+  const n=w*h, img=new Uint8Array(3*n), m=new Uint8Array(n);
+  for(let i=0;i<n;i++){ img[i]=px[i*4]; img[n+i]=px[i*4+1]; img[2*n+i]=px[i*4+2]; m[i]=hole[i]?0:255; }
+  const feeds={};
+  for(const name of sess.inputNames) feeds[name]=/mask/i.test(name) ? new ort.Tensor('uint8',m,[1,1,h,w]) : new ort.Tensor('uint8',img,[1,3,h,w]);
+  const out=await sess.run(feeds), t=out[sess.outputNames[0]], d=t.data, res=new Uint8ClampedArray(n*4);
+  for(let i=0;i<n;i++){ res[i*4]=d[i]; res[i*4+1]=d[n+i]; res[i*4+2]=d[2*n+i]; res[i*4+3]=255; }
+  if(t.dispose) t.dispose();
+  return res;
+}
+async function inpaintLama(imgData,P){
+  const N=512, pl=N*N;
+  const src=new OffscreenCanvas(P.cw,P.ch); src.getContext('2d').putImageData(imgData,0,0);
+  const sc=new OffscreenCanvas(N,N), sg=sc.getContext('2d',{willReadFrequently:true}); sg.imageSmoothingQuality='high'; sg.drawImage(src,0,0,N,N);
+  const sd=sg.getImageData(0,0,N,N).data;
+  const hc=new OffscreenCanvas(P.cw,P.ch), hg=hc.getContext('2d'), hi=hg.createImageData(P.cw,P.ch);
+  for(let i=0;i<P.hole.length;i++) if(P.hole[i]) hi.data[i*4+3]=255;
+  hg.putImageData(hi,0,0);
+  const mc=new OffscreenCanvas(N,N), mg=mc.getContext('2d',{willReadFrequently:true}); mg.drawImage(hc,0,0,N,N);
+  const md=mg.getImageData(0,0,N,N).data, im=new Float32Array(3*pl), mk=new Float32Array(pl);
+  for(let i=0;i<pl;i++){ const h=md[i*4+3]>0?1:0; mk[i]=h; if(!h){ im[i]=sd[i*4]/255; im[pl+i]=sd[i*4+1]/255; im[2*pl+i]=sd[i*4+2]/255; } }
+  const feeds={};
+  for(const name of sess.inputNames) feeds[name]=/mask/i.test(name) ? new ort.Tensor('float32',mk,[1,1,N,N]) : new ort.Tensor('float32',im,[1,3,N,N]);
+  const out=await sess.run(feeds), t=out[sess.outputNames[0]], d=t.data;
+  let mx=0; for(let i=0;i<d.length;i+=997) mx=Math.max(mx,d[i]);
+  const k=mx<=1.5 ? 255 : 1, oi=new ImageData(N,N);
+  for(let i=0;i<pl;i++){ oi.data[i*4]=d[i]*k; oi.data[i*4+1]=d[pl+i]*k; oi.data[i*4+2]=d[2*pl+i]*k; oi.data[i*4+3]=255; }
+  if(t.dispose) t.dispose();
+  const oc=new OffscreenCanvas(N,N); oc.getContext('2d').putImageData(oi,0,0);
+  const bc=new OffscreenCanvas(P.cw,P.ch), bg=bc.getContext('2d',{willReadFrequently:true}); bg.imageSmoothingQuality='high'; bg.drawImage(oc,0,0,P.cw,P.ch);
+  return bg.getImageData(0,0,P.cw,P.ch).data;
+}
+async function inpaint(img,P,S){
+  const run=()=>S.engine==='lama' ? inpaintLama(img,P) : inpaintMigan(img.data,P.cw,P.ch,P.hole);
+  try{ return await run(); }
+  catch(e){
+    if(cancelled || sessEP!=='webgpu') throw e;
+    console.warn('Graphics card failed, switching to processor',e);
+    await getSession(S.engine,true); return await run();
+  }
+}
+
+/* ---------- invisible blending: soft edge + steady fill + matched grain ---------- */
+function blendInto(px,fill,P,state,b,S){
+  const key='t'+b.id, st=state.get(key), R=P.ring, ringNow=new Float32Array(R.length);
+  for(let k=0;k<R.length;k++) ringNow[k]=lum(px,R[k]);
+  let a=0;
+  if(st && S.steady>0 && st.ring.length===R.length){
+    let s=0; for(let k=0;k<R.length;k++) s+=Math.abs(ringNow[k]-st.ring[k]);
+    a=S.steady*clamp(1-(s/Math.max(1,R.length))/12,0,1);   // camera still → steady, camera moving → follow the video
+  }
+  let sigma=0;
+  if(S.grain && R.length>40){
+    const diffs=[];
+    for(let k=0;k<R.length;k+=2){ const i=R[k]; if(i%P.cw<P.cw-1) diffs.push(Math.abs(lum(px,i)-lum(px,i+1))); }
+    diffs.sort((p,q)=>p-q);
+    sigma=Math.min(10,(diffs[diffs.length>>1]||0)/1.35)*0.8;
+  }
+  const I=P.idx, A=P.alpha, prev=new Float32Array(I.length*3), old=st && st.prev.length===prev.length ? st.prev : null;
+  for(let k=0;k<I.length;k++){
+    const p=I[k]*4, al=A[k], nz=sigma ? (Math.random()+Math.random()+Math.random()-1.5)*2*sigma*al : 0;
+    for(let c=0;c<3;c++){
+      let v=fill[p+c];
+      if(old && a>0) v=v*(1-a)+old[k*3+c]*a;
+      prev[k*3+c]=v;
+      px[p+c]=px[p+c]*(1-al)+v*al+nz;
+    }
+  }
+  state.set(key,{ prev, ring:ringNow });
+}
+async function processFrame(ctx,W,H,t,list,state,S){
+  for(const b of list){
+    if(!isActive(b,t)){ state.delete('t'+b.id); continue; }
+    const r=boxPx(b,W,H); if(r.w<2 || r.h<2) continue;
+    if(b.mode!=='ai'){ removeRegion(ctx,W,H,r.x,r.y,r.w,r.h,b.mode,b.strength); continue; }
+    const P=prep(b,W,H,state,S);
+    const img=ctx.getImageData(P.cx,P.cy,P.cw,P.ch);
+    const fill=await inpaint(img,P,S);
+    blendInto(img.data,fill,P,state,b,S);
+    ctx.putImageData(img,P.cx,P.cy);
+  }
+}
+
+/* ---------- loading a video ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+function loadFile(f){
+  if(!f || busy) return;
+  if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name)) return toast('Please choose a video file');
+  file=f; loadToken++; pvCache.clear();
+  if(url) URL.revokeObjectURL(url); url=URL.createObjectURL(f);
+  boxes=[]; selId=null; ['note','doneBox','progressBox'].forEach(hide);
+  $('fileInfo').textContent='Opening '+f.name+'…'; video.src=url; loadMB().catch(()=>{});
+  const big=f.size>700*1048576 && 'showSaveFilePicker' in window;
+  $('diskWrap').classList.toggle('hidden',!big); $('toDisk').checked=big;
+}
+video.addEventListener('loadedmetadata',()=>{
+  hide('empty'); show('wrap'); show('controls'); show('holdBtn');
+  $('seek').max=video.duration||1;
+  $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+video.videoWidth+'×'+video.videoHeight+' · '+fmtClock(video.duration);
+  $('hint').textContent='Drag on the video to draw a box · drag a box to move it · drag the white dot to resize';
+  $('addBoxBtn').disabled=false;
+  addBox(0.76,0.86,0.21,0.1);   // logos often sit in a corner; move it to yours
+  const tk=loadToken;
+  if('requestVideoFrameCallback' in HTMLVideoElement.prototype){
+    const loop=()=>{ if(tk!==loadToken) return; if(!video.paused) renderPreview(); updateActive(); video.requestVideoFrameCallback(loop); };
+    video.requestVideoFrameCallback(loop);
+  }
+});
+video.addEventListener('loadeddata',renderPreview);
+video.addEventListener('seeked',()=>{ if(!detecting){ renderPreview(); updateActive(); } });
+video.addEventListener('pause',renderPreview);
+video.addEventListener('timeupdate',()=>{ $('seek').value=video.currentTime; $('time').textContent=fmtClock(video.currentTime)+' / '+fmtClock(video.duration); });
+video.addEventListener('error',()=>{ if(file){ showNote('Your browser cannot open this video. Convert it to MP4 first, or use Chrome or Edge.'); $('fileInfo').textContent=file.name; } });
+video.addEventListener('play',()=>{ $('playBtn').textContent='⏸'; renderPreview(); });
+video.addEventListener('pause',()=>$('playBtn').textContent='▶');
+$('playBtn').onclick=()=>video.paused ? video.play() : video.pause();
+$('seek').addEventListener('input',()=>{ video.currentTime=+$('seek').value; });
+
+/* ---------- preview ---------- */
+function renderPreview(){
+  const on=$('showResult').checked && !holding && file && video.videoWidth && !detecting;
+  if(!on){ preview.style.display='none'; return; }
+  const W=video.videoWidth, H=video.videoHeight, t=video.currentTime;
+  if(preview.width!==W || preview.height!==H){ preview.width=W; preview.height=H; }
+  if(boxes.some(b=>b.mode==='ai' && isActive(b,t))){
+    preview.style.display='none'; pvToken++;
+    if(!video.paused){ $('hint').textContent='▶ Playing the original. Pause anywhere to see the AI result.'; return; }
+    clearTimeout(pvTimer); pvTimer=setTimeout(aiPreview,250);
+    return;
+  }
+  try{
+    pctx.drawImage(video,0,0,W,H);
+    for(const b of boxes){ if(!isActive(b,t)) continue; const r=boxPx(b,W,H); if(r.w>=2 && r.h>=2) removeRegion(pctx,W,H,r.x,r.y,r.w,r.h,b.mode,b.strength); }
+    preview.style.display='block';
+  }catch{}
+}
+async function aiPreview(){
+  if(busy || detecting || !video.paused || !file) return;
+  const tok=++pvToken, W=video.videoWidth, H=video.videoHeight, S=settings();
+  try{
+    if(!sess || sessKey!==S.engine){ show('progressBox'); await getSession(S.engine); hide('progressBox'); if(tok!==pvToken) return; }
+    $('hint').textContent='✨ Rebuilding the area with AI…';
+    const c=new OffscreenCanvas(W,H), g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(video,0,0,W,H);
+    for(const k of [...pvCache.keys()]) if(k[0]==='t') pvCache.delete(k);
+    await processFrame(g,W,H,video.currentTime,boxes,pvCache,S);
+    if(tok!==pvToken || !video.paused) return;
+    pctx.drawImage(c,0,0); preview.style.display='block';
+    $('hint').textContent='This is the result. Hold "Hold to see original" to compare. Play to check other moments.';
+  }catch(e){ hide('progressBox'); if(tok===pvToken) showNote('Preview failed: '+(e.message||e)+'.'); }
+}
+$('showResult').onchange=renderPreview;
+const hb=$('holdBtn');
+hb.addEventListener('pointerdown',()=>{ holding=true; preview.style.display='none'; });
+['pointerup','pointerleave','pointercancel'].forEach(ev=>hb.addEventListener(ev,()=>{ if(holding){ holding=false; renderPreview(); } }));
+$('engine').onchange=()=>{ pvCache.clear(); renderPreview(); };
+$('steady').oninput=()=>{ $('steadyVal').textContent=$('steady').value; };
+$('edge').oninput=()=>{ $('edgeVal').textContent=$('edge').value+'px'; renderPreview(); };
+$('grain').onchange=renderPreview;
+
+/* ---------- boxes ---------- */
+function newBox(x,y,w,h){ return { id:nextId++, x, y, w, h, mode:'ai', strength:5, grow:3, from:0, to:null, shape:null, shapeId:0, shapeURL:'' }; }
+function addBox(x,y,w,h){ const b=newBox(x,y,w,h); boxes.push(b); selId=b.id; drawBoxes(); renderList(); renderPreview(); return b; }
+$('addBoxBtn').onclick=()=>addBox(0.4,0.4,0.2,0.1);
+function clearShape(b){ if(b.shape){ b.shape=null; b.shapeId=0; b.shapeURL=''; } }
+function drawBoxes(){
+  const t=video.currentTime||0;
+  overlay.innerHTML=boxes.map((b,i)=>'<div class="box'+(b.id===selId?' sel':'')+(isActive(b,t)?'':' off')+'" data-id="'+b.id+'" style="left:'+(b.x*100)+'%;top:'+(b.y*100)+'%;width:'+(b.w*100)+'%;height:'+(b.h*100)+'%'+(b.shapeURL?';background-image:url('+b.shapeURL+')':'')+'"><span>'+(i+1)+'</span><div class="handle"></div></div>').join('');
+}
+function updateActive(){ const t=video.currentTime||0; overlay.querySelectorAll('.box').forEach(el=>{ const b=getBox(+el.dataset.id); if(b) el.classList.toggle('off',!isActive(b,t)); }); }
+function pt(e){ const r=overlay.getBoundingClientRect(); return { x:clamp((e.clientX-r.left)/r.width,0,1), y:clamp((e.clientY-r.top)/r.height,0,1) }; }
+overlay.addEventListener('pointerdown',e=>{
+  if(!file || busy || detecting) return;
+  const p=pt(e), boxEl=e.target.closest('.box'), handle=e.target.closest('.handle');
+  if(boxEl){ const b=getBox(+boxEl.dataset.id); selId=b.id; drag={ type:handle?'resize':'move', b, sx:p.x, sy:p.y, o:{ x:b.x, y:b.y, w:b.w, h:b.h } }; }
+  else{ const b=newBox(p.x,p.y,0,0); boxes.push(b); selId=b.id; drag={ type:'create', b, sx:p.x, sy:p.y }; }
+  overlay.setPointerCapture(e.pointerId); e.preventDefault(); drawBoxes(); renderList();
+});
+overlay.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const p=pt(e), b=drag.b;
+  if(drag.type==='create'){ b.x=Math.min(drag.sx,p.x); b.y=Math.min(drag.sy,p.y); b.w=Math.abs(p.x-drag.sx); b.h=Math.abs(p.y-drag.sy); }
+  else if(drag.type==='move'){ b.x=clamp(drag.o.x+p.x-drag.sx,0,1-b.w); b.y=clamp(drag.o.y+p.y-drag.sy,0,1-b.h); }
+  else{ b.w=clamp(drag.o.w+p.x-drag.sx,0.01,1-b.x); b.h=clamp(drag.o.h+p.y-drag.sy,0.01,1-b.y); }
+  clearShape(b); drawBoxes(); preview.style.display='none';
+});
+function endDrag(){
+  if(!drag) return;
+  if(drag.type==='create' && (drag.b.w<0.01 || drag.b.h<0.01)){ boxes=boxes.filter(x=>x!==drag.b); selId=boxes.length ? boxes[boxes.length-1].id : null; }
+  drag=null; drawBoxes(); renderList(); renderPreview();
+}
+overlay.addEventListener('pointerup',endDrag);
+overlay.addEventListener('pointercancel',endDrag);
+document.addEventListener('keydown',e=>{
+  if(busy || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if((e.key==='Delete' || e.key==='Backspace') && selId){ boxes=boxes.filter(b=>b.id!==selId); selId=null; drawBoxes(); renderList(); renderPreview(); }
+  if(e.key===' ' && file){ e.preventDefault(); video.paused ? video.play() : video.pause(); }
+});
+
+/* ---------- box panel ---------- */
+function renderList(){
+  $('boxList').innerHTML=boxes.map((b,i)=>{
+    const ai=b.mode==='ai';
+    return '<div class="boxcard'+(b.id===selId?' sel':'')+'" data-id="'+b.id+'">'
+      +'<div class="bc-head"><b>Box '+(i+1)+'</b><button class="del" title="Delete box">✕</button></div>'
+      +'<select class="f-mode"><option value="ai"'+(ai?' selected':'')+'>✨ AI erase (no blur, no trace)</option><option value="fill"'+(b.mode==='fill'?' selected':'')+'>Smart fill (fast, soft)</option><option value="blur"'+(b.mode==='blur'?' selected':'')+'>Blur</option><option value="pixel"'+(b.mode==='pixel'?' selected':'')+'>Pixelate</option></select>'
+      +(ai
+        ? '<button class="mini f-detect">🎯 Find exact shape</button><div class="shape'+(b.shape?' ok':'')+'">'+(b.shape?'✓ Exact watermark shape found (red). Only those pixels are rebuilt.':'Erasing the whole box. Click "Find exact shape" for a cleaner result.')+'</div>'
+          +'<label class="slider">Cover edges <input type="range" class="f-grow" min="0" max="12" value="'+b.grow+'"></label>'
+        : '<label class="slider">Strength <input type="range" class="f-str" min="1" max="10" value="'+b.strength+'"></label>')
+      +'<div class="row small">From <input type="number" class="f-from" min="0" step="0.1" value="'+(b.from||0)+'"> to <input type="number" class="f-to" min="0" step="0.1" placeholder="end" value="'+(b.to==null?'':b.to)+'"> sec</div>'
+      +'<div class="row"><button class="mini f-setfrom">Start here</button><button class="mini f-setto">End here</button><button class="mini f-all">Whole video</button></div>'
+      +'</div>';
+  }).join('');
+  $('runBtn').disabled=!file || !boxes.length || busy;
+}
+function onBoxInput(e){
+  const card=e.target.closest('.boxcard'); if(!card) return;
+  const b=getBox(+card.dataset.id); if(!b) return;
+  const c=e.target.classList;
+  if(c.contains('f-mode')){ b.mode=e.target.value; renderList(); }
+  if(c.contains('f-str')) b.strength=+e.target.value;
+  if(c.contains('f-grow')) b.grow=+e.target.value;
+  if(c.contains('f-from')) b.from=Math.max(0,parseFloat(e.target.value)||0);
+  if(c.contains('f-to')){ const v=parseFloat(e.target.value); b.to=isNaN(v)?null:v; }
+  updateActive(); renderPreview();
+}
+$('boxList').addEventListener('change',onBoxInput);
+$('boxList').addEventListener('input',e=>{ if(e.target.type==='range' || e.target.type==='number') onBoxInput(e); });
+$('boxList').addEventListener('click',e=>{
+  const card=e.target.closest('.boxcard'); if(!card || busy || detecting) return;
+  const b=getBox(+card.dataset.id); if(!b) return;
+  const c=e.target.classList;
+  if(c.contains('del')){ boxes=boxes.filter(x=>x!==b); if(selId===b.id) selId=null; }
+  else if(c.contains('f-detect')){ detectShape(b); return; }
+  else if(c.contains('f-setfrom')) b.from=Math.round(video.currentTime*10)/10;
+  else if(c.contains('f-setto')) b.to=Math.round(video.currentTime*10)/10;
+  else if(c.contains('f-all')){ b.from=0; b.to=null; }
+  else if(e.target.tagName==='SELECT' || e.target.tagName==='INPUT') return;
+  else selId=b.id;
+  drawBoxes(); renderList(); renderPreview();
+});
+
+/* ---------- 🎯 find the exact watermark shape ---------- */
+function seekTo(t){
+  return new Promise(res=>{
+    let done=false; const fin=()=>{ if(!done){ done=true; res(); } };
+    video.addEventListener('seeked',fin,{ once:true }); setTimeout(fin,4000);
+    video.currentTime=clamp(t,0,Math.max(0,(video.duration||t)-0.05));
+  });
+}
+function maskURL(mask,w,h){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d'), im=g.createImageData(w,h);
+  for(let i=0;i<mask.length;i++) if(mask[i]){ im.data[i*4]=255; im.data[i*4+1]=50; im.data[i*4+2]=50; im.data[i*4+3]=150; }
+  g.putImageData(im,0,0); return c.toDataURL();
+}
+async function detectShape(b){
+  if(busy || detecting || !video.videoWidth) return;
+  const W=video.videoWidth, H=video.videoHeight, r=boxPx(b,W,H), back=video.currentTime;
+  if(r.w<4 || r.h<4) return toast('Make the box a bit bigger first');
+  detecting=true; video.pause(); preview.style.display='none'; hide('note'); show('progressBox');
+  try{
+    const from=b.from||0, to=b.to==null ? video.duration : b.to, N=Math.round(clamp((to-from)*3,8,32));
+    const n=r.w*r.h, sum=new Float32Array(n), sq=new Float32Array(n);
+    const c=new OffscreenCanvas(r.w,r.h), g=c.getContext('2d',{willReadFrequently:true});
+    for(let k=0;k<N;k++){
+      setP(k/N,'Studying the watermark across the video… '+Math.round(k/N*100)+'%');
+      await seekTo(from+(k+0.5)/N*(to-from));
+      g.drawImage(video,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
+      const d=g.getImageData(0,0,r.w,r.h).data;
+      for(let i=0;i<n;i++){ const L=lum(d,i); sum[i]+=L; sq[i]+=L*L; }
+    }
+    const mean=new Float32Array(n), std=new Float32Array(n), grad=new Float32Array(n);
+    for(let i=0;i<n;i++){ mean[i]=sum[i]/N; std[i]=Math.sqrt(Math.max(0,sq[i]/N-mean[i]*mean[i])); }
+    for(let y=1;y<r.h-1;y++) for(let x=1;x<r.w-1;x++){ const i=y*r.w+x; grad[i]=Math.hypot(mean[i+1]-mean[i-1],mean[i+r.w]-mean[i-r.w]); }
+    const med=a=>{ const s=Float32Array.from(a).sort(); return s[s.length>>1]; };
+    const medS=med(std), medG=med(grad), thrS=Math.max(2.5,medS*0.45), thrG=Math.max(10,medG*3);
+    const mask=new Uint8Array(n); let cnt=0;
+    for(let i=0;i<n;i++) if(std[i]<thrS || grad[i]>thrG){ mask[i]=1; cnt++; }
+    const frac=cnt/n;
+    if(medS<2 || frac>0.85){ clearShape(b); showNote('The picture behind this watermark hardly moves, so its exact shape cannot be separated. The whole box will be rebuilt instead, which still works well. Keep the box tight.'); }
+    else if(frac<0.003){ clearShape(b); showNote('No still watermark was found inside this box. Check that the box covers it.'); }
+    else{ b.shape={ mask, rect:r, W, H }; b.shapeId=++shapeSeq; b.shapeURL=maskURL(mask,r.w,r.h); showNote('Found the exact watermark shape (shown in red). Only those pixels will be rebuilt, so the result blends in better. Use "Cover edges" if a faint outline remains.','ok'); }
+  }catch(e){ showNote('Could not study the watermark: '+(e.message||e)+'.'); }
+  finally{
+    await seekTo(back); detecting=false; hide('progressBox');
+    drawBoxes(); renderList(); renderPreview();
+  }
+}
+
+/* ---------- export ---------- */
+function setBusy(on){
+  busy=on; $('runBtn').disabled=on || !boxes.length;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  ['quality','toDisk','addBoxBtn','engine','steady','edge','grain'].forEach(id=>$(id).disabled=on);
+  drop.style.pointerEvents=on?'none':''; $('boxList').style.pointerEvents=on?'none':''; $('boxList').style.opacity=on?'.6':'';
+  keepAwake(on);
+}
+function pickQuality(MB,v){ const map={ 'very-high':MB.QUALITY_VERY_HIGH, high:MB.QUALITY_HIGH, medium:MB.QUALITY_MEDIUM }; if(map[v]) return map[v]; try{ return new MB.Quality(v); }catch{ return undefined; } }
+
+$('runBtn').onclick=async()=>{
+  if(!file || !boxes.length || busy) return;
+  video.pause(); clearTimeout(pvTimer); pvToken++;
+  const S=settings(), needAI=boxes.some(b=>b.mode==='ai'), useDisk=$('toDisk').checked && 'showSaveFilePicker' in window;
+  let writable=null; cancelled=false;
+  setBusy(true); hide('note'); hide('doneBox'); show('progressBox'); setP(0,'Loading the video engine…');
+  try{
+    const MB=await loadMB();
+    if(needAI) await getSession(S.engine);
+    if(useDisk){ const handle=await window.showSaveFilePicker({ suggestedName:outName(), types:[{ description:'MP4 video', accept:{ 'video/mp4':['.mp4'] } }] }); writable=await handle.createWritable(); }
+    const input=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    const output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:useDisk ? false : 'in-memory' }), target:useDisk ? new MB.StreamTarget(writable,{ chunked:true }) : new MB.BufferTarget() });
+    const snap=boxes.map(b=>({ ...b })), state=new Map();
+    let cv=null, cx=null;
+    const videoOpts={
+      forceTranscode:true, allowTransformationMetadata:false,
+      process:async(sample)=>{
+        const W=sample.displayWidth, H=sample.displayHeight;
+        if(!cv){ cv=new OffscreenCanvas(W,H); cx=cv.getContext('2d',{willReadFrequently:true}); }
+        else if(cv.width!==W || cv.height!==H){ cv.width=W; cv.height=H; }
+        sample.draw(cx,0,0);
+        await processFrame(cx,W,H,sample.timestamp,snap,state,S);
+        return cv;
+      }
+    };
+    const q=pickQuality(MB,$('quality').value); if(q) videoOpts.quality=q;
+    conv=await MB.Conversion.init({ input, output, video:videoOpts });
+    if(!conv.isValid) throw new Error('this video format cannot be processed here ('+(conv.discardedTracks||[]).map(d=>d.reason).join(', ')+'). Convert it to MP4 first and try again');
+    const t0=performance.now();
+    conv.onProgress=p=>{ const secs=(performance.now()-t0)/1000; setP(p,'Removing watermark… '+Math.round(p*100)+'%'+(p>0.02?' · about '+fmtTime(secs/p*(1-p))+' left':'')+(needAI && sessEP==='wasm'?' · processor mode (slower)':'')); };
+    setP(0,'Starting…');
+    await conv.execute();
+    const took=fmtTime((performance.now()-t0)/1000);
+    if(useDisk){
+      try{ await writable.close(); }catch{}
+      setP(1,'Finished in '+took); showNote('Done! Your clean video was saved to the file you chose.','ok');
+    }else{
+      resultBlob=new Blob([output.target.buffer],{type:'video/mp4'});
+      if(resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl=URL.createObjectURL(resultBlob); $('resultVideo').src=resultUrl;
+      setP(1,'Finished in '+took+' · '+fmtSize(resultBlob.size)); show('doneBox');
+      showNote('Done! Play the result below and check it closely, then click Download.','ok');
+    }
+  }catch(err){
+    const c=err && (err.name==='AbortError' || err.name==='ConversionCanceledError' || /cancel/i.test(err.message||''));
+    showNote(c ? 'Cancelled.' : 'Something went wrong: '+(err.message||err)+'. Use Chrome or Edge on a computer, or try a shorter clip first.');
+    if(writable){ try{ await writable.abort(); }catch{} }
+    hide('progressBox');
+  }finally{ conv=null; setBusy(false); }
+};
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Cancelling…'; if(conv){ try{ await conv.cancel(); }catch{} } };
+$('downloadBtn').onclick=()=>{ if(!resultBlob) return; const a=document.createElement('a'); a.href=resultUrl; a.download=outName(); document.body.appendChild(a); a.click(); a.remove(); toast('Downloaded '+outName()); };
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

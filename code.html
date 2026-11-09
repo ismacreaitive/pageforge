@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageForge — Code & Text to HTML</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root{--bg:#0e1116;--panel:#151a21;--panel-2:#1c222b;--line:#262d38;--text:#e6e9ef;--muted:#8a94a6;--accent:#5b8cff;--accent-2:#7c5cff;--warn:#f5b84a;--err:#ff6b6b;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;margin-right:auto}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font:600 12px var(--mono)}
+.brand small{color:var(--muted);font-weight:500}
+select,input[type=text]{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+input[type=text]{width:140px}
+button{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border:none;font-weight:600}
+label.toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
+main{flex:1;display:flex;min-height:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+#left{width:45%;border-right:1px solid var(--line)}
+#right{flex:1;background:#0b0d11}
+.pane-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+#editor{flex:1;width:100%;resize:none;border:none;outline:none;background:var(--bg);color:var(--text);font:13.5px/1.6 var(--mono);padding:16px;tab-size:2;white-space:pre;overflow:auto}
+#editor.dragover{outline:2px dashed var(--accent);outline-offset:-10px}
+.stage{flex:1;display:flex;justify-content:center;padding:14px;min-height:0;overflow:auto}
+iframe{width:100%;height:100%;border:none;background:#fff;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.45);transition:width .25s;flex:none}
+.devices{display:flex;gap:6px}
+.devices button{padding:5px 9px;font-size:12px}
+.devices button.active{border-color:var(--accent);color:var(--accent)}
+#console{height:130px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font:12px/1.5 var(--mono);padding:6px 14px}
+#console.hidden{display:none}
+#console div{padding:3px 0;border-bottom:1px solid #1d232c;white-space:pre-wrap}
+.c-error{color:var(--err)}.c-warn{color:var(--warn)}.c-log,.c-info{color:var(--muted)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+#sampleData{display:none}
+@media(max-width:860px){main{flex-direction:column}#left{width:100%;height:45%;border-right:none;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">&lt;/&gt;</div>PageForge <small>code → HTML, free</small></div>
+  <select id="mode">
+    <option value="auto">Auto-detect</option>
+    <option value="html">HTML / CSS / JS</option>
+    <option value="markdown">Markdown</option>
+    <option value="text">Plain text</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="autorun" checked> Live</label>
+  <button id="runBtn">▶ Run</button>
+  <button id="sampleBtn">Sample</button>
+  <button id="clearBtn">Clear</button>
+  <input type="text" id="filename" value="index">
+  <button id="copyBtn">Copy HTML</button>
+  <button id="openBtn">Open tab</button>
+  <button id="downloadBtn" class="primary">⬇ Download .html</button>
+</header>
+<main>
+  <section class="pane" id="left">
+    <div class="pane-head"><span>INPUT · paste code, AI output, Markdown or text · drop a file</span><span id="stats"></span></div>
+    <textarea id="editor" spellcheck="false" placeholder="Paste your code or text here..."></textarea>
+  </section>
+  <section class="pane" id="right">
+    <div class="pane-head">
+      <span id="detected">Preview</span>
+      <div class="devices">
+        <button data-w="100%" class="active">Desktop</button>
+        <button data-w="768px">Tablet</button>
+        <button data-w="390px">Mobile</button>
+        <button id="consoleToggle">Console <span id="errCount"></span></button>
+      </div>
+    </div>
+    <div class="stage"><iframe id="preview" title="Preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"></iframe></div>
+    <div id="console" class="hidden"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<pre id="sampleData">Sure! Here is a simple landing page:
+
+&#96;&#96;&#96;html
+&lt;section class="hero"&gt;
+  &lt;h1&gt;Hello, PageForge&lt;/h1&gt;
+  &lt;p&gt;Paste code from Gemini, ChatGPT or anywhere. Preview it. Download it. Free.&lt;/p&gt;
+  &lt;button id="cta"&gt;Click me&lt;/button&gt;
+&lt;/section&gt;
+&#96;&#96;&#96;
+
+&#96;&#96;&#96;css
+body{margin:0;font-family:system-ui,sans-serif}
+.hero{min-height:100vh;display:grid;place-content:center;text-align:center;gap:16px;padding:24px;background:linear-gradient(135deg,#5b8cff,#7c5cff);color:#fff}
+.hero h1{font-size:clamp(2rem,6vw,3.5rem);margin:0}
+.hero button{justify-self:center;padding:12px 28px;border:0;border-radius:999px;font-size:1rem;font-weight:600;cursor:pointer}
+&#96;&#96;&#96;
+
+&#96;&#96;&#96;javascript
+document.getElementById('cta').onclick = function(){ alert('It works!'); };
+console.log('Page loaded');
+&#96;&#96;&#96;</pre>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var editor = $('editor'), frame = $('preview'), modeSel = $('mode'), con = $('console');
+var STORE = 'pageforge:draft';
+var errors = 0, timer;
+var FENCE = /```([\w+-]*)[^\n]*\n([\s\S]*?)```/g;
+var SO = '<' + 'script>', SC = '<' + '/script>';
+
+var SAMPLE = $('sampleData').textContent;
+
+var READABLE_CSS = ['body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.7;color:#1f2328;background:#fff;margin:0}',
+'main{max-width:760px;margin:0 auto;padding:48px 24px}',
+'h1,h2,h3,h4{line-height:1.25;margin:1.6em 0 .6em}',
+'h1{font-size:2.2em;margin-top:0}',
+'p,ul,ol,blockquote,pre,table{margin:0 0 1.1em}',
+'a{color:#2f6feb}',
+'code{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f3f4f6;padding:.15em .4em;border-radius:5px;font-size:.9em}',
+'pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:10px;overflow:auto}',
+'pre code{background:none;padding:0;color:inherit}',
+'blockquote{border-left:4px solid #d0d7de;padding-left:16px;color:#57606a}',
+'table{border-collapse:collapse;width:100%}',
+'th,td{border:1px solid #d0d7de;padding:8px 12px;text-align:left}',
+'img{max-width:100%}'].join('\n');
+
+var BRIDGE = SO + '(function(){function s(t,a){try{parent.postMessage({__pv:1,type:t,msg:[].map.call(a,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error"].forEach(function(k){var o=console[k];console[k]=function(){s(k,arguments);o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled promise: "+(e.reason&&e.reason.message||e.reason)])})})();' + SC;
+
+var EMPTY = '<html><body style="margin:0;display:grid;place-content:center;height:100vh;font-family:system-ui;color:#8a94a6;background:#fafbfc">Your preview will appear here</body></html>';
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function looksLikeHtml(s){ return /<(!doctype|html|head|body|div|section|main|p|h[1-6]|style|script|span|a|img|ul|ol|table|form|button|header|nav|footer|svg)\b/i.test(s); }
+function isFullDoc(s){ return /<html[\s>]|<!doctype/i.test(s); }
+
+function injectBefore(html, tag, chunk, prependIfMissing){
+  var i = html.toLowerCase().lastIndexOf(tag);
+  if(i === -1) return prependIfMissing ? chunk + html : html + chunk;
+  return html.slice(0, i) + chunk + html.slice(i);
+}
+
+function fullDoc(html, css, js){
+  css = css || ''; js = js || '';
+  var title = escapeHtml(($('filename').value || 'Page').trim());
+  if(!isFullDoc(html)){
+    var out = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + title + '</title>\n';
+    if(css) out += '<style>\n' + css.trim() + '\n</style>\n';
+    out += '</head>\n<body>\n' + html.trim() + '\n';
+    if(js) out += SO + '\n' + js.trim() + '\n' + SC + '\n';
+    out += '</body>\n</html>';
+    return out;
+  }
+  if(css) html = injectBefore(html, '</head>', '<style>\n' + css.trim() + '\n</style>\n', true);
+  if(js) html = injectBefore(html, '</body>', SO + '\n' + js.trim() + '\n' + SC + '\n');
+  return html;
+}
+
+function build(raw, mode){
+  var src = raw.trim();
+  if(!src) return { doc: '', kind: 'Empty' };
+  if(mode === 'auto' || mode === 'html'){
+    var html = '', css = '', js = '', m;
+    FENCE.lastIndex = 0;
+    while((m = FENCE.exec(src)) !== null){
+      var lang = (m[1] || '').toLowerCase(); var code = m[2];
+      if(lang === 'css') css += code + '\n';
+      else if(/^(js|javascript|jsx)$/.test(lang)) js += code + '\n';
+      else if(/^(html|htm|xml|svg)?$/.test(lang) || looksLikeHtml(code)) html += code + '\n';
+    }
+    if(html || css || js) return { doc: fullDoc(html, css, js), kind: 'AI code blocks merged' };
+  }
+  if(mode === 'html' || (mode === 'auto' && looksLikeHtml(src))){
+    var start = src.search(/<!doctype|<html/i);
+    if(start > 0){
+      var end = src.toLowerCase().lastIndexOf('</html>');
+      src = src.slice(start, end > -1 ? end + 7 : undefined);
+    }
+    return { doc: fullDoc(src), kind: isFullDoc(src) ? 'Full HTML document' : 'HTML snippet wrapped' };
+  }
+  if(mode === 'text'){
+    var body = src.split(/\n{2,}/).map(function(p){ return '<p>' + escapeHtml(p).replace(/\n/g, '<br>') + '</p>'; }).join('\n');
+    return { doc: fullDoc('<main>\n' + body + '\n</main>', READABLE_CSS), kind: 'Plain text to HTML' };
+  }
+  var mdBody = window.marked ? marked.parse(src) : '<pre>' + escapeHtml(src) + '</pre>';
+  return { doc: fullDoc('<main>\n' + mdBody + '\n</main>', READABLE_CSS), kind: 'Markdown to HTML' };
+}
+
+function current(){ return build(editor.value, modeSel.value); }
+function withBridge(doc){ var m = doc.match(/<head[^>]*>/i); return m ? doc.replace(m[0], m[0] + BRIDGE) : BRIDGE + doc; }
+function clearConsole(){ errors = 0; con.innerHTML = ''; $('errCount').textContent = ''; }
+
+function render(){
+  var r = current();
+  clearConsole();
+  frame.srcdoc = r.doc ? withBridge(r.doc) : EMPTY;
+  $('detected').textContent = 'Preview · ' + r.kind;
+  try { localStorage.setItem(STORE, editor.value); } catch(e){}
+  updateStats();
+}
+function updateStats(){ var v = editor.value; $('stats').textContent = (v ? v.split('\n').length : 0) + ' lines · ' + v.length + ' chars'; }
+function schedule(){ updateStats(); if(!$('autorun').checked) return; clearTimeout(timer); timer = setTimeout(render, 400); }
+function fileName(){ var n = ($('filename').value || 'index').trim().replace(/[^\w.-]+/g, '-'); return /\.html?$/i.test(n) ? n : n + '.html'; }
+function toast(msg){ var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 1800); }
+
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d || !d.__pv || e.source !== frame.contentWindow) return;
+  var row = document.createElement('div');
+  row.className = 'c-' + d.type;
+  row.textContent = (d.type === 'error' ? '✖ ' : d.type === 'warn' ? '⚠ ' : '› ') + d.msg;
+  con.appendChild(row); con.scrollTop = con.scrollHeight;
+  if(d.type === 'error'){ errors++; $('errCount').textContent = '(' + errors + ')'; con.classList.remove('hidden'); }
+});
+
+editor.addEventListener('input', schedule);
+editor.addEventListener('keydown', function(e){
+  if(e.key === 'Tab'){ e.preventDefault(); editor.setRangeText('  ', editor.selectionStart, editor.selectionEnd, 'end'); schedule(); }
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); render(); }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); $('downloadBtn').click(); }
+});
+editor.addEventListener('dragover', function(e){ e.preventDefault(); editor.classList.add('dragover'); });
+editor.addEventListener('dragleave', function(){ editor.classList.remove('dragover'); });
+editor.addEventListener('drop', function(e){
+  e.preventDefault(); editor.classList.remove('dragover');
+  var f = e.dataTransfer.files[0]; if(!f) return;
+  f.text().then(function(txt){
+    editor.value = txt;
+    $('filename').value = f.name.replace(/\.[^.]+$/, '');
+    if(/\.md$/i.test(f.name)) modeSel.value = 'markdown';
+    render(); toast('Loaded ' + f.name);
+  });
+});
+
+modeSel.onchange = render;
+$('autorun').onchange = function(){ if($('autorun').checked) render(); };
+$('runBtn').onclick = render;
+$('sampleBtn').onclick = function(){ editor.value = SAMPLE; modeSel.value = 'auto'; render(); };
+$('clearBtn').onclick = function(){ editor.value = ''; render(); editor.focus(); };
+$('consoleToggle').onclick = function(){ con.classList.toggle('hidden'); };
+
+$('downloadBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to download yet');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([r.doc], { type: 'text/html;charset=utf-8' }));
+  a.download = fileName();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  toast('Downloaded ' + fileName());
+};
+$('copyBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to copy yet');
+  if(navigator.clipboard){ navigator.clipboard.writeText(r.doc).then(function(){ toast('HTML copied'); }, function(){ toast('Copy blocked'); }); }
+  else toast('Copy not supported');
+};
+$('openBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to open yet');
+  window.open(URL.createObjectURL(new Blob([r.doc], { type: 'text/html' })), '_blank');
+};
+
+var btns = document.querySelectorAll('.devices button[data-w]');
+for(var i = 0; i < btns.length; i++){
+  (function(b){ b.onclick = function(){ for(var j = 0; j < btns.length; j++) btns[j].classList.remove('active'); b.classList.add('active'); frame.style.width = b.dataset.w; }; })(btns[i]);
+}
+
+var saved = null;
+try { saved = localStorage.getItem(STORE); } catch(e){}
+editor.value = saved || SAMPLE;
+render();
+})();
+</script>
+</body>
+</html>

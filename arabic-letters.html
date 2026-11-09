@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<!-- arabic-letters.html — v6 — StoryForge Pack 2 · 🔤 Arabic Letter-Joining Teacher.
+v6: DATA-ONLY fix, no logic changes needed. Per direct feedback: a beginner-facing word shouldn't end in bare sukun (no audible vowel) on the very first letter they're learning to sound out -- it reads as silence rather than a letter to pronounce. All 26 library words' voweled form (arH) now end in full tanween damm (the "-un" ending, e.g. \u0643\u0650\u062a\u064e\u0627\u0628\u064c kitabun, \u0634\u064e\u0645\u0652\u0633\u064c shamsun, \u0642\u064e\u0645\u064e\u0631\u064c qamarun -- matching the exact examples given), replacing v5's word-final sukun, with two grammatically-required exceptions kept correct rather than forced into the same pattern: the four af'al-pattern color words (ahmar/azraq/akhdar/asfar) are diptotes and take a single damma only, never tanween, in any correct Arabic; and ithnan (two) is a dual noun whose correct ending is kasra (\u0627\u0650\u062b\u0652\u0646\u064e\u0627\u0646\u0650 ithn\u0101ni), not tanween damm -- forcing "-un" onto either would teach an incorrect word form. Internal structural sukuns (e.g. the \u0645 in \u0634\u064e\u0645\u0652\u0633\u064c, the \u064a in \u0628\u064e\u064a\u0652\u062a\u064c) are untouched since those are genuinely part of each word's correct pronunciation, not the word-final-silence issue being fixed. No code changes: computeStandardLayout/computeTallLayout/drawWordScene/the per-letter caption all already read whatever diacritics are actually present in the text and name them via the existing HARAKAT_INFO table (already covering tanween damm, damma, kasra, sukun, shadda from v4/v5), so updating the word data alone correctly updates the on-screen captions too -- e.g. the final letter of ahmaru will now caption as "u (damma)" and ithn\u0101ni's final letter as "i (kasra)", both accurate. Everything else unchanged from v5: caption/glyph separation fix, dynamic letter-size boost, per-word tap-to-pace recording, guaranteed-fit sizing, diacritic-safe grapheme splitting, 19 fonts, 4 themes, dedicated Tall vs Wide/Square layout, intro/countdown/outro, hook/outro suggestions, tick/chime audio, PNG+REC, scene chaining, \u0643\u0650\u062a\u064e\u0627\u0628\u064c (kitabun) pre-loaded as the default scene. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Arabic Letters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Amiri+Quran&family=Scheherazade+New:wght@700&family=Noto+Naskh+Arabic:wght@700&family=Lateef:wght@700&family=Markazi+Text:wght@700&family=Reem+Kufi:wght@700&family=Reem+Kufi+Ink&family=Noto+Kufi+Arabic:wght@700&family=El+Messiri:wght@700&family=Cairo:wght@700&family=Aref+Ruqaa:wght@700&family=Aref+Ruqaa+Ink&family=Katibeh&family=Rakkas&family=Mirza:wght@700&family=Noto+Nastaliq+Urdu:wght@700&family=Jomhuria&family=Lalezar&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.scenehead{display:flex;gap:8px;align-items:center}
+.scenehead b{flex:1}
+.scenehead .btn{flex:0 0 auto;width:auto;padding:6px 10px;font-size:13px}
+.pillgrouplabel{display:block;margin:10px 0 4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.quickrow{display:flex;gap:8px;margin-top:8px}
+.quickrow .btn{flex:1}
+input[type=file]{padding:6px}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🔤 Arabic Letter-Joining Teacher <small>v6</small></h1>
+  <small>Already loaded with كِتَابٌ (Kitabun / "Book") below — hit Preview to test right away.</small>
+
+  <div class="card">
+    <h2>Add a word</h2>
+    <small>Zero typing needed — tap a quick button, or pick from the library. Each tap adds a new scene.</small>
+    <div class="checkrow"><input type="checkbox" id="showHarakat" checked><label for="showHarakat">Include harakat (vowel marks) on library words</label></div>
+    <div class="quickrow" style="margin-top:10px">
+      <button class="btn gold" id="surpriseBtn" type="button">🎲 Surprise Me (+1)</button>
+      <button class="btn gold" id="quickBuildBtn" type="button">✨ Quick Build (+5)</button>
+    </div>
+    <div id="presetLibrary" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Words in this video</h2>
+    <small id="sceneHint">Each one builds letter-by-letter then holds, in order. Edit any text below, use the speed dropdown for a quick global pace, or tap your own pacing per word for full control.</small>
+    <div id="scenesContainer" style="margin-top:4px"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="addSceneBtn" type="button">+ Add a blank word to type your own</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro (optional)</h2>
+    <small>Leave either blank to skip it.</small>
+    <div class="row" style="margin-top:8px">
+      <button class="btn gold" id="suggestBtn" type="button">💡 Suggest hooks &amp; outros</button>
+    </div>
+    <div id="hookPills" class="hidden" style="margin-top:10px">
+      <small>Pick a hook (tap to use):</small>
+      <div class="pills" id="hookPillsList" style="margin-top:6px"></div>
+    </div>
+    <div id="outroPills" class="hidden" style="margin-top:10px">
+      <small>Pick an outro (tap to use):</small>
+      <div class="pills" id="outroPillsList" style="margin-top:6px"></div>
+    </div>
+    <input id="introText" placeholder="Intro text (optional)" style="margin-top:10px" value="">
+    <input id="outroText" placeholder="Outro text (optional)" style="margin-top:8px" value="">
+    <div class="checkrow">
+      <input type="checkbox" id="showCountdown">
+      <label for="showCountdown">Show 3-2-1 countdown before the first word</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Calligraphy style</h2>
+    <small>19 styles across 5 families.</small>
+    <select id="fontStyle" style="margin-top:8px"></select>
+  </div>
+
+  <div class="card">
+    <h2>Colour theme</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing, shape &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="letterSpeed">
+        <option value="veryslow">Very slow per letter</option>
+        <option value="slow">Slow per letter</option>
+        <option value="normal" selected>Normal per letter</option>
+        <option value="fast">Fast per letter</option>
+      </select>
+    </div>
+    <small style="margin-top:6px;display:block">Used only for words without their own tapped pacing (see each word's card above).</small>
+    <div class="checkrow"><input type="checkbox" id="tickPerLetter" checked><label for="tickPerLetter">🔊 Tick sound as each letter appears</label></div>
+    <small style="margin-top:8px;display:block">Sound when each word completes:</small>
+    <div class="row" style="margin-top:6px">
+      <select id="completeSfx">
+        <option value="chime">🔔 Soft chime</option>
+        <option value="tick">🔘 Pen tick</option>
+        <option value="none">🔇 No sound</option>
+      </select>
+    </div>
+    <small style="margin-top:8px;display:block">Background music (optional):</small>
+    <div class="row" style="margin-top:6px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+
+let settings={ theme:'emerald', font:'Amiri' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', accentLight:'#e9cf78', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', accentLight:'#c3dcff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', accentLight:'#f3c594', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', accentLight:'#f3c3d0', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+const FADE=300;
+
+/* ===== 19 fonts, 5 families ===== */
+const FONT_OPTIONS = [
+  { label:'Naskh — Traditional, most readable', items:[
+    { v:'Amiri', label:'Amiri', bold:700 },
+    { v:'Amiri Quran', label:'Amiri Quran (Mushaf style)', bold:400 },
+    { v:'Scheherazade New', label:'Scheherazade New', bold:700 },
+    { v:'Noto Naskh Arabic', label:'Noto Naskh Arabic', bold:700 },
+    { v:'Lateef', label:'Lateef', bold:700 },
+    { v:'Markazi Text', label:'Markazi Text', bold:700 }
+  ]},
+  { label:'Kufi — Geometric, modern', items:[
+    { v:'Reem Kufi', label:'Reem Kufi', bold:700 },
+    { v:'Reem Kufi Ink', label:'Reem Kufi Ink', bold:400 },
+    { v:'Noto Kufi Arabic', label:'Noto Kufi Arabic', bold:700 },
+    { v:'El Messiri', label:'El Messiri', bold:700 },
+    { v:'Cairo', label:'Cairo', bold:700 }
+  ]},
+  { label:'Ruqaa & Diwani — Flowing calligraphy', items:[
+    { v:'Aref Ruqaa', label:'Aref Ruqaa', bold:700 },
+    { v:'Aref Ruqaa Ink', label:'Aref Ruqaa Ink (bold)', bold:400 },
+    { v:'Katibeh', label:'Katibeh', bold:400 },
+    { v:'Rakkas', label:'Rakkas', bold:400 }
+  ]},
+  { label:'Nastaliq — Persian-influenced flow', items:[
+    { v:'Mirza', label:'Mirza', bold:700 },
+    { v:'Noto Nastaliq Urdu', label:'Noto Nastaliq Urdu', bold:700 }
+  ]},
+  { label:'Bold Display', items:[
+    { v:'Jomhuria', label:'Jomhuria (tall & condensed)', bold:400 },
+    { v:'Lalezar', label:'Lalezar', bold:400 }
+  ]}
+];
+const FONT_BOLD = {};
+FONT_OPTIONS.forEach(g=>g.items.forEach(it=>{ FONT_BOLD[it.v]=it.bold; }));
+
+function renderFontSelect(){
+  const sel=$('fontStyle');
+  sel.innerHTML='';
+  FONT_OPTIONS.forEach(group=>{
+    const og=document.createElement('optgroup'); og.label=group.label;
+    group.items.forEach(it=>{
+      const op=document.createElement('option'); op.value=it.v; op.textContent=it.label;
+      og.appendChild(op);
+    });
+    sel.appendChild(og);
+  });
+  sel.value='Amiri';
+  sel.addEventListener('change', ()=>{ settings.font=sel.value; });
+}
+
+/* ===== letter reference table ===== */
+const LETTER_INFO = {
+  'ا':{name:'Alif', connects:false}, 'أ':{name:'Alif (hamza above)', connects:false},
+  'إ':{name:'Alif (hamza below)', connects:false}, 'آ':{name:'Alif Madda', connects:false},
+  'ب':{name:'Ba', connects:true}, 'ت':{name:'Ta', connects:true}, 'ث':{name:'Tha', connects:true},
+  'ج':{name:'Jim', connects:true}, 'ح':{name:'Ha', connects:true}, 'خ':{name:'Kha', connects:true},
+  'د':{name:'Dal', connects:false}, 'ذ':{name:'Dhal', connects:false},
+  'ر':{name:'Ra', connects:false}, 'ز':{name:'Zay', connects:false},
+  'س':{name:'Sin', connects:true}, 'ش':{name:'Shin', connects:true},
+  'ص':{name:'Sad', connects:true}, 'ض':{name:'Dad', connects:true},
+  'ط':{name:'Ta (emphatic)', connects:true}, 'ظ':{name:'Za (emphatic)', connects:true},
+  'ع':{name:'Ayn', connects:true}, 'غ':{name:'Ghayn', connects:true},
+  'ف':{name:'Fa', connects:true}, 'ق':{name:'Qaf', connects:true},
+  'ك':{name:'Kaf', connects:true}, 'ل':{name:'Lam', connects:true},
+  'م':{name:'Mim', connects:true}, 'ن':{name:'Nun', connects:true},
+  'ه':{name:'Ha', connects:true}, 'و':{name:'Waw', connects:false},
+  'ي':{name:'Ya', connects:true}, 'ء':{name:'Hamza', connects:false},
+  'ة':{name:'Ta Marbuta', connects:false}
+};
+
+/* ===== vowel mark (harakat) names, for the caption ===== */
+const HARAKAT_INFO = {
+  '\u064E':'a (fatha)', '\u064F':'u (damma)', '\u0650':'i (kasra)',
+  '\u0652':'sukun — no vowel', '\u0651':'shadda — doubled',
+  '\u064B':'an (tanween fath)', '\u064C':'un (tanween damm)', '\u064D':'in (tanween kasr)'
+};
+
+/* ===== grapheme-safe letter splitting ===== */
+const ARABIC_DIACRITIC_RE = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u08D3-\u08FF]/;
+const ARABIC_DIACRITIC_RE_G = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u08D3-\u08FF]/g;
+function splitGraphemes(str){
+  if(typeof Intl!=='undefined' && typeof Intl.Segmenter==='function'){
+    try{
+      const seg=new Intl.Segmenter('ar', {granularity:'grapheme'});
+      return Array.from(seg.segment(str), s=>s.segment);
+    }catch(err){}
+  }
+  const codepoints=Array.from(str);
+  const out=[];
+  codepoints.forEach(ch=>{
+    if(ARABIC_DIACRITIC_RE.test(ch) && out.length>0){ out[out.length-1]+=ch; }
+    else { out.push(ch); }
+  });
+  return out;
+}
+
+/* ===== word library: 26 words, plain (ar) + fully-voweled citation form (arH).
+   Regular nouns end in tanween damm ("-un", e.g. kitabun, shamsun, qamarun).
+   Two grammatically-required exceptions: the four color words are diptotes
+   and take a single damma only (ahmaru, not ahmarun); ithnan (two) is a dual
+   noun and correctly ends in kasra (ithnani), not tanween. ===== */
+const WORDS = {
+  kitab:{ar:'كتاب',arH:'كِتَابٌ',tl:'Kitabun',en:'Book'}, qalam:{ar:'قلم',arH:'قَلَمٌ',tl:'Qalamun',en:'Pen'},
+  bab:{ar:'باب',arH:'بَابٌ',tl:'Babun',en:'Door'}, bayt:{ar:'بيت',arH:'بَيْتٌ',tl:'Baytun',en:'House'},
+  shams:{ar:'شمس',arH:'شَمْسٌ',tl:'Shamsun',en:'Sun'}, qamar:{ar:'قمر',arH:'قَمَرٌ',tl:'Qamarun',en:'Moon'},
+  najm:{ar:'نجم',arH:'نَجْمٌ',tl:'Najmun',en:'Star'}, bahr:{ar:'بحر',arH:'بَحْرٌ',tl:'Bahrun',en:'Sea'},
+  nar:{ar:'نار',arH:'نَارٌ',tl:'Narun',en:'Fire'}, maa:{ar:'ماء',arH:'مَاءٌ',tl:"Maa'un",en:'Water'},
+  umm:{ar:'أم',arH:'أُمٌّ',tl:'Ummun',en:'Mother'}, ab:{ar:'أب',arH:'أَبٌ',tl:'Abun',en:'Father'},
+  akh:{ar:'أخ',arH:'أَخٌ',tl:'Akhun',en:'Brother'}, bint:{ar:'بنت',arH:'بِنْتٌ',tl:'Bintun',en:'Daughter / Girl'},
+  wahid:{ar:'واحد',arH:'وَاحِدٌ',tl:'Wahidun',en:'One'}, ithnan:{ar:'اثنان',arH:'اِثْنَانِ',tl:'Ithnani',en:'Two'},
+  thalatha:{ar:'ثلاثة',arH:'ثَلَاثَةٌ',tl:'Thalathatun',en:'Three'}, arbaa:{ar:'أربعة',arH:'أَرْبَعَةٌ',tl:"Arba'atun",en:'Four'},
+  ahmar:{ar:'أحمر',arH:'أَحْمَرُ',tl:'Ahmaru',en:'Red'}, azraq:{ar:'أزرق',arH:'أَزْرَقُ',tl:'Azraqu',en:'Blue'},
+  akhdar:{ar:'أخضر',arH:'أَخْضَرُ',tl:'Akhdaru',en:'Green'}, asfar:{ar:'أصفر',arH:'أَصْفَرُ',tl:'Asfaru',en:'Yellow'},
+  salam:{ar:'سلام',arH:'سَلَامٌ',tl:'Salamun',en:'Peace'}, nur:{ar:'نور',arH:'نُورٌ',tl:'Nurun',en:'Light'},
+  qalb:{ar:'قلب',arH:'قَلْبٌ',tl:'Qalbun',en:'Heart'}, ilm:{ar:'علم',arH:'عِلْمٌ',tl:'Ilmun',en:'Knowledge'}
+};
+const WORD_CATEGORIES = [
+  { label:'Objects', items:['kitab','qalam','bab','bayt'] },
+  { label:'Nature', items:['shams','qamar','najm','bahr','nar','maa'] },
+  { label:'Family', items:['umm','ab','akh','bint'] },
+  { label:'Numbers', items:['wahid','ithnan','thalatha','arbaa'] },
+  { label:'Colors', items:['ahmar','azraq','akhdar','asfar'] },
+  { label:'Common Words', items:['salam','nur','qalb','ilm'] }
+];
+function pickArabic(d){ return $('showHarakat').checked ? d.arH : d.ar; }
+function renderPresetLibrary(){
+  const box=$('presetLibrary'); box.innerHTML='';
+  WORD_CATEGORIES.forEach(cat=>{
+    const h=document.createElement('small'); h.className='pillgrouplabel'; h.textContent=cat.label;
+    box.appendChild(h);
+    const row=document.createElement('div'); row.className='pills';
+    cat.items.forEach(key=>{
+      const d=WORDS[key]; if(!d) return;
+      const p=document.createElement('div'); p.className='p'; p.textContent=d.tl+' — '+d.en; p.dataset.k=key;
+      row.appendChild(p);
+    });
+    box.appendChild(row);
+  });
+  box.addEventListener('click', e=>{
+    const p=e.target.closest('.p'); if(!p) return;
+    const d=WORDS[p.dataset.k]; if(!d) return;
+    addScene(pickArabic(d), d.tl, d.en);
+    toast('✓ Added "'+d.tl+'"');
+  });
+}
+$('surpriseBtn').onclick=()=>{
+  const keys=Object.keys(WORDS);
+  const k=keys[Math.floor(Math.random()*keys.length)];
+  const d=WORDS[k]; addScene(pickArabic(d),d.tl,d.en);
+  toast('✓ Added "'+d.tl+'"');
+};
+$('quickBuildBtn').onclick=()=>{
+  const keys=Object.keys(WORDS).slice();
+  for(let i=keys.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const tmp=keys[i]; keys[i]=keys[j]; keys[j]=tmp; }
+  keys.slice(0,5).forEach(k=>{ const d=WORDS[k]; addScene(pickArabic(d),d.tl,d.en); });
+  toast('✓ Added 5 random words — ready to preview');
+};
+
+/* ===== scene management ===== */
+function addScene(ar, tl, en){
+  const el=document.createElement('div');
+  el.className='card'; el.style.background='var(--panel2)'; el.dataset.scene='1';
+  el.customTiming=null;
+  el.innerHTML =
+    '<div class="scenehead"><b>Word <span class="sceneNum"></span></b>'+
+    '<button class="btn" type="button" data-remove>Remove</button></div>'+
+    '<input data-ar dir="rtl" style="margin-top:8px;font-size:20px" value="'+escapeAttr(ar||'')+'">'+
+    '<div class="row"><input data-tl placeholder="Transliteration (optional)" value="'+escapeAttr(tl||'')+'"></div>'+
+    '<div class="row"><input data-en placeholder="Meaning (optional)" value="'+escapeAttr(en||'')+'"></div>'+
+    '<div class="checkrow"><input type="checkbox" data-showtl checked><label>Show transliteration</label></div>'+
+    '<div class="checkrow"><input type="checkbox" data-showen checked><label>Show meaning</label></div>'+
+    '<div class="row" style="margin-top:8px"><button class="btn" type="button" data-pacebtn>🎙 Tap your own pacing (optional)</button></div>'+
+    '<div class="hidden" data-pacepanel style="margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px">'+
+      '<div data-paceletters dir="rtl" style="font-size:30px;text-align:center;margin-bottom:10px;min-height:40px"></div>'+
+      '<small data-pacestatus style="display:block;text-align:center;margin-bottom:8px"></small>'+
+      '<button class="btn gold" type="button" data-pacetap>Tap to start →</button>'+
+      '<div class="row" data-paceresult style="display:none;margin-top:8px">'+
+        '<button class="btn" type="button" data-pacererecord>Re-record</button>'+
+        '<button class="btn" type="button" data-paceclear>Use preset speed instead</button>'+
+      '</div>'+
+    '</div>';
+  el.querySelector('[data-remove]').onclick=()=>{ el.remove(); renumberScenes(); };
+  setupPaceRecorder(el);
+  $('scenesContainer').appendChild(el);
+  renumberScenes();
+}
+function renumberScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  blocks.forEach((b,i)=>{
+    b.querySelector('.sceneNum').textContent=String(i+1);
+    b.querySelector('[data-remove]').style.display = blocks.length>1 ? '' : 'none';
+  });
+}
+$('addSceneBtn').onclick=()=>{ addScene('','',''); toast('✓ Blank word added'); };
+
+/* ===== tap-to-pace recorder ===== */
+function setupPaceRecorder(el){
+  const paceBtn=el.querySelector('[data-pacebtn]');
+  const panel=el.querySelector('[data-pacepanel]');
+  const lettersBox=el.querySelector('[data-paceletters]');
+  const status=el.querySelector('[data-pacestatus]');
+  const tapBtn=el.querySelector('[data-pacetap]');
+  const resultRow=el.querySelector('[data-paceresult]');
+  const rerecordBtn=el.querySelector('[data-pacererecord]');
+  const clearBtn=el.querySelector('[data-paceclear]');
+  const arInput=el.querySelector('[data-ar]');
+
+  let recLetters=[], tapCount=0, recTimes=[], recStartT=0;
+
+  function renderLetterSpans(upTo){
+    const shown=recLetters.slice(0,upTo).join('');
+    const rest=recLetters.slice(upTo).join('');
+    lettersBox.innerHTML =
+      '<span style="color:var(--accent)">'+escapeHtml(shown)+'</span>'+
+      '<span style="opacity:0.3">'+escapeHtml(rest)+'</span>';
+  }
+
+  function resetPanel(){
+    recLetters=splitGraphemes(arInput.value.trim());
+    tapCount=0; recTimes=[];
+    renderLetterSpans(0);
+    resultRow.style.display='none';
+    if(!recLetters.length){
+      status.textContent='Type the word first';
+    } else {
+      status.textContent='Tap to reveal letter 1 of '+recLetters.length;
+    }
+    tapBtn.textContent='Tap to start →';
+  }
+
+  function updateBadge(){
+    paceBtn.textContent = (el.customTiming && el.customTiming.length)
+      ? '🎙 Custom pacing saved ('+el.customTiming.length+' letters) — tap to review'
+      : '🎙 Tap your own pacing (optional)';
+  }
+
+  tapBtn.addEventListener('click', ()=>{
+    if(!recLetters.length){ toast('Type the word first'); return; }
+    const now=performance.now();
+    tapCount++;
+    if(tapCount===1){
+      recStartT=now;
+      renderLetterSpans(1);
+      status.textContent = recLetters.length>1 ? ('Tap to reveal letter 2 of '+recLetters.length) : 'Tap when ready to finish word';
+      tapBtn.textContent = recLetters.length>1 ? 'Tap for next letter →' : 'Tap when ready to finish word →';
+      return;
+    }
+    const dt=Math.max(150, now-recStartT);
+    recTimes.push(dt);
+    recStartT=now;
+    if(tapCount<=recLetters.length){
+      renderLetterSpans(tapCount);
+      if(tapCount<recLetters.length){
+        status.textContent='Tap to reveal letter '+(tapCount+1)+' of '+recLetters.length;
+        tapBtn.textContent='Tap for next letter →';
+      } else {
+        status.textContent='Tap when ready to finish word';
+        tapBtn.textContent='Tap when ready to finish word →';
+      }
+    } else {
+      el.customTiming=recTimes.slice();
+      status.textContent='✓ Pacing recorded';
+      tapBtn.textContent='Tap to start →';
+      resultRow.style.display='flex';
+      updateBadge();
+      toast('✓ Custom pacing saved for this word');
+      tapCount=0;
+    }
+  });
+
+  paceBtn.addEventListener('click', ()=>{
+    const willOpen=panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if(willOpen){
+      if(el.customTiming && el.customTiming.length){
+        recLetters=splitGraphemes(arInput.value.trim());
+        renderLetterSpans(recLetters.length);
+        status.textContent='✓ Pacing recorded ('+el.customTiming.length+' letters)';
+        tapBtn.textContent='Tap to start →';
+        resultRow.style.display='flex';
+        tapCount=0; recTimes=[];
+      } else {
+        resetPanel();
+      }
+    }
+  });
+  rerecordBtn.addEventListener('click', resetPanel);
+  clearBtn.addEventListener('click', ()=>{
+    el.customTiming=null;
+    panel.classList.add('hidden');
+    updateBadge();
+    toast('Using preset speed for this word');
+  });
+  arInput.addEventListener('input', ()=>{
+    if(el.customTiming){
+      el.customTiming=null;
+      updateBadge();
+      toast('Word changed — custom pacing cleared, using preset speed');
+    }
+  });
+
+  updateBadge();
+}
+
+function collectScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const scenes=[];
+  blocks.forEach(b=>{
+    const ar=b.querySelector('[data-ar]').value.trim();
+    if(!ar) return;
+    scenes.push({
+      ar, tl:b.querySelector('[data-tl]').value.trim(), en:b.querySelector('[data-en]').value.trim(),
+      showTl:b.querySelector('[data-showtl]').checked, showEn:b.querySelector('[data-showen]').checked,
+      customTiming: (b.customTiming && b.customTiming.length) ? b.customTiming.slice() : null
+    });
+  });
+  return scenes;
+}
+
+/* ===== hook / outro suggestion helper ===== */
+const HOOKS=['Learn to Read Arabic','Letter by Letter','Watch the Letters Join'];
+const OUTROS=['Practice This Word','Save to Learn Later','Follow for More Arabic Lessons'];
+function renderPills(containerId, options, targetInputId){
+  const box=$(containerId);
+  box.innerHTML='';
+  options.forEach(opt=>{
+    const p=document.createElement('div');
+    p.className='p'; p.textContent=opt;
+    p.onclick=()=>{
+      $(targetInputId).value=opt;
+      [...box.children].forEach(c=>c.classList.remove('on'));
+      p.classList.add('on');
+    };
+    box.appendChild(p);
+  });
+}
+$('suggestBtn').onclick=()=>{
+  renderPills('hookPillsList', HOOKS, 'introText');
+  renderPills('outroPillsList', OUTROS, 'outroText');
+  $('hookPills').classList.remove('hidden');
+  $('outroPills').classList.remove('hidden');
+  toast('✓ Suggestions ready — tap one to use it, or keep typing your own');
+};
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+/* ===== ambient background music + chime/tick ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+function playChime(){
+  const now=audioCtx.currentTime;
+  [660,990].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+    const g=audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.16/(i+1), now+0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.6);
+    o.connect(g); g.connect(ambientGain);
+    o.start(now); o.stop(now+0.65);
+  });
+}
+function playTick(){
+  const now=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(); o.type='triangle'; o.frequency.value=1200;
+  const g=audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.18, now+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+0.1);
+  o.connect(g); g.connect(ambientGain);
+  o.start(now); o.stop(now+0.12);
+}
+function playCompleteSound(){
+  if(!audioCtx || !ambientGain) return;
+  const type=$('completeSfx').value;
+  if(type==='none') return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(type==='chime') playChime(); else if(type==='tick') playTick();
+}
+function playLetterTick(){
+  if(!$('tickPerLetter').checked) return;
+  if(!audioCtx || !ambientGain) return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  playTick();
+}
+
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+const SPEED_MS={ veryslow:1800, slow:1300, normal:900, fast:600 };
+const HARD_FLOOR_FS=26;
+const LETTER_BOOST=0.35;
+
+function drawFrame(th, W, H){
+  const m=Math.min(W,H)*0.055;
+  ctx.strokeStyle=hexAlpha(th.accent,0.7); ctx.lineWidth=2;
+  ctx.strokeRect(m, m, W-m*2, H-m*2);
+  const flourish=(x,y,sx,sy)=>{
+    ctx.save(); ctx.translate(x,y); ctx.scale(sx,sy);
+    ctx.strokeStyle=th.accent; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(0,36); ctx.lineTo(0,10); ctx.lineTo(26,10); ctx.stroke();
+    ctx.beginPath(); ctx.arc(10,10,7,0,Math.PI/2); ctx.stroke();
+    ctx.restore();
+  };
+  flourish(m,m,1,1); flourish(W-m,m,-1,1); flourish(m,H-m,1,-1); flourish(W-m,H-m,-1,-1);
+}
+
+function drawIntro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const hook=$('introText').value.trim();
+  const fs=Math.round(W*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, hook, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawOutro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const txt=$('outroText').value.trim();
+  const fs=Math.round(W*0.065);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, txt, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdown(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save(); ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.direction='ltr';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+
+function computeStandardLayout(scene, W, H, mainFont, boldWeight){
+  const GAPS={g1:0.55,g2:0.46,g3:0.36};
+  const maxW = W*0.84;
+  let fs = Math.round(Math.min(W,H)*0.17);
+  ctx.font = boldWeight+' '+fs+'px "'+mainFont+'"';
+  let w = ctx.measureText(scene.ar).width;
+  while(w>maxW && fs>HARD_FLOOR_FS){
+    fs = Math.max(HARD_FLOOR_FS, fs-2);
+    ctx.font = boldWeight+' '+fs+'px "'+mainFont+'"';
+    w = ctx.measureText(scene.ar).width;
+  }
+  const centerX=W/2, centerY=H*0.40;
+  const rightX = centerX + w/2;
+  const met=ctx.measureText(scene.ar);
+  const descent = met.actualBoundingBoxDescent || fs*0.32;
+  return { fs, width:w, rightX, centerX, centerY, textBottomY: centerY+descent, boldWeight, gaps:GAPS };
+}
+
+function computeTallLayout(scene, W, H, mainFont, boldWeight){
+  const GAPS={g1:0.85,g2:0.68,g3:0.46};
+  const frameMargin = Math.min(W,H)*0.055;
+  const usableTop = frameMargin + H*0.05;
+  const usableBottom = H - frameMargin - H*0.05;
+  const usableH = usableBottom - usableTop;
+  const maxW = W*0.88;
+  let fs = Math.round(W*0.21);
+  ctx.font = boldWeight+' '+fs+'px "'+mainFont+'"';
+  let w = ctx.measureText(scene.ar).width;
+  while(w>maxW && fs>HARD_FLOOR_FS){
+    fs = Math.max(HARD_FLOOR_FS, fs-2);
+    ctx.font = boldWeight+' '+fs+'px "'+mainFont+'"';
+    w = ctx.measureText(scene.ar).width;
+  }
+  let arabicVisualH = fs*1.5;
+  const maxArabicShare = usableH*0.47;
+  if(arabicVisualH>maxArabicShare){
+    fs = Math.max(HARD_FLOOR_FS, Math.round(fs*(maxArabicShare/arabicVisualH)));
+    ctx.font = boldWeight+' '+fs+'px "'+mainFont+'"';
+    w = ctx.measureText(scene.ar).width;
+    arabicVisualH = fs*1.5;
+  }
+  const showTl = !!(scene.showTl && scene.tl);
+  const showEn = !!(scene.showEn && scene.en);
+  ctx.font='500 '+Math.round(fs*0.26)+'px system-ui';
+  const enLines = showEn ? wrapText(ctx, scene.en, W*0.74, ctx.font) : [];
+  const captionBlockH = (showTl||showEn ? fs*GAPS.g1 : 0) + (showTl ? fs*GAPS.g2 : 0) + (showEn ? enLines.length*fs*GAPS.g3 : 0);
+  const blockH = Math.min(usableH, arabicVisualH+captionBlockH);
+  const leftover = Math.max(0, usableH-blockH);
+  const blockTop = usableTop + leftover*0.45;
+  const centerX=W/2;
+  const centerY = blockTop + arabicVisualH/2;
+  const rightX = centerX + w/2;
+  const textBottomY = (blockTop+arabicVisualH) - fs*0.38;
+  return { fs, width:w, rightX, centerX, centerY, textBottomY, boldWeight, gaps:GAPS };
+}
+function computeSceneLayout(scene, W, H, mainFont, boldWeight, shape){
+  if(shape==='tall') return computeTallLayout(scene, W, H, mainFont, boldWeight);
+  return computeStandardLayout(scene, W, H, mainFont, boldWeight);
+}
+
+function letterIndexAt(timings, t){
+  let acc=0;
+  for(let i=0;i<timings.length;i++){
+    if(t<acc+timings[i]) return {idx:i, within:(t-acc)/timings[i]};
+    acc+=timings[i];
+  }
+  return {idx:-1, within:1};
+}
+
+function drawWordScene(t, th, scene){
+  const L=scene.layout;
+  const letters=scene.letters;
+  const timings=scene.timings;
+  const letterPhaseDur = timings.reduce((a,b)=>a+b,0);
+  const totalBeforeFade = letterPhaseDur+scene.holdDur;
+  const inFadeOut = t>totalBeforeFade;
+  const fadeOutAlpha = inFadeOut ? Math.max(0, 1-((t-totalBeforeFade)/scene.fadeOut)) : 1;
+
+  let idx, within;
+  if(t<letterPhaseDur){
+    const r=letterIndexAt(timings, t); idx=r.idx; within=r.within;
+    if(idx===-1){ idx=letters.length-1; within=1; }
+  } else { idx=letters.length-1; within=1; }
+
+  const progress = Math.min(1, t/letterPhaseDur);
+  const dynamicScale = 1 + (1-progress)*LETTER_BOOST;
+
+  ctx.font = L.boldWeight+' '+L.fs+'px "'+settings.font+'"';
+  const substr = letters.slice(0, idx+1).join('');
+  const prevSubstr = idx>0 ? letters.slice(0, idx).join('') : '';
+  const wCur = ctx.measureText(substr).width;
+  const wPrev = prevSubstr ? ctx.measureText(prevSubstr).width : 0;
+  const deltaW = Math.max(4, wCur-wPrev);
+
+  ctx.save();
+  ctx.translate(L.rightX, L.centerY);
+  ctx.scale(dynamicScale, dynamicScale);
+  ctx.translate(-L.rightX, -L.centerY);
+
+  if(t<letterPhaseDur){
+    const hAlpha = Math.max(0, 1-within/0.75);
+    if(hAlpha>0){
+      const circX = L.rightX - wCur + deltaW/2;
+      ctx.save();
+      ctx.globalAlpha = hAlpha*fadeOutAlpha;
+      ctx.strokeStyle = th.accentLight;
+      ctx.lineWidth = Math.max(2, L.fs*0.025);
+      ctx.beginPath(); ctx.arc(circX, L.centerY, L.fs*0.42, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  ctx.globalAlpha=fadeOutAlpha;
+  ctx.direction='rtl'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillStyle=th.text;
+  ctx.fillText(substr, L.rightX, L.centerY);
+  ctx.restore();
+
+  ctx.restore();
+
+  const scaledBottomOffset = (L.textBottomY - L.centerY) * dynamicScale;
+  const effectiveTextBottomY = L.centerY + scaledBottomOffset;
+
+  ctx.save(); ctx.globalAlpha=fadeOutAlpha*0.95;
+  ctx.direction='ltr'; ctx.textAlign='center';
+  let ty=effectiveTextBottomY+L.fs*L.gaps.g1;
+  if(t<letterPhaseDur){
+    const ch=letters[idx];
+    const baseCh = ch.replace(ARABIC_DIACRITIC_RE,'') || ch;
+    const info=LETTER_INFO[baseCh] || {name:ch, connects:true};
+    const isLast = idx===letters.length-1;
+    let label=info.name;
+    const marks = ch.match(ARABIC_DIACRITIC_RE_G) || [];
+    if(marks.length){
+      const markNames = marks.map(m=>HARAKAT_INFO[m]).filter(Boolean);
+      if(markNames.length) label += ' · ' + markNames.join(' + ');
+    }
+    if(!info.connects && !isLast) label += ' — doesn\u2019t connect forward';
+    ctx.font='700 '+Math.round(L.fs*0.26)+'px system-ui';
+    ctx.fillStyle=th.accentLight;
+    ctx.fillText(label, L.centerX, ty);
+  } else {
+    if(scene.showTl && scene.tl){
+      ctx.font='italic 600 '+Math.round(L.fs*0.30)+'px system-ui';
+      ctx.fillStyle=th.accentLight;
+      ctx.fillText(scene.tl, L.centerX, ty);
+      ty+=L.fs*L.gaps.g2;
+    }
+    if(scene.showEn && scene.en){
+      ctx.font='500 '+Math.round(L.fs*0.26)+'px system-ui';
+      ctx.fillStyle=th.textDim;
+      const lines2=wrapText(ctx, scene.en, W*0.7, ctx.font);
+      lines2.forEach(l=>{ ctx.fillText(l, L.centerX, ty); ty+=L.fs*L.gaps.g3; });
+    }
+  }
+  ctx.restore();
+}
+
+/* ===== timeline assembly ===== */
+function buildTimeline(scenes){
+  const hookText=$('introText').value.trim();
+  const outroText=$('outroText').value.trim();
+  const showCountdown=$('showCountdown').checked;
+  const introMs = hookText?2600:0;
+  const countdownMs = showCountdown?3000:0;
+  const boldWeight = FONT_BOLD[settings.font] || 700;
+  const shape = $('shape').value;
+  const stepDur = SPEED_MS[$('letterSpeed').value] || 900;
+  const holdDur = 2400, fadeOut=450;
+  const sceneTL = scenes.map(sc=>{
+    const letters = splitGraphemes(sc.ar);
+    let timings;
+    if(sc.customTiming && sc.customTiming.length===letters.length){
+      timings = sc.customTiming.slice();
+    } else {
+      timings = new Array(letters.length).fill(stepDur);
+    }
+    const layout = computeSceneLayout(sc, W, H, settings.font, boldWeight, shape);
+    const letterPhaseDur = timings.reduce((a,b)=>a+b,0);
+    const total = letterPhaseDur + holdDur + fadeOut;
+    return Object.assign({}, sc, {letters, timings, holdDur, fadeOut, total, layout});
+  });
+  const outroMs = outroText?2600:0;
+  const total = introMs+countdownMs+sceneTL.reduce((a,s)=>a+s.total,0)+outroMs;
+  return { introMs, countdownMs, scenes:sceneTL, outroMs, total };
+}
+function phaseAt(t){
+  let rem=t;
+  if(rem<TL.introMs) return {phase:'intro', localT:rem};
+  rem-=TL.introMs;
+  if(rem<TL.countdownMs) return {phase:'countdown', localT:rem};
+  rem-=TL.countdownMs;
+  for(let i=0;i<TL.scenes.length;i++){
+    const s=TL.scenes[i];
+    if(rem<s.total) return {phase:'word', sceneIndex:i, localT:rem};
+    rem-=s.total;
+  }
+  return {phase:'outro', localT:rem};
+}
+
+let cv,ctx,W,H,rafId,startTs=null,fontsReady=false,TL=null,lastSoundKey='';
+let mr,chunks=[],blob,pngBlob;
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  let elapsed=ts-startTs;
+  if(TL.total>0) elapsed = elapsed % TL.total;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  drawFrame(th, W, H);
+
+  const ph=phaseAt(elapsed);
+  if(ph.phase==='intro'){ drawIntro(ph.localT, th); }
+  else if(ph.phase==='countdown'){ drawCountdown(ph.localT, th); }
+  else if(ph.phase==='word'){
+    const scene=TL.scenes[ph.sceneIndex];
+    drawWordScene(ph.localT, th, scene);
+    const letterPhaseDur = scene.timings.reduce((a,b)=>a+b,0);
+    const r = ph.localT<letterPhaseDur ? letterIndexAt(scene.timings, ph.localT) : {idx:-1};
+    const curIdx = r.idx;
+    const soundKey = ph.sceneIndex+':'+(curIdx>=0 ? ('letter'+curIdx) : 'hold');
+    if(soundKey!==lastSoundKey){
+      if(curIdx>=0) playLetterTick(); else playCompleteSound();
+      lastSoundKey=soundKey;
+    }
+    if(TL.scenes.length>1){
+      ctx.textAlign='right'; ctx.direction='ltr'; ctx.fillStyle=th.textDim; ctx.font='700 '+Math.round(W*0.022)+'px system-ui';
+      ctx.fillText((ph.sceneIndex+1)+' / '+TL.scenes.length, W-30, 46);
+    }
+  } else {
+    drawOutro(ph.localT, th);
+  }
+}
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+async function ensureFontsLoaded(){
+  if(fontsReady) return;
+  try{
+    await Promise.all(FONT_OPTIONS.flatMap(g=>g.items).map(it=>
+      document.fonts.load(it.bold+' 100px "'+it.v+'"').catch(()=>null)
+    ));
+  }catch(err){}
+  fontsReady=true;
+}
+
+$('openBtn').onclick=async ()=>{
+  const scenes=collectScenes();
+  if(!scenes.length){ toast('Add at least one word first'); return; }
+  toast('Loading fonts…');
+  await ensureFontsLoaded();
+  const checkWeight=FONT_BOLD[settings.font]||700;
+  if(!document.fonts.check(checkWeight+' 40px "'+settings.font+'"')){
+    toast('Could not load "'+settings.font+'" from the internet — using a fallback font instead');
+  }
+  lastSoundKey=''; startTs=null;
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  TL=buildTimeline(scenes);
+  $('player').classList.add('show');
+  ensureAmbientGraph();
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  startTs=null; lastSoundKey='';
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'arabic-letters-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+
+/* initial render */
+renderFontSelect();
+renderPresetLibrary();
+addScene(pickArabic(WORDS.kitab), WORDS.kitab.tl, WORDS.kitab.en);
+</script>
+</body>
+</html>

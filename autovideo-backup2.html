@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryForge — Prompt to Video</title>
+<link rel="stylesheet" href="forge.css">
+<style>
+.sec{font-size:13px;font-weight:700;margin-top:4px}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg2 button{padding:8px 4px;font-size:12px}
+.seg2 button.on{border-color:var(--accent);color:var(--accent);background:#1f2633}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel-2);display:flex;flex-direction:column;gap:8px}
+.pick{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel-2);font-size:13px}
+.pick:hover{border-color:var(--accent)}
+.ptext a,.credit a{color:var(--accent)}
+.credit{font-size:12px;color:var(--muted)}
+#out{display:block;max-width:100%;max-height:calc(100vh - 480px);min-height:200px;border-radius:8px;background:#000}
+.scenes{height:330px;flex:none;overflow:auto;border-top:1px solid var(--line);background:var(--panel);padding:10px 16px;display:flex;flex-direction:column;gap:10px}
+.sc{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px;display:flex;flex-direction:column;gap:8px}
+.sc-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.sc-top b{color:var(--text)}
+.sc-top input.q{flex:1;min-width:140px;width:auto;padding:5px 8px}
+.sc textarea{min-height:46px;line-height:1.5}
+.clips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.clip{flex:none;width:110px;border:3px solid transparent;border-radius:9px;overflow:hidden;cursor:pointer;background:#000;position:relative}
+.clip img{display:block;width:100%;height:66px;object-fit:cover}
+.clip span{position:absolute;bottom:3px;right:4px;font-size:10px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px}
+.clip.on{border-color:var(--ok)}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.post .row button{flex:none}
+.keyrow .label{margin:0}
+textarea.keys{min-height:62px;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre;overflow-x:auto}
+.keystat{font-size:12px;color:var(--muted)}
+.keystat.warn{color:#ffb020}
+details textarea,details .mini,details input{margin-top:6px}
+aside>*,.box>*{flex-shrink:0}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">✨</div>StoryForge <small>type an idea → get a finished video · voice, footage, captions, music</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <div class="sec">1 · Your idea</div>
+  <textarea id="topic" rows="3" placeholder="What is the video about? e.g. 5 habits of successful students · the story of the Great Wall of China · why you should drink more water"></textarea>
+  <div class="row">
+    <div><div class="label">Type</div><select id="vtype"><option value="explainer">Faceless explainer</option><option value="list">Top list (e.g. 5 tips)</option><option value="story">Story narration</option><option value="motivation">Motivational</option><option value="promo">Product / business promo</option></select></div>
+    <div><div class="label">Length</div><select id="vlen"><option value="30">About 30 s</option><option value="60" selected>About 60 s</option><option value="90">About 90 s</option><option value="180">About 3 min</option></select></div>
+  </div>
+  <div><div class="label">Shape</div><select id="format"><option value="9:16">Vertical 9:16 (TikTok, Reels, Shorts, Status)</option><option value="16:9">Wide 16:9 (YouTube)</option><option value="1:1">Square 1:1</option></select></div>
+
+  <div class="sec">2 · Script</div>
+  <div class="seg2" id="srcMode"><button data-s="ai" class="on">🤖 AI writes it</button><button data-s="own">✍️ My own script</button></div>
+  <div class="box" id="aiBox">
+    <div><div class="label">Use first</div><select id="provider"><option value="gemini">Google Gemini</option><option value="groq">Groq (very fast)</option></select></div>
+    <details><summary class="ptext" style="cursor:pointer;margin:0">📥 Paste all my keys at once</summary>
+      <textarea id="keyDump" rows="3" placeholder="Paste your keys text here. Gemini, Groq and Pixabay keys are found automatically."></textarea>
+      <button class="mini" id="keyImport">Fill in my keys</button>
+    </details>
+    <div class="stack keyrow" style="gap:6px">
+      <div class="label">Gemini keys · one per line, up to 8 · <a class="ptext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get one free</a></div>
+      <textarea id="gkey" class="keys" rows="3" placeholder="AQ...&#10;AQ...&#10;AQ..." autocomplete="off" spellcheck="false"></textarea>
+      <div class="keystat" id="gstat"></div>
+      <div class="row"><select id="gmodel"><option value="">Paste a key to load writers</option></select><button class="mini" id="gRefresh" style="flex:none" title="Reload writers and wake all keys">↻</button></div>
+    </div>
+    <div class="stack keyrow" style="gap:6px">
+      <div class="label">Groq keys · one per line, up to 5 · <a class="ptext" href="https://console.groq.com/keys" target="_blank" rel="noopener">get one free</a></div>
+      <textarea id="qkey" class="keys" rows="3" placeholder="gsk_...&#10;gsk_...&#10;gsk_..." autocomplete="off" spellcheck="false"></textarea>
+      <div class="keystat" id="qstat"></div>
+      <div class="row"><select id="qmodel"><option value="">Paste a key to load writers</option></select><button class="mini" id="qRefresh" style="flex:none" title="Reload writers and wake all keys">↻</button></div>
+    </div>
+    <label class="check"><input type="checkbox" id="fallback" checked> When every key of one AI is used up, switch to the other AI automatically</label>
+    <div class="ptext" style="margin:0">Keys are saved only in this browser, never in your website files. Use a normal (not incognito) window so they stay saved.</div>
+  </div>
+  <div class="hidden" id="ownBox"><textarea id="ownScript" rows="7" placeholder="Paste or type your script. Every sentence or two becomes a scene."></textarea></div>
+  <button id="scriptBtn">📝 Write the script only (optional)</button>
+
+  <div class="sec">3 · Voice</div>
+  <div class="row"><select id="voice"></select><button class="mini" id="voiceTest" style="flex:none">▶ Listen</button></div>
+  <label class="slider">Speed <input type="range" id="speed" min="0.8" max="1.25" step="0.05" value="1"><b id="speedVal">1.00×</b></label>
+
+  <div class="sec">4 · Footage, music &amp; captions</div>
+  <div class="stack keyrow" style="gap:6px">
+    <div class="label">Pixabay key · <a class="ptext" href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">get one free</a></div>
+    <input type="text" id="xkey" placeholder="Paste your free Pixabay API key" autocomplete="off" spellcheck="false">
+  </div>
+  <details><summary class="ptext" style="cursor:pointer;margin:0">Already have a Pexels key? (optional)</summary>
+    <input type="text" id="pkey" placeholder="Pexels API key" autocomplete="off" spellcheck="false">
+  </details>
+  <div><div class="label">People in clips</div><select id="people"><option value="nowomen">Avoid women</option><option value="none">No people at all</option><option value="any">Any clips</option></select></div>
+  <div class="row"><label class="pick">🎵 Add music from your PC (optional)<input type="file" id="musicInput" accept="audio/*" hidden></label><button class="mini hidden" id="musicRemove" style="flex:none">✕</button></div>
+  <div class="ptext" id="musicName" style="margin:0">No music</div>
+  <label class="slider">Music volume <input type="range" id="musicVol" min="0" max="60" value="16"></label>
+  <div class="row">
+    <div><div class="label">Captions</div><select id="capStyle"><option value="pop">Bold yellow (TikTok)</option><option value="box">White on dark box</option><option value="outline">White with outline</option><option value="none">No captions</option></select></div>
+    <div><div class="label">Words at a time</div><select id="wpc"><option value="3">3 words</option><option value="5" selected>5 words</option><option value="0">Full sentence</option></select></div>
+  </div>
+  <div><div class="label">Quality</div><select id="quality"><option value="720">720p (faster)</option><option value="1080" selected>1080p (best)</option></select></div>
+
+  <button class="primary big" id="oneBtn">✨ Make my video (one click)</button>
+  <button class="big hidden" id="renderBtn">🎬 Render again with my edits</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="box post hidden" id="postBox">
+    <div class="label" style="margin:0">Ready to post</div>
+    <div class="row"><input type="text" id="postTitle"><button class="mini cp" data-t="postTitle">📋</button></div>
+    <div class="row"><textarea id="postDesc" rows="4"></textarea><button class="mini cp" data-t="postDesc">📋</button></div>
+  </div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download video</button><button id="creditsBtn" style="width:100%;margin-top:8px">⬇ Clip credits (.txt)</button></div>
+  <div class="credit">Stock videos by <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> and <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a> · AI voice by Kokoro (runs on your computer)</div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Type your idea on the left, then click "Make my video"</span></div>
+  <div class="stage"><div class="empty" id="empty">✨<br>Your finished video will play here</div><video id="out" class="hidden" controls playsinline></video></div>
+  <div class="scenes" id="scenes"><div class="muted">Your scenes appear here after the script is written. You can change any sentence, search word or clip, then render again.</div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+let Bridge={ dock(){}, setResult(){}, take:async()=>null };
+try{ Bridge=await import('./forge-bridge.js'); }catch(e){ console.warn('Tool bar unavailable',e); }
+Bridge.dock('autovideo');
+const $=id=>document.getElementById(id);
+let MBP=null, KP=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const loadKokoro=()=>KP||(KP=import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm').catch(()=>import('https://esm.sh/kokoro-js@1.2.1')));
+const KEYS={ pexels:'forge:pexelsKey', pixabay:'forge:pixabayKey', gemini:'forge:geminiKey', gmodel:'forge:geminiModel', groq:'forge:groqKey', qmodel:'forge:groqModel', provider:'forge:aiProvider', voice:'forge:voice', people:'forge:people' };
+const GBASE='https://generativelanguage.googleapis.com/v1beta/', QBASE='https://api.groq.com/openai/v1/';
+const FORMATS={ '9:16':[1080,1920], '16:9':[1920,1080], '1:1':[1080,1080] };
+const VOICES=[['am_michael','Michael: calm US male'],['am_fenrir','Fenrir: deep US male'],['am_puck','Puck: upbeat US male'],['bm_george','George: British male'],['bm_fable','Fable: British storyteller (male)'],['af_heart','Heart: warm US female'],['af_bella','Bella: lively US female'],['af_nicole','Nicole: soft US female'],['af_sarah','Sarah: clear US female'],['bf_emma','Emma: British female'],['bf_isabella','Isabella: British female']];
+const TYPES={ explainer:'faceless educational explainer', list:'top-list countdown', story:'story narration', motivation:'motivational speech', promo:'product or business promo' };
+const LEAD=0.25, GAP=0.35, FPS=30;
+let scenes=[], srcMode='ai', busy=false, cancelled=false, tts=null, musicBuf=null, out=null;
+let resultBlob=null, resultUrl=null, resultName='', credits='', wakeLock=null, nextId=1;
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2800); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); n.scrollIntoView({ behavior:'smooth', block:'center' }); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtTime(s){ s=Math.round(s); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const check=()=>{ if(cancelled) throw new Error('cancelled'); };
+if(location.protocol==='file:') showNote('This page was opened by double-clicking the file. Open it with Live Server in VS Code, or on your Netlify site.');
+
+/* ---------- saved settings (only in this browser) ---------- */
+$('voice').innerHTML=VOICES.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
+$('voice').value=localStorage.getItem(KEYS.voice)||'am_michael';
+$('voice').onchange=()=>localStorage.setItem(KEYS.voice,$('voice').value);
+$('people').value=localStorage.getItem(KEYS.people)||'nowomen';
+$('people').onchange=()=>{ localStorage.setItem(KEYS.people,$('people').value); scenes.forEach(s=>{ s.results=null; s.pick=-1; }); if(scenes.length){ renderScenes(); toast('Clips will be searched again with this setting'); } };
+[['pkey','pexels'],['xkey','pixabay'],['gkey','gemini'],['qkey','groq']].forEach(([id,k])=>{ $(id).value=localStorage.getItem(KEYS[k])||''; });
+$('provider').value=localStorage.getItem(KEYS.provider)||'gemini';
+$('provider').onchange=()=>localStorage.setItem(KEYS.provider,$('provider').value);
+$('pkey').addEventListener('input',()=>localStorage.setItem(KEYS.pexels,$('pkey').value.trim()));
+$('xkey').addEventListener('input',()=>localStorage.setItem(KEYS.pixabay,$('xkey').value.trim()));
+let gT=0, qT=0;
+$('gkey').addEventListener('input',()=>{ localStorage.setItem(KEYS.gemini,$('gkey').value.trim()); keyStatus('gemini'); clearTimeout(gT); gT=setTimeout(()=>loadGemini().catch(e=>toast('Gemini: '+e.message)),900); });
+$('qkey').addEventListener('input',()=>{ localStorage.setItem(KEYS.groq,$('qkey').value.trim()); keyStatus('groq'); clearTimeout(qT); qT=setTimeout(()=>loadGroq().catch(e=>toast('Groq: '+e.message)),900); });
+$('gmodel').onchange=()=>{ localStorage.setItem(KEYS.gmodel,$('gmodel').value); keyStatus('gemini'); };
+$('qmodel').onchange=()=>{ localStorage.setItem(KEYS.qmodel,$('qmodel').value); keyStatus('groq'); };
+const wake=p=>{ POOLS[p].rest={}; localStorage.removeItem('forge:'+p+'Rest'); keyStatus(p); };
+$('gRefresh').onclick=()=>{ wake('gemini'); loadGemini().then(()=>toast('Gemini writers updated · all keys woken up')).catch(e=>toast('Gemini: '+e.message)); };
+$('qRefresh').onclick=()=>{ wake('groq'); loadGroq().then(()=>toast('Groq writers updated · all keys woken up')).catch(e=>toast('Groq: '+e.message)); };
+$('keyImport').onclick=()=>{
+  const t=$('keyDump').value;
+  const g=t.match(/AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{20,}/g)||[];
+  const q=t.match(/gsk_[0-9A-Za-z]{20,}/g)||[];
+  const x=(t.match(/\b\d{4,12}-[0-9a-f]{20,40}\b/i)||[])[0];
+  if(!g.length && !q.length && !x) return toast('No Gemini, Groq or Pixabay keys found in that text');
+  const add=(id,found)=>{ if(!found.length) return; const now=$(id).value.split(/[\s,;]+/).filter(Boolean); $(id).value=[...new Set([...now,...found])].join('\n'); $(id).dispatchEvent(new Event('input')); };
+  add('gkey',g); add('qkey',q);
+  if(x){ $('xkey').value=x; $('xkey').dispatchEvent(new Event('input')); }
+  $('keyDump').value=''; toast('Added '+g.length+' Gemini + '+q.length+' Groq key(s)'+(x ? ' + Pixabay key' : ''));
+};
+$('speed').oninput=()=>$('speedVal').textContent=(+$('speed').value).toFixed(2)+'×';
+$('srcMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; srcMode=b.dataset.s; $('srcMode').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); $('aiBox').classList.toggle('hidden',srcMode!=='ai'); $('ownBox').classList.toggle('hidden',srcMode!=='own'); };
+$('musicInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ const ctx=new AudioContext(); musicBuf=await ctx.decodeAudioData(await f.arrayBuffer()); ctx.close(); $('musicName').textContent='🎵 '+f.name+' (fades in and out automatically)'; show('musicRemove'); }
+  catch{ toast('Could not read that music file. Try an MP3.'); }
+};
+$('musicRemove').onclick=()=>{ musicBuf=null; $('musicName').textContent='No music'; hide('musicRemove'); };
+document.querySelectorAll('.cp').forEach(b=>b.onclick=async()=>{ const el=$(b.dataset.t); try{ await navigator.clipboard.writeText(el.value); toast('Copied'); }catch{ el.select(); toast('Press Ctrl + C'); } });
+
+/* ---------- key rotation (many keys per AI, limits tracked per writer) ---------- */
+const POOLS={
+  gemini:{ name:'Gemini', el:'gkey', stat:'gstat', max:8 },
+  groq:{ name:'Groq', el:'qkey', stat:'qstat', max:5 }
+};
+const tag=k=>k.slice(-6);
+for(const p in POOLS){ const P=POOLS[p]; P.next=+localStorage.getItem('forge:'+p+'Next')||0; try{ P.rest=JSON.parse(localStorage.getItem('forge:'+p+'Rest')||'{}'); }catch{ P.rest={}; } }
+const allKeys=p=>[...new Set($(POOLS[p].el).value.split(/[\s,;]+/).map(s=>s.trim()).filter(s=>s.length>10))];
+const keyList=p=>allKeys(p).slice(0,POOLS[p].max);
+const hasKeys=p=>keyList(p).length>0;
+const scopeNow=p=>p==='gemini' ? $('gmodel').value : $('qmodel').value;
+const restUntil=(P,key,scope)=>Math.max(P.rest[tag(key)]||0, scope ? (P.rest[tag(key)+'|'+scope]||0) : 0);
+function keyStatus(p){
+  const P=POOLS[p], all=allKeys(p), l=all.slice(0,P.max), now=Date.now(), el=$(P.stat), sc=scopeNow(p);
+  const resting=l.filter(k=>restUntil(P,k,sc)>now).length;
+  let s=l.length ? l.length+' key'+(l.length>1?'s':'')+' ready, taking turns' : 'No keys yet';
+  if(resting) s=(l.length-resting)+' of '+l.length+' keys available for this writer · '+resting+' resting after a limit (↻ wakes them)';
+  if(all.length>P.max) s+=' · only the first '+P.max+' are used';
+  el.textContent=s; el.classList.toggle('warn',!!resting && resting===l.length);
+}
+function keyErr(msg,rest,global){ const e=new Error(msg); e.rest=rest; e.global=!!global; return e; }
+function waitText(ms){ const m=Math.max(1,Math.ceil(ms/60000)); return m<60 ? m+' min' : Math.round(m/60)+' h'; }
+async function withKey(p,fn,scope=''){
+  const P=POOLS[p], list=keyList(p);
+  if(!list.length) throw new Error('no '+P.name+' key');
+  const errs=[]; let tried=0;
+  for(let n=0;n<list.length;n++){
+    const i=(P.next+n)%list.length, key=list[i];
+    if(restUntil(P,key,scope)>Date.now()) continue;
+    tried++;
+    try{
+      const r=await fn(key);
+      P.next=(i+1)%list.length; localStorage.setItem('forge:'+p+'Next',P.next);
+      return r;
+    }catch(e){
+      if(!e.rest) throw e;
+      P.rest[e.global || !scope ? tag(key) : tag(key)+'|'+scope]=Date.now()+e.rest;
+      for(const t in P.rest) if(P.rest[t]<Date.now()) delete P.rest[t];
+      localStorage.setItem('forge:'+p+'Rest',JSON.stringify(P.rest));
+      errs.push(e.message); keyStatus(p); console.warn(P.name+' key …'+tag(key)+(scope ? ' on '+scope : '')+': '+e.message+' → trying the next key');
+    }
+  }
+  let err;
+  if(tried) err=new Error([...new Set(errs)].join('; ')+(tried>1 ? ' (tried '+tried+' keys)' : ''));
+  else{ const soon=Math.min(...list.map(k=>restUntil(P,k,scope)))-Date.now(); err=new Error('all '+list.length+' keys are resting after hitting their limits. The first is ready again in about '+waitText(soon)); }
+  if(scope) err.skip=true;
+  throw err;
+}
+
+/* ---------- if a writer is busy or out of free requests, try the next one ---------- */
+async function tryModels(sel,name,run){
+  const pick=$(sel).value, list=[pick,...[...$(sel).options].map(o=>o.value).filter(v=>v && v!==pick)].slice(0,5);
+  let last=null;
+  for(let i=0;i<list.length;i++){
+    try{ if(i) setP(0.08,name+': trying another writer ('+list[i].replace('models/','')+')…'); return await run(list[i]); }
+    catch(e){ if(!e.skip) throw e; last=e; console.warn(name+' writer '+list[i]+': '+e.message); if(i<list.length-1) await sleep(1200); }
+  }
+  throw new Error('no writer could answer. Last problem: '+(last ? last.message : 'busy'));
+}
+
+/* ---------- AI writer 1: Google Gemini ---------- */
+async function gfetch(path,opts,key){
+  const r=await fetch(GBASE+path,{ ...opts, headers:{ 'Content-Type':'application/json', 'x-goog-api-key':key } }).catch(()=>null);
+  if(!r) throw new Error('could not reach Google. Check your internet');
+  let j=null; try{ j=await r.json(); }catch{}
+  if(!r.ok){
+    const msg=(j && j.error && j.error.message) || ('error '+r.status), all=JSON.stringify(j||{});
+    if(/API key not valid|API_KEY_INVALID|invalid authentication|UNAUTHENTICATED/i.test(msg) || r.status===401) throw keyErr('a key was not accepted (check it at aistudio.google.com/apikey)',7*864e5,true);
+    if(r.status===429){ const d=all.match(/"retryDelay"\s*:\s*"(\d+)/); throw keyErr('the free limit was reached', /PerDay/i.test(all) ? 3*36e5 : Math.max(60,d ? +d[1]+5 : 60)*1000); }
+    if(/country|region|location/i.test(msg)) throw new Error('the free tier is not available in your area');
+    if(r.status===403) throw keyErr('a key is blocked or its project is not set up',30*6e4,true);
+    if(r.status===404 || r.status>=500 || /overloaded|high demand|UNAVAILABLE/i.test(msg)){ const e=new Error(r.status===404 ? 'this writer is not available' : 'this writer is busy right now'); e.skip=true; throw e; }
+    throw new Error(msg);
+  }
+  return j;
+}
+const gcall=(path,opts={},scope='')=>withKey('gemini',key=>gfetch(path,opts,key),scope);
+async function loadGemini(){
+  if(!hasKeys('gemini')) return;
+  const j=await gcall('models?pageSize=200',{},'models');
+  const ok=m=>(m.supportedGenerationMethods||[]).includes('generateContent') && /gemini/i.test(m.name) && !/(image|tts|audio|live|embedding|vision|learnlm|robotics|computer|nano)/i.test(m.name);
+  const ver=n=>{ const v=n.match(/gemini-(\d+(?:\.\d+)?)/); return v ? parseFloat(v[1]) : 0; };
+  const score=m=>ver(m.name)*10+(/flash/i.test(m.name)?3:0)-(/lite/i.test(m.name)?1:0)-(/(preview|exp)/i.test(m.name)?2:0)-(/pro/i.test(m.name)?4:0);
+  const list=(j.models||[]).filter(ok).sort((a,b)=>score(b)-score(a));
+  if(!list.length) throw new Error('no writers available on these keys');
+  const saved=localStorage.getItem(KEYS.gmodel);
+  $('gmodel').innerHTML=list.map(m=>'<option value="'+esc(m.name)+'">'+esc(m.displayName||m.name.replace('models/',''))+'</option>').join('');
+  $('gmodel').value=list.some(m=>m.name===saved) ? saved : list[0].name;
+  keyStatus('gemini');
+}
+async function writeGemini(prompt){
+  if(!$('gmodel').value) await loadGemini();
+  const body={ contents:[{ role:'user', parts:[{ text:prompt }] }], generationConfig:{ temperature:0.9, responseMimeType:'application/json',
+    responseSchema:{ type:'OBJECT', properties:{ title:{ type:'STRING' }, description:{ type:'STRING' }, hashtags:{ type:'ARRAY', items:{ type:'STRING' } },
+      scenes:{ type:'ARRAY', items:{ type:'OBJECT', properties:{ text:{ type:'STRING' }, search:{ type:'STRING' } }, required:['text','search'] } } }, required:['title','scenes'] } } };
+  const j=await tryModels('gmodel','Gemini',m=>gcall(m+':generateContent',{ method:'POST', body:JSON.stringify(body) },m));
+  const parts=(j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  const txt=parts.filter(p=>p.text && !p.thought).map(p=>p.text).join('').trim();
+  if(!txt) throw new Error(j.promptFeedback && j.promptFeedback.blockReason ? 'it refused this topic ('+j.promptFeedback.blockReason+')' : 'it returned an empty answer');
+  return txt;
+}
+
+/* ---------- AI writer 2: Groq ---------- */
+async function qfetch(path,opts,key){
+  const o={ ...opts, headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key } };
+  let r=await fetch(QBASE+path,o).catch(()=>null);
+  if(!r) r=await fetch('/groq-api/openai/v1/'+path,o).catch(()=>null);
+  if(!r) throw new Error('could not reach Groq. Check your internet');
+  let j=null; try{ j=await r.json(); }catch{}
+  if(!r.ok){
+    const msg=(j && j.error && j.error.message) || ('error '+r.status);
+    if(r.status===401) throw keyErr('a key was not accepted (check it at console.groq.com/keys)',7*864e5,true);
+    if(r.status===429) throw keyErr('the free limit was reached', /per day|\(TPD\)|\(RPD\)/i.test(msg) ? 3*36e5 : 65*1000);
+    if(r.status===403) throw keyErr('a key is blocked',30*6e4,true);
+    if(r.status===404 || r.status>=500 || /model/i.test(msg) && r.status===400 || /over capacity|overloaded/i.test(msg)){ const e=new Error(r.status>=500 ? 'this writer is busy right now' : 'this writer is not available'); e.skip=true; throw e; }
+    throw new Error(msg);
+  }
+  return j;
+}
+const qcall=(path,opts={},scope='')=>withKey('groq',key=>qfetch(path,opts,key),scope);
+async function loadGroq(){
+  if(!hasKeys('groq')) return;
+  const j=await qcall('models',{},'models');
+  const pref=['llama-3.3-70b-versatile','openai/gpt-oss-120b','moonshotai/kimi-k2-instruct','openai/gpt-oss-20b','llama-3.1-8b-instant'];
+  const ids=(j.data||[]).map(m=>m.id).filter(id=>!/(whisper|tts|guard|vision|distil|playai|orpheus|compound|safeguard)/i.test(id));
+  ids.sort((a,b)=>{ const ia=pref.indexOf(a), ib=pref.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  if(!ids.length) throw new Error('no writers available on these keys');
+  const saved=localStorage.getItem(KEYS.qmodel);
+  $('qmodel').innerHTML=ids.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
+  $('qmodel').value=ids.includes(saved) ? saved : ids[0];
+  keyStatus('groq');
+}
+async function writeGroq(prompt){
+  if(!$('qmodel').value) await loadGroq();
+  const shape='\nReply with JSON only, in exactly this shape: {"title":"...","description":"...","hashtags":["..."],"scenes":[{"text":"...","search":"..."}]}';
+  const j=await tryModels('qmodel','Groq',m=>qcall('chat/completions',{ method:'POST', body:JSON.stringify({ model:m, temperature:0.9, response_format:{ type:'json_object' },
+    messages:[{ role:'system', content:'You are a professional short-video scriptwriter. You always reply with valid JSON only.' },{ role:'user', content:prompt+shape }] }) },m));
+  const txt=j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if(!txt) throw new Error('it returned an empty answer');
+  return txt;
+}
+keyStatus('gemini'); keyStatus('groq');
+if(hasKeys('gemini')) loadGemini().catch(()=>{});
+if(hasKeys('groq')) loadGroq().catch(()=>{});
+
+/* ---------- writing the script (with automatic fallback) ---------- */
+const mk=(text,search)=>({ id:nextId++, text, search, results:null, pick:-1, status:'', audio:null, audioKey:'' });
+function buildPrompt(){
+  const topic=$('topic').value.trim(); if(!topic) throw new Error('type your idea in step 1 first');
+  const sec=+$('vlen').value, words=Math.round(sec*2.5), n=Math.max(4,Math.round(sec/6)), ppl=$('people').value;
+  const footageRule=ppl==='none' ? '- The "search" words must describe footage with NO people: objects, places, screens, nature, city views, buildings.\n'
+    : ppl==='nowomen' ? '- The "search" words must avoid women and people in revealing clothing. Prefer objects, places, screens, buildings and hands at work.\n' : '';
+  return 'Write the voice-over script for a '+TYPES[$('vtype').value]+' video about: "'+topic+'".\n'
+    +'Length: about '+words+' words in total (about '+sec+' seconds when spoken), split into about '+n+' scenes.\n'
+    +'Rules:\n- The first scene is a strong hook that makes people keep watching.\n- Simple, natural spoken English with short sentences. No emojis, no hashtags, no stage directions, no scene labels inside the text.\n'
+    +'- Each scene "text" is exactly what the narrator says (1 or 2 sentences, at most 30 words).\n'
+    +'- Each scene "search" is 1 to 3 simple English words describing real footage for a stock video site, e.g. "city traffic night", "laptop screen code", "ocean waves". No names of people, brands or written text.\n'
+    +footageRule
+    +'- The last scene is a short call to action (follow, subscribe or share).\n'
+    +'Also write a catchy "title" (under 70 characters), a "description" (2 or 3 sentences for social media) and 5 to 8 "hashtags" (without the # symbol).';
+}
+function applyScript(txt){
+  let data; try{ data=JSON.parse(String(txt).replace(/^```(?:json)?/i,'').replace(/```$/,'').trim()); }catch{ throw new Error('the AI answer could not be read'); }
+  const sc=(data.scenes||[]).filter(s=>s && s.text && String(s.text).trim());
+  if(!sc.length) throw new Error('the AI did not return any scenes');
+  scenes=sc.map(s=>mk(String(s.text).trim(),String(s.search||'').trim()));
+  const tags=(data.hashtags||[]).map(h=>'#'+String(h).replace(/^#/,'').replace(/\s+/g,'')).filter(h=>h.length>1).join(' ');
+  $('postTitle').value=data.title||''; $('postDesc').value=((data.description||'')+(tags?'\n\n'+tags:'')).trim(); show('postBox');
+}
+async function writeWithAI(){
+  const prompt=buildPrompt();
+  const order=$('provider').value==='groq' ? ['groq','gemini'] : ['gemini','groq'];
+  const usable=order.filter(hasKeys);
+  if(!usable.length) throw new Error('paste a Gemini or Groq key in step 2, or choose "My own script"');
+  const tries=$('fallback').checked ? usable : usable.slice(0,1), errs=[];
+  for(const p of tries){
+    const name=p==='gemini' ? 'Gemini' : 'Groq';
+    try{ setP(0.05,name+' is writing your script…'); applyScript(p==='gemini' ? await writeGemini(prompt) : await writeGroq(prompt)); if(errs.length) toast(errs[0]+' · used '+name+' instead'); return; }
+    catch(e){ console.warn(name,e); errs.push(name+': '+e.message); }
+  }
+  throw new Error(errs.join(' · '));
+}
+const STOP=new Set('a about after all also am an and any are as at be because been but by can could did do does for from get got had has have he her here him his how i if in into is it its just like make many me more most my no not now of on one only or our out over really so some such than that the their them then there these they this those to too up us very was we were what when where which who why will with would you your youre lets let thats dont cant wont every each made way things thing people time day know want need going'.split(' '));
+function searchFor(t){
+  const w=t.toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(x=>x.length>3 && !STOP.has(x));
+  return [...new Set(w)].sort((a,b)=>b.length-a.length).slice(0,2).join(' ') || ($('topic').value.trim().split(/\s+/).slice(0,2).join(' ')||'nature');
+}
+function splitOwn(text){
+  const sents=text.replace(/\s+/g,' ').trim().split(/(?<=[.!?])\s+/).filter(Boolean), outp=[]; let cur='';
+  for(const s of sents){ const t=cur ? cur+' '+s : s; if(cur && t.split(' ').length>28){ outp.push(cur); cur=s; } else cur=t; if(cur.split(' ').length>=14){ outp.push(cur); cur=''; } }
+  if(cur) outp.push(cur);
+  return outp;
+}
+async function prepareScript(){
+  if(srcMode==='own'){
+    const t=$('ownScript').value.trim(); if(!t) throw new Error('paste your script in step 2 first');
+    scenes=splitOwn(t).map(s=>mk(s,searchFor(s)));
+    if(!$('postTitle').value){ $('postTitle').value=(($('topic').value.trim())||scenes[0].text).slice(0,70); show('postBox'); }
+  }else await writeWithAI();
+  renderScenes();
+}
+
+/* ---------- stock footage: Pixabay first, Pexels optional ---------- */
+const orient=()=>({ '9:16':'portrait', '16:9':'landscape', '1:1':'square' })[$('format').value];
+const mp4s=v=>(v.video_files||[]).filter(f=>f.link && f.width && f.height && /mp4/.test(f.file_type||'')).sort((a,b)=>a.width*a.height-b.width*b.height);
+function pickFile(v,W,H){
+  const l=[...v.files].sort((a,b)=>a.width*a.height-b.width*b.height), ok=l.filter(f=>f.width*f.height<=2.3e6);
+  if(!ok.length) return l[0]||null;
+  return ok.find(f=>Math.max(W/f.width,H/f.height)<=1) || ok[ok.length-1];
+}
+const WOMEN=/\b(woman|women|girl|girls|female|females|lady|ladies|bikini|swimsuit|swimwear|lingerie|underwear|sexy|model|models|beauty|bride|dancer|yoga|fitness)\b/;
+const PEOPLE=/\b(people|person|persons|man|men|boy|boys|guy|guys|child|children|kid|kids|baby|family|couple|crowd|human|portrait|face|businessman|businesswoman|worker|workers|student|students|teacher|doctor)\b/;
+function peopleOk(v){
+  const mode=$('people').value; if(mode==='any') return true;
+  const t=String(v.tags||'').toLowerCase().replace(/[-_\/.,]/g,' ');
+  if(WOMEN.test(t)) return false;
+  if(mode==='none' && PEOPLE.test(t)) return false;
+  return true;
+}
+const PXB_CACHE='forge:pixabayCache2';
+function cacheGet(q){ try{ const c=JSON.parse(localStorage.getItem(PXB_CACHE)||'{}'), e=c[q]; return e && Date.now()-e.t<864e5 ? e.r : null; }catch{ return null; } }
+function cachePut(q,r){ try{ const c=JSON.parse(localStorage.getItem(PXB_CACHE)||'{}'), now=Date.now(); for(const k in c) if(now-c[k].t>864e5) delete c[k]; c[q]={ t:now, r }; localStorage.setItem(PXB_CACHE,JSON.stringify(c)); }catch{} }
+async function pixabayVideos(query){
+  const q=query.trim().toLowerCase().slice(0,100), hit=cacheGet(q); if(hit) return hit;
+  const qs='videos/?key='+encodeURIComponent($('xkey').value.trim())+'&q='+encodeURIComponent(q)+'&per_page=20&safesearch=true&video_type=film';
+  let res=await fetch('https://pixabay.com/api/'+qs).catch(()=>null);
+  if(!res) res=await fetch('/pixabay-api/'+qs).catch(()=>null);
+  if(!res) throw new Error('could not reach Pixabay. Check your internet');
+  if(res.status===429) throw new Error('the Pixabay limit was reached (100 searches per minute). Wait a minute and try again');
+  if(!res.ok){ const t=await res.text().catch(()=>''); if(/key/i.test(t) || res.status===401 || res.status===403) throw new Error('the Pixabay key was not accepted'); throw new Error('Pixabay answered with an error ('+res.status+')'); }
+  const j=await res.json();
+  const r=(j.hits||[]).filter(h=>h.duration>=3 && h.videos).map(h=>{
+    const files=['tiny','small','medium','large'].map(k=>h.videos[k]).filter(f=>f && f.url && f.width && f.height).map(f=>({ link:f.url, width:f.width, height:f.height }));
+    const th=(h.videos.small||h.videos.tiny||{}).thumbnail||'';
+    return { id:'x'+h.id, image:th, duration:h.duration, user:h.user, url:h.pageURL, src:'Pixabay', tags:h.tags||'', files };
+  }).filter(v=>v.files.length);
+  cachePut(q,r); return r;
+}
+async function pexelsVideos(query){
+  const key=$('pkey').value.trim();
+  const qs='v1/videos/search?query='+encodeURIComponent(query)+'&per_page=15&orientation='+orient(), opts={ headers:{ Authorization:key } };
+  let res; try{ res=await fetch('https://api.pexels.com/'+qs,opts); }catch{ res=await fetch('/pexels-api/'+qs,opts).catch(()=>null); }
+  if(!res) throw new Error('could not reach Pexels. Check your internet');
+  if(res.status===401 || res.status===403) throw new Error('the Pexels key was not accepted');
+  if(res.status===429) throw new Error('the Pexels limit was reached (200 searches per hour). Try again later');
+  if(!res.ok || !/json/.test(res.headers.get('content-type')||'')) throw new Error('Pexels answered with an error ('+res.status+')');
+  return ((await res.json()).videos||[]).filter(v=>v.duration>=3 && mp4s(v).length).map(v=>({ id:'p'+v.id, image:v.image, duration:v.duration, user:v.user && v.user.name, url:v.url, src:'Pexels', tags:String(v.url||'').split('/video/')[1]||'', files:mp4s(v).map(f=>({ link:f.link, width:f.width, height:f.height })) }));
+}
+async function footageSearch(query){
+  const x=$('xkey').value.trim(), p=$('pkey').value.trim();
+  if(!x && !p) throw new Error('paste your free Pixabay key in step 4');
+  let firstErr=null;
+  if(x){ try{ const r=(await pixabayVideos(query)).filter(peopleOk); if(r.length || !p) return r; }catch(e){ if(!p) throw e; firstErr=e; } }
+  try{ return (await pexelsVideos(query)).filter(peopleOk); }catch(e){ throw firstErr || e; }
+}
+async function searchScene(sc,autoPick){
+  if(!sc.search.trim()) sc.search=searchFor(sc.text);
+  sc.status='Searching for "'+sc.search+'"…'; renderOne(sc);
+  try{
+    sc.results=await footageSearch(sc.search);
+    if(autoPick || sc.pick<0){ const used=new Set(scenes.filter(x=>x!==sc && x.pick>=0 && x.results).map(x=>x.results[x.pick].id)); const i=sc.results.findIndex(v=>!used.has(v.id)); sc.pick=i>=0 ? i : (sc.results.length ? 0 : -1); }
+  }finally{ sc.status=''; renderOne(sc); }
+}
+async function getClipBlob(link){
+  try{ const r=await fetch(link); if(r.ok) return await r.blob(); }catch{}
+  const routes=[[/^https:\/\/videos\.pexels\.com\/(.+)$/,'/pexels-video/'],[/^https:\/\/cdn\.pixabay\.com\/(.+)$/,'/pixabay-video/']];
+  for(const [re,base] of routes){ const m=link.match(re); if(m){ try{ const r=await fetch(base+m[1]); if(r.ok && !/text\/html/.test(r.headers.get('content-type')||'')) return await r.blob(); }catch{} } }
+  throw new Error('a stock clip could not be downloaded. Check that the _redirects file is uploaded to Netlify');
+}
+
+/* ---------- scenes panel ---------- */
+function cardHtml(sc,i){
+  let clips;
+  if(sc.status) clips='<div class="muted">'+esc(sc.status)+'</div>';
+  else if(!sc.results) clips='<div class="muted">Clips are found automatically when you make the video, or click 🔍.</div>';
+  else if(!sc.results.length) clips='<div class="muted">No suitable clips found. Try simpler words like "city", "office", "laptop" or "nature".</div>';
+  else clips='<div class="clips">'+sc.results.map((v,k)=>'<div class="clip'+(k===sc.pick?' on':'')+'" data-k="'+k+'" title="Video by '+esc(v.user || v.src)+' on '+esc(v.src)+'"><img src="'+esc(v.image)+'" alt="" loading="lazy"><span>'+v.duration+'s</span></div>').join('')+'</div>';
+  return '<div class="sc" data-id="'+sc.id+'"><div class="sc-top"><b>Scene '+(i+1)+'</b>'+(sc.dur ? '· '+sc.dur.toFixed(1)+'s' : '')+'<input type="text" class="q" value="'+esc(sc.search)+'" placeholder="footage search words"><button class="mini s-search">🔍</button><button class="mini s-up" title="Move up">↑</button><button class="mini s-del" title="Delete scene">✕</button></div>'
+    +'<textarea class="s-text" rows="2">'+esc(sc.text)+'</textarea>'+clips+'</div>';
+}
+function renderScenes(){
+  $('scenes').innerHTML=scenes.length ? scenes.map(cardHtml).join('')+'<button class="mini" id="addScene">+ Add a scene</button>' : '<div class="muted">Your scenes appear here after the script is written.</div>';
+  if(scenes.length){ $('hint').textContent=scenes.length+' scenes · edit anything, then render'; show('renderBtn'); }
+}
+function renderOne(sc){ const el=$('scenes').querySelector('[data-id="'+sc.id+'"]'); if(el) el.outerHTML=cardHtml(sc,scenes.indexOf(sc)); }
+const sceneOf=el=>scenes.find(s=>s.id===+el.closest('.sc')?.dataset.id);
+$('scenes').addEventListener('input',e=>{ const sc=sceneOf(e.target); if(!sc) return; if(e.target.classList.contains('s-text')) sc.text=e.target.value; if(e.target.classList.contains('q')) sc.search=e.target.value; });
+$('scenes').addEventListener('click',e=>{
+  if(busy) return;
+  if(e.target.id==='addScene'){ scenes.push(mk('Write what the narrator says here.','')); renderScenes(); return; }
+  const sc=sceneOf(e.target); if(!sc) return;
+  const clip=e.target.closest('.clip'), c=e.target.classList, i=scenes.indexOf(sc);
+  if(clip){ sc.pick=+clip.dataset.k; renderOne(sc); }
+  else if(c.contains('s-search')) searchScene(sc,false).catch(err=>showNote('Search failed: '+err.message+'.'));
+  else if(c.contains('s-del')){ scenes.splice(i,1); renderScenes(); }
+  else if(c.contains('s-up') && i>0){ [scenes[i-1],scenes[i]]=[scenes[i],scenes[i-1]]; renderScenes(); }
+});
+
+/* ---------- AI voice (Kokoro, runs on this computer) ---------- */
+async function getTTS(){
+  if(tts) return tts;
+  const { KokoroTTS }=await loadKokoro();
+  setP(0,'Loading the AI voice (first time downloads about 90 MB, then it is saved)…');
+  tts=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{ dtype:'q8', device:'wasm',
+    progress_callback:p=>{ if(p.status==='progress' && typeof p.progress==='number' && /onnx/.test(p.file||'')) setP(p.progress/100,'Downloading the AI voice (first time only)… '+Math.round(p.progress)+'%'); } });
+  return tts;
+}
+$('voiceTest').onclick=async()=>{
+  if(busy) return; busy=true; show('prog'); hide('note');
+  try{
+    const t=await getTTS(); setP(1,'Speaking…');
+    const a=await t.generate('Hi! This is how your video will sound. Pretty natural, right?',{ voice:$('voice').value, speed:+$('speed').value });
+    const ctx=new AudioContext(), b=ctx.createBuffer(1,a.audio.length,a.sampling_rate); b.copyToChannel(a.audio,0);
+    const s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(); s.onended=()=>ctx.close();
+    hide('prog');
+  }catch(e){ showNote('The voice could not load: '+(e.message||e)+'.'); }
+  finally{ busy=false; }
+};
+
+/* ---------- drawing ---------- */
+function wrap(ctx,text,maxW){ const words=text.split(/\s+/).filter(Boolean), lines=[]; let line=''; for(const w of words){ const t=line ? line+' '+w : w; if(ctx.measureText(t).width>maxW && line){ lines.push(line); line=w; } else line=t; } if(line) lines.push(line); return lines; }
+function drawCaption(ctx,W,H,text,style){
+  if(!text || style==='none') return;
+  if(style==='pop') text=text.toUpperCase();
+  const fs=Math.round(Math.min(W,H)*(style==='pop' ? 0.075 : 0.055));
+  ctx.save(); ctx.font='900 '+fs+'px "Segoe UI", Roboto, Arial, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const lines=wrap(ctx,text,W*0.84), lh=fs*1.25, total=lines.length*lh, top=(W<H ? H*0.70 : H*0.84)-total/2;
+  lines.forEach((ln,i)=>{
+    const y=top+i*lh+lh/2;
+    if(style==='box'){ const w=ctx.measureText(ln).width+fs*0.7; ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(W/2-w/2,y-lh/2,w,lh,fs*0.22); else ctx.rect(W/2-w/2,y-lh/2,w,lh); ctx.fill(); ctx.fillStyle='#fff'; ctx.fillText(ln,W/2,y); }
+    else{ ctx.lineJoin='round'; ctx.lineWidth=Math.max(4,fs*0.2); ctx.strokeStyle='#000'; ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=fs*0.15; ctx.strokeText(ln,W/2,y); ctx.shadowColor='transparent'; ctx.fillStyle=style==='pop' ? '#ffd60a' : '#fff'; ctx.fillText(ln,W/2,y); }
+  });
+  ctx.restore();
+}
+function buildCaptions(n){
+  const caps=[];
+  for(const sc of scenes){
+    const words=sc.text.trim().split(/\s+/).filter(Boolean); if(!words.length) continue;
+    const groups=[]; if(!n) groups.push(words); else for(let i=0;i<words.length;i+=n) groups.push(words.slice(i,i+n));
+    const totalChars=words.join(' ').length; let before=0;
+    for(const g of groups){ const t=g.join(' '), s=sc.start+sc.dur*(before/totalChars); before+=t.length+1; caps.push({ start:s, end:sc.start+sc.dur*Math.min(1,before/totalChars), text:t }); }
+  }
+  return caps;
+}
+const capAt=(caps,t)=>{ for(const c of caps){ if(t>=c.start && t<c.end) return c.text; } return ''; };
+
+/* ---------- decoding a stock clip (loops if shorter than the scene) ---------- */
+async function openClip(MB,blob,W,H){
+  const input=new MB.Input({ source:new MB.BlobSource(blob), formats:MB.ALL_FORMATS });
+  const track=await input.getPrimaryVideoTrack();
+  if(!track || !(await track.canDecode())) throw new Error('cannot decode');
+  const first=await track.getFirstTimestamp(), dur=Math.max(0.5,(await track.computeDuration())-first), skip=Math.min(0.4,dur*0.1);
+  const hold=new OffscreenCanvas(W,H);
+  return { input, first:first+skip, dur:dur-skip, hold, hx:hold.getContext('2d'), sink:new MB.CanvasSink(track,{ width:W, height:H, fit:'cover', poolSize:2 }), iter:null, next:null, has:false, pos:-1 };
+}
+async function restartClip(c){ if(c.iter){ try{ await c.iter.return(); }catch{} } c.iter=c.sink.canvases(c.first); const r=await c.iter.next(); c.next=r.done ? null : r.value; }
+async function clipFrame(c,t){
+  if(!c.iter) await restartClip(c);
+  const target=c.first+(t % c.dur);
+  if(target<c.pos-0.001) await restartClip(c);
+  while(c.next && (!c.has || c.next.timestamp<=target+0.001)){ c.hx.drawImage(c.next.canvas,0,0); c.has=true; const r=await c.iter.next(); c.next=r.done ? null : r.value; }
+  c.pos=target; return c.has ? c.hold : null;
+}
+async function closeClip(c){ if(!c) return; try{ if(c.iter) await c.iter.return(); }catch{} try{ c.input.dispose?.(); }catch{} }
+
+/* ---------- making the video ---------- */
+function setBusy(on){
+  busy=on; $('oneBtn').disabled=on; $('renderBtn').disabled=on; $('scriptBtn').disabled=on; $('voiceTest').disabled=on;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  $('scenes').style.pointerEvents=on?'none':''; $('scenes').style.opacity=on?'.65':'';
+  keepAwake(on);
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(out){ try{ await out.cancel(); }catch{} } };
+async function render(){
+  if(!('VideoEncoder' in window)) throw new Error('making videos needs Google Chrome or Microsoft Edge on a computer');
+  if(!scenes.length) throw new Error('there are no scenes yet');
+  if(!$('xkey').value.trim() && !$('pkey').value.trim()) throw new Error('paste your free Pixabay key in step 4');
+  const MB=await loadMB();
+  const q=+$('quality').value, [BW,BH]=FORMATS[$('format').value], k=q/Math.min(BW,BH), W=Math.round(BW*k/2)*2, H=Math.round(BH*k/2)*2;
+
+  const t=await getTTS(), voice=$('voice').value, speed=+$('speed').value;
+  for(let i=0;i<scenes.length;i++){
+    check(); const sc=scenes[i], key=voice+'|'+speed+'|'+sc.text.trim();
+    setP(0.05+0.25*i/scenes.length,'Recording the voice… scene '+(i+1)+' of '+scenes.length);
+    if(sc.audioKey!==key){ const a=await t.generate(sc.text.trim(),{ voice, speed }); sc.audio={ data:a.audio, rate:a.sampling_rate }; sc.audioKey=key; }
+  }
+  let time=LEAD;
+  scenes.forEach(sc=>{ sc.start=time; sc.dur=sc.audio.data.length/sc.audio.rate; sc.end=time+sc.dur+GAP; time=sc.end; });
+  const total=time+0.6;
+  scenes.forEach((sc,i)=>{ sc.vs=i ? scenes[i-1].end : 0; sc.ve=i===scenes.length-1 ? total : sc.end; });
+  renderScenes();
+
+  for(let i=0;i<scenes.length;i++){
+    check(); const sc=scenes[i];
+    if(!sc.results){ setP(0.3+0.1*i/scenes.length,'Finding footage… scene '+(i+1)); try{ await searchScene(sc,true); }catch(e){ if(/key|limit/.test(e.message)) throw e; } await sleep(250); }
+  }
+  const blobs=[];
+  for(let i=0;i<scenes.length;i++){
+    check(); const sc=scenes[i], v=sc.pick>=0 && sc.results ? sc.results[sc.pick] : null, f=v ? pickFile(v,W,H) : null;
+    setP(0.4+0.15*i/scenes.length,'Downloading footage… scene '+(i+1)+' of '+scenes.length);
+    blobs[i]=f ? await getClipBlob(f.link).catch(()=>null) : null;
+  }
+
+  setP(0.56,'Mixing the sound…');
+  const SR=48000, off=new OfflineAudioContext(2,Math.ceil(total*SR),SR);
+  for(const sc of scenes){ const b=off.createBuffer(1,sc.audio.data.length,sc.audio.rate); b.copyToChannel(sc.audio.data,0); const s=off.createBufferSource(); s.buffer=b; s.connect(off.destination); s.start(sc.start); }
+  if(musicBuf && +$('musicVol').value>0){
+    const s=off.createBufferSource(), g=off.createGain(), v=+$('musicVol').value/100;
+    s.buffer=musicBuf; s.loop=musicBuf.duration<total; s.connect(g); g.connect(off.destination);
+    g.gain.setValueAtTime(0,0); g.gain.linearRampToValueAtTime(v,Math.min(1.5,total/4));
+    g.gain.setValueAtTime(v,Math.max(1.5,total-2)); g.gain.linearRampToValueAtTime(0,total); s.start(0);
+  }
+  const mixed=await off.startRendering();
+
+  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H; const ctx=canvas.getContext('2d');
+  out=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:'in-memory' }), target:new MB.BufferTarget() });
+  let vcodec='avc'; try{ if(MB.getFirstEncodableVideoCodec) vcodec=(await MB.getFirstEncodableVideoCodec(out.format.getSupportedVideoCodecs(),{ width:W, height:H }))||'avc'; }catch{}
+  const vsrc=new MB.CanvasSource(canvas,{ codec:vcodec, quality:new MB.Quality('high') }); out.addVideoTrack(vsrc,{ frameRate:FPS });
+  let acodec='aac'; try{ if(MB.getFirstEncodableAudioCodec) acodec=(await MB.getFirstEncodableAudioCodec(out.format.getSupportedAudioCodecs(),{ numberOfChannels:2, sampleRate:SR }))||'aac'; }catch{}
+  const asrc=new MB.AudioBufferSource({ codec:acodec, quality:new MB.Quality('high') }); out.addAudioTrack(asrc);
+  await out.start(); await asrc.add(mixed); asrc.close();
+  const caps=buildCaptions(+$('wpc').value), style=$('capStyle').value, frames=Math.ceil(total*FPS), t0=performance.now();
+  const clips=new Array(scenes.length).fill(undefined);
+  let si=0;
+  for(let f=0;f<frames;f++){
+    check();
+    const tt=f/FPS;
+    while(si<scenes.length-1 && tt>=scenes[si].ve){ await closeClip(clips[si]); clips[si]=null; si++; }
+    const sc=scenes[si];
+    if(clips[si]===undefined){ clips[si]=null; if(blobs[si]){ try{ clips[si]=await openClip(MB,blobs[si],W,H); }catch{ clips[si]=null; } } }
+    const p=clamp((tt-sc.vs)/Math.max(0.1,sc.ve-sc.vs),0,1);
+    const img=clips[si] ? await clipFrame(clips[si],tt-sc.vs) : null;
+    if(img){ const s=1.02+0.07*p, sw=W*s, sh=H*s, pan=(sw-W)/2*(p-0.5)*(si%2 ? 1 : -1); ctx.drawImage(img,(W-sw)/2+pan,(H-sh)/2,sw,sh); }
+    else{ const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,'#1d2b64'); g.addColorStop(1,'#7c5cff'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+    const shade=ctx.createLinearGradient(0,H*0.45,0,H); shade.addColorStop(0,'rgba(0,0,0,0)'); shade.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=shade; ctx.fillRect(0,H*0.45,W,H*0.55);
+    drawCaption(ctx,W,H,capAt(caps,tt),style);
+    await vsrc.add(tt,1/FPS);
+    if(f%15===0){ const pr=f/frames, secs=(performance.now()-t0)/1000; setP(0.6+0.4*pr,'Building the video… '+Math.round(pr*100)+'%'+(pr>0.05 ? ' · about '+fmtTime(secs/pr*(1-pr))+' left' : '')); }
+  }
+  for(const c of clips) await closeClip(c);
+  vsrc.close(); setP(1,'Finishing…'); await out.finalize();
+
+  resultBlob=new Blob([out.target.buffer],{ type:'video/mp4' }); out=null;
+  if(resultUrl) URL.revokeObjectURL(resultUrl);
+  resultUrl=URL.createObjectURL(resultBlob);
+  const v=$('out'); v.src=resultUrl; show('out'); hide('empty');
+  resultName=(($('postTitle').value||$('topic').value||'storyforge-video').replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-').slice(0,60)||'storyforge-video')+'.mp4';
+  const lines=scenes.map((sc,i)=>{ const v=sc.pick>=0 && sc.results ? sc.results[sc.pick] : null; return v ? 'Scene '+(i+1)+': video by '+(v.user || 'unknown')+' on '+v.src+', '+v.url : null; }).filter(Boolean);
+  credits='Stock videos provided by Pixabay (https://pixabay.com) and Pexels (https://www.pexels.com)\n\n'+lines.join('\n')+'\n\nVoice: Kokoro TTS (Apache-2.0)\n';
+  show('doneBox'); Bridge.setResult(resultBlob,resultName);
+  setP(1,'Finished · '+fmtTime(total)+' video · '+fmtSize(resultBlob.size));
+  showNote('Your video is ready! Play it on the right. Change any scene below it and click "Render again", or download it.','ok');
+}
+async function runTask(fn){
+  if(busy) return;
+  cancelled=false; setBusy(true); hide('note'); show('prog'); setP(0,'Starting…'); $('prog').scrollIntoView({ behavior:'smooth', block:'center' });
+  try{ await fn(); }
+  catch(err){ console.error(err); showNote(err.message==='cancelled' || /cancel/i.test(err.message||'') ? 'Cancelled.' : 'Could not finish: '+(err.message||err)+'.'); try{ if(out) await out.cancel(); }catch{} out=null; }
+  finally{ setBusy(false); }
+}
+$('scriptBtn').onclick=()=>runTask(async()=>{ setP(0.2,srcMode==='ai' ? 'The AI is writing your script…' : 'Splitting your script into scenes…'); await prepareScript(); setP(1,'Script ready'); showNote('Script ready! Edit any scene on the right, then click "Make my video".','ok'); });
+$('oneBtn').onclick=()=>runTask(async()=>{ await prepareScript(); await render(); });
+$('renderBtn').onclick=()=>runTask(render);
+$('downloadBtn').onclick=()=>{ if(!resultBlob) return; const a=document.createElement('a'); a.href=resultUrl; a.download=resultName; document.body.appendChild(a); a.click(); a.remove(); };
+$('creditsBtn').onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([credits],{ type:'text/plain' })); a.download='video-credits.txt'; document.body.appendChild(a); a.click(); a.remove(); };
+</script>
+</body>
+</html>

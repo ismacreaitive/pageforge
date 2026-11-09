@@ -1,0 +1,6 @@
+/pexels-api/*    https://api.pexels.com/:splat     200
+/pexels-video/*  https://videos.pexels.com/:splat  200
+/pexels-img/*    https://images.pexels.com/:splat  200
+/groq-api/*      https://api.groq.com/:splat       200
+/pixabay-api/*      https://pixabay.com/api/:splat      200
+/pixabay-video/*    https://cdn.pixabay.com/:splat      200

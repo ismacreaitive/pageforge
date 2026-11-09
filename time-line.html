@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<!-- timeline.html — v4 — StoryForge Pack 2 · 🕰️ Timeline. v4: removed all direct-API generation (no more fetch calls, no API key, no model picker) — it was the repeated source of 404/503/syntax-error failures. Replaced with a manual workflow: "Copy prompt" builds the same well-tested instructions and copies them to the clipboard; you paste them into any AI chat you like (ChatGPT, Gemini, Claude, whatever); paste its reply back into the box below and "Use this" loads it straight into the Events field. Nothing in this flow can time out, 404, or need a key — it's just clipboard + paste. v3: model selector (now removed). v2: 5 hand-written presets, dates allow "c. [year]" when uncertain, never generates literal Qur'an/hadith wording. v1: typed "Date: Title | description" list reveals one event at a time along a growing timeline — vertical + auto-scroll for tall/square, true horizontal + auto-pan for wide. 4 themes, 3 motion effects, ambient sound, PNG + REC, 9:16/16:9/1:1. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Timeline</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:180px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:14px/1.5 system-ui;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=file]{padding:6px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.5;cursor:default}
+.step{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.step .num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .body{flex:1}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🕰️ Timeline <small>v4</small></h1>
+  <small>Milestones video — events reveal one at a time along a growing timeline</small>
+
+  <div class="card">
+    <h2>Start from a preset</h2>
+    <small>Hand-checked, ready to go — pick one, then edit freely below.</small>
+    <div class="pills" id="presetPills" style="margin-top:8px">
+      <div class="p" data-v="prophet">Life of the Prophet ﷺ</div>
+      <div class="p" data-v="hijrah">The Hijrah Journey</div>
+      <div class="p" data-v="badr">Battle of Badr</div>
+      <div class="p" data-v="rashidun">The Rightly-Guided Caliphs</div>
+      <div class="p" data-v="miraj">Isra &amp; Mi'raj</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✨ Generate with any AI</h2>
+    <small>No key, no setup. Describe a topic, copy the prompt, paste it into ChatGPT, Gemini, Claude — whichever you already use — then bring the answer back here.</small>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="body">
+        <textarea id="genTopic" style="min-height:50px" placeholder="e.g. Key events of the Conquest of Makkah"></textarea>
+        <div class="row">
+          <select id="genCount">
+            <option value="4">4 events</option>
+            <option value="6" selected>6 events</option>
+            <option value="8">8 events</option>
+            <option value="10">10 events</option>
+          </select>
+          <button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="body"><small>Paste that into any AI chat app and send it. Copy its full reply.</small></div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <textarea id="aiPaste" style="min-height:90px" placeholder="Paste the AI's reply here…"></textarea>
+        <div class="row"><button class="btn gold" id="usePasteBtn" type="button">✓ Use this</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Title (optional)</h2>
+    <input id="timelineTitle" placeholder="e.g. Key Moments in the Life of the Prophet ﷺ" value="Key Moments in the Life of the Prophet ﷺ">
+  </div>
+
+  <div class="card">
+    <h2>Events — one per line</h2>
+    <small>Format: <code>Date: Title | short description</code>. Dates can be anything — AH, AD, "Year 2 of the Hijrah" — nothing is calculated for you. Keep descriptions short on Wide so they don't crowd the line.</small>
+    <textarea id="script" style="margin-top:8px">570 AD: Birth | Prophet Muhammad ﷺ is born in Makkah
+610 AD: First Revelation | Angel Jibreel appears in the Cave of Hira
+622 AD: The Hijrah | Migration from Makkah to Madinah
+624 AD: Battle of Badr | The first major battle, a turning point for the Muslims
+630 AD: Conquest of Makkah | The Prophet ﷺ returns to Makkah peacefully
+632 AD: Farewell Pilgrimage | The final sermon and completion of the message</textarea>
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="steady">Steady</option><option value="pulse">Pulsing dot</option><option value="glow">Glowing line</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="speed"><option value="2200">Normal</option><option value="1500">Fast</option><option value="3200">Slow</option></select>
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview timeline</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+
+/* ===== presets (hand-written, no API involved) ===== */
+const PRESETS = {
+  prophet: { title:"Key Moments in the Life of the Prophet ﷺ", events:
+`570 AD: Birth | Prophet Muhammad ﷺ is born in Makkah
+610 AD: First Revelation | Angel Jibreel appears in the Cave of Hira
+622 AD: The Hijrah | Migration from Makkah to Madinah
+624 AD: Battle of Badr | The first major battle, a turning point for the Muslims
+630 AD: Conquest of Makkah | The Prophet ﷺ returns to Makkah peacefully
+632 AD: Farewell Pilgrimage | The final sermon and completion of the message` },
+  hijrah: { title:"The Hijrah Journey", events:
+`622 AD: Plot Against the Prophet | Quraysh leaders plan to assassinate him in Makkah
+622 AD: Night Departure | The Prophet ﷺ and Abu Bakr slip out of Makkah under cover of night
+622 AD: Cave of Thawr | They hide for three days while search parties pass by
+622 AD: Arrival in Quba | First stop outside Madinah, where a mosque is built
+622 AD: Entry into Madinah | Warmly welcomed, marking the start of the Islamic calendar` },
+  badr: { title:"Battle of Badr", events:
+`624 AD: The Caravan | A Makkan trade caravan returning from Syria draws the Muslims out
+624 AD: Quraysh Mobilize | An army marches from Makkah to defend the caravan
+624 AD: Armies Meet at Badr | Around 313 Muslims face a much larger Makkan force
+624 AD: The Battle | A decisive Muslim victory against far greater numbers
+624 AD: Aftermath | A turning point that reshaped the balance of power in Arabia` },
+  rashidun: { title:"The Rightly-Guided Caliphs", events:
+`632 AD: Abu Bakr | First Caliph; unifies Arabia after the Ridda wars
+634 AD: Umar ibn al-Khattab | Second Caliph; rapid expansion across Persia and the Levant
+644 AD: Uthman ibn Affan | Third Caliph; oversees compiling the Qur'an into one text
+656 AD: Ali ibn Abi Talib | Fourth Caliph; a period of internal trial and civil strife
+661 AD: End of an Era | The Rashidun period closes as the Umayyad dynasty begins` },
+  miraj: { title:"Isra & Mi'raj — The Night Journey", events:
+`c. 620 AD: Masjid al-Haram | The journey begins in Makkah
+c. 620 AD: Masjid al-Aqsa | A miraculous night journey to Jerusalem
+c. 620 AD: The Ascension | Ascends through the heavens, meeting earlier prophets
+c. 620 AD: The Command of Salah | The five daily prayers are prescribed
+c. 620 AD: Return to Makkah | Returns the same night to share what happened` }
+};
+$('presetPills').addEventListener('click', e=>{
+  const p=e.target.closest('.p'); if(!p) return;
+  const data=PRESETS[p.dataset.v]; if(!data) return;
+  $('timelineTitle').value=data.title;
+  $('script').value=data.events;
+  toast('✓ Preset loaded — edit freely below');
+});
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+/* ===== manual AI workflow: build prompt → clipboard, no API call of any kind ===== */
+function buildPrompt(){
+  const topic=$('genTopic').value.trim();
+  const count=+$('genCount').value;
+  if(!topic){ return null; }
+  return `You are drafting a factual historical timeline about: "${topic}"
+
+Rules — follow exactly:
+1. Output ONLY timeline lines, each in this exact format: Date: Title | short description
+2. Write approximately ${count} events, in chronological order.
+3. Use only widely-agreed mainstream historical facts. If you are not fully confident of an exact date, write an approximate form like "c. 620 AD" or "Early Madinan period" instead of inventing false precision.
+4. Never write the literal wording of a Qur'an ayah or a hadith — describe events in your own words only.
+5. Keep each title short (a few words) and each description to one short sentence.
+6. No intro, no explanation, no markdown code fences — output only the lines themselves.`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e2){ return false; }
+  }
+}
+$('copyPromptBtn').onclick=async ()=>{
+  const prompt=buildPrompt();
+  if(!prompt){ toast('Describe a topic first'); return; }
+  const ok=await copyText(prompt);
+  toast(ok ? '✓ Copied — paste it into any AI chat' : 'Could not copy automatically — select and copy manually');
+  if(!ok){
+    $('aiPaste').value='';
+    $('aiPaste').placeholder='Copy failed — here is the prompt, select all and copy it yourself:\n\n'+prompt;
+  }
+};
+$('usePasteBtn').onclick=()=>{
+  let text=$('aiPaste').value.trim();
+  if(!text){ toast('Paste the AI\u2019s reply first'); return; }
+  text=text.replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
+  const lineCount=text.split('\n').map(l=>l.trim()).filter(Boolean).length;
+  $('script').value=text;
+  toast('✓ Loaded '+lineCount+' line(s) into Events — review before recording');
+};
+
+function parseScript(){
+  return $('script').value.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const ci=line.indexOf(':');
+    if(ci===-1) return null;
+    const date=line.slice(0,ci).trim();
+    let rest=line.slice(ci+1).trim();
+    let title=rest, desc='';
+    const pi=rest.indexOf('|');
+    if(pi!==-1){ title=rest.slice(0,pi).trim(); desc=rest.slice(pi+1).trim(); }
+    return { date, title, desc };
+  }).filter(Boolean);
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+/* ===== ambient sound (same proven pattern as Calendar) ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+
+/* ===== vertical layout (tall + square): dot+line on the left, text to the right, auto-scrolls down ===== */
+const VERT = {
+  tall:   { W:1080, H:1920, titleY:110, titleFs:48, startY:230, dotX:130, textX:200, maxTextW:1080-200-70, dotR:16, lineW:5, dateFs:30, titleEventFs:50, descFs:32, gapAfter:60 },
+  square: { W:1080, H:1080, titleY:90,  titleFs:38, startY:190, dotX:120, textX:182, maxTextW:1080-182-60, dotR:13, lineW:4, dateFs:24, titleEventFs:38, descFs:25, gapAfter:42 }
+};
+/* ===== horizontal layout (wide): dot+line across the middle, labels alternate above/below, auto-pans right ===== */
+const HORZ = { W:1920, H:1080, titleY:90, titleFs:46, lineY:540, slotW:460, startX:260, dotR:16, lineW:5, dateFs:28, titleEventFs:40, descFs:24, labelOffset:70, maxTextW:400 };
+
+function measureVertCards(ctx, L, events){
+  return events.map(ev=>{
+    const descLines = ev.desc ? wrapText(ctx, ev.desc, L.maxTextW, '500 '+L.descFs+'px system-ui') : [];
+    const h = L.dateFs*1.3 + L.titleEventFs*1.25 + descLines.length*(L.descFs*1.4) + L.gapAfter;
+    return { descLines, h };
+  });
+}
+
+let cv,ctx,W,H,events=[],visibleCount=0,rafId,lastStep=0,SPEED=2200;
+let mr,chunks=[],blob,pngBlob;
+let vScroll=0, hPan=0;
+
+function drawVertical(ts, L, th){
+  const motion=$('motion').value;
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  const titleLines=wrapText(ctx, $('timelineTitle').value.trim(), W*0.86, '900 '+L.titleFs+'px system-ui');
+  titleLines.forEach((l,i)=> ctx.fillText(l, W/2, L.titleY+i*(L.titleFs*1.15)));
+  const contentTop = L.startY + Math.max(0,titleLines.length-1)*(L.titleFs*1.15);
+
+  const metas = measureVertCards(ctx, L, events);
+  let totalH=0; for(let i=0;i<visibleCount;i++) totalH+=metas[i].h;
+  const viewH = H - contentTop - 60;
+  const maxScroll = Math.max(0, totalH-viewH);
+  vScroll += (maxScroll-vScroll)*0.15;
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, contentTop-20, W, H-contentTop); ctx.clip();
+  ctx.translate(0, -vScroll);
+
+  ctx.strokeStyle=th.line; ctx.lineWidth=L.lineW; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(L.dotX, contentTop); ctx.lineTo(L.dotX, contentTop+totalH); ctx.stroke();
+
+  if(motion==='glow' && visibleCount>0){
+    const glowY = contentTop + ((ts/15)%totalH);
+    const grad=ctx.createLinearGradient(0,glowY-80,0,glowY+80);
+    grad.addColorStop(0,'rgba(255,255,255,0)'); grad.addColorStop(0.5,th.accent); grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle=grad; ctx.lineWidth=L.lineW;
+    ctx.beginPath(); ctx.moveTo(L.dotX, contentTop); ctx.lineTo(L.dotX, contentTop+totalH); ctx.stroke(); ctx.restore();
+  }
+
+  let y = contentTop;
+  for(let i=0;i<visibleCount;i++){
+    const ev=events[i], m=metas[i];
+    const isNewest = i===visibleCount-1;
+    const pulse = (motion==='pulse' && isNewest) ? 1+0.25*Math.abs(Math.sin(ts/300)) : 1;
+    ctx.save();
+    ctx.translate(L.dotX, y+L.dotR+4);
+    ctx.scale(pulse,pulse);
+    ctx.fillStyle=th.accent;
+    ctx.beginPath(); ctx.arc(0,0,L.dotR,0,7); ctx.fill();
+    ctx.restore();
+
+    ctx.textAlign='left';
+    ctx.fillStyle=th.accent; ctx.font='700 '+L.dateFs+'px system-ui';
+    ctx.fillText(ev.date, L.textX, y+L.dateFs);
+    ctx.fillStyle=th.text; ctx.font='800 '+L.titleEventFs+'px system-ui';
+    ctx.fillText(ev.title, L.textX, y+L.dateFs*1.3+L.titleEventFs*0.85);
+    let dy=y+L.dateFs*1.3+L.titleEventFs*1.25+L.descFs*0.85;
+    ctx.fillStyle=th.textDim; ctx.font='500 '+L.descFs+'px system-ui';
+    m.descLines.forEach(line=>{ ctx.fillText(line, L.textX, dy); dy+=L.descFs*1.4; });
+
+    y += m.h;
+  }
+  ctx.restore();
+}
+
+function drawHorizontal(ts, th){
+  const L=HORZ, motion=$('motion').value;
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  ctx.fillText($('timelineTitle').value.trim(), W/2, L.titleY);
+
+  const totalW = L.startX + Math.max(0,events.length-1)*L.slotW;
+  const viewW = W - L.startX - 80;
+  const latestWorldX = L.startX + Math.max(0,visibleCount-1)*L.slotW;
+  const targetPan = Math.max(0, latestWorldX - W*0.68);
+  const maxPan = Math.max(0, totalW - viewW);
+  hPan += (Math.min(targetPan,maxPan) - hPan) * 0.15;
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(40, L.titleY+30, W-80, H-L.titleY-60); ctx.clip();
+  ctx.translate(-hPan, 0);
+
+  ctx.strokeStyle=th.line; ctx.lineWidth=L.lineW; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(L.startX, L.lineY); ctx.lineTo(L.startX+Math.max(0,visibleCount-1)*L.slotW, L.lineY); ctx.stroke();
+
+  if(motion==='glow' && visibleCount>1){
+    const span=Math.max(0,visibleCount-1)*L.slotW;
+    const glowX = L.startX + ((ts/18)%Math.max(span,1));
+    const grad=ctx.createLinearGradient(glowX-90,0,glowX+90,0);
+    grad.addColorStop(0,'rgba(255,255,255,0)'); grad.addColorStop(0.5,th.accent); grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle=grad; ctx.lineWidth=L.lineW;
+    ctx.beginPath(); ctx.moveTo(L.startX, L.lineY); ctx.lineTo(L.startX+span, L.lineY); ctx.stroke(); ctx.restore();
+  }
+
+  const minAboveTy = L.titleY + L.titleFs*1.3 + 20;
+
+  for(let i=0;i<visibleCount;i++){
+    const ev=events[i];
+    const x = L.startX + i*L.slotW;
+    const above = i%2===0;
+    const isNewest = i===visibleCount-1;
+    const pulse = (motion==='pulse' && isNewest) ? 1+0.25*Math.abs(Math.sin(ts/300)) : 1;
+
+    ctx.save();
+    ctx.translate(x, L.lineY);
+    ctx.scale(pulse,pulse);
+    ctx.fillStyle=th.accent;
+    ctx.beginPath(); ctx.arc(0,0,L.dotR,0,7); ctx.fill();
+    ctx.restore();
+
+    const descLines = ev.desc ? wrapText(ctx, ev.desc, L.maxTextW, '500 '+L.descFs+'px system-ui') : [];
+    ctx.textAlign='center';
+    if(above){
+      let ty = L.lineY - L.labelOffset - descLines.length*(L.descFs*1.35) - L.titleEventFs*1.1 - L.dateFs*1.1;
+      if(ty < minAboveTy) ty = minAboveTy;
+      ctx.fillStyle=th.accent; ctx.font='700 '+L.dateFs+'px system-ui'; ctx.fillText(ev.date, x, ty); ty+=L.dateFs*1.3;
+      ctx.fillStyle=th.text; ctx.font='800 '+L.titleEventFs+'px system-ui'; ctx.fillText(ev.title, x, ty); ty+=L.titleEventFs*1.1;
+      ctx.fillStyle=th.textDim; ctx.font='500 '+L.descFs+'px system-ui';
+      descLines.forEach(line=>{ ctx.fillText(line, x, ty); ty+=L.descFs*1.35; });
+    } else {
+      let ty = L.lineY + L.labelOffset + L.dateFs;
+      ctx.fillStyle=th.accent; ctx.font='700 '+L.dateFs+'px system-ui'; ctx.fillText(ev.date, x, ty); ty+=L.titleEventFs*0.95;
+      ctx.fillStyle=th.text; ctx.font='800 '+L.titleEventFs+'px system-ui'; ctx.fillText(ev.title, x, ty); ty+=L.descFs*1.2;
+      ctx.fillStyle=th.textDim; ctx.font='500 '+L.descFs+'px system-ui';
+      descLines.forEach(line=>{ ty+=L.descFs*1.35; ctx.fillText(line, x, ty); });
+    }
+  }
+  ctx.restore();
+}
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(!lastStep) lastStep=ts;
+  if(ts-lastStep>SPEED){
+    lastStep=ts;
+    if(visibleCount<events.length) visibleCount++;
+  }
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  const shapeKey=$('shape').value;
+  if(shapeKey==='wide'){ drawHorizontal(ts, th); }
+  else { drawVertical(ts, VERT[shapeKey], th); }
+}
+
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const rawLineCount = $('script').value.split('\n').map(l=>l.trim()).filter(Boolean).length;
+  events=parseScript();
+  if(!events.length){ toast('Add at least one line: Date: Title | description'); return; }
+  if(events.length < rawLineCount){ toast((rawLineCount-events.length)+' line(s) skipped — missing a ":" after the date'); }
+  SPEED=+$('speed').value;
+  visibleCount = 1;
+  lastStep=0; vScroll=0; hPan=0;
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  $('player').classList.add('show');
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'timeline-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

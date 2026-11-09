@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<!-- chat-story.html — v2.8 — StoryForge Formats · Pack 1 · 💬 Chat Story. v2.8: fixed two bugs. (1) Mic now shows live interim text as you speak (interimResults re-enabled) instead of waiting for Chrome to decide you're fully done — fixes the ~10s delay and reduces drift, since you can see and stop it the moment it's right. (2) Generate button could hang forever on a stalled connection with no way to recover; added a 25s timeout via AbortController that fails gracefully with a clear message instead. No other changes from v2.7. v2.6: auto-generate calls "gemini-flash-latest" (Google's auto-updating alias). v2.5: voice dictation added. v2.4: auto-generate from topic via free Gemini API; never generates actual Qur'an/hadith wording, leaves bracketed placeholder + warns via toast; live "Estimated length" readout. v2.3: *bold* _italic_ ~strike~ formatting + "> " quote-block. v2.2: avatar upload both sides; fixed keyboard-click sound. v2.1 base: typing dots, seen ticks, 4 themes, 4 sounds, auto-scroll, PNG + REC. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Chat Story</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#25D366}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+.ta-wrap{position:relative}
+textarea{width:100%;min-height:160px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;padding-right:46px;font:14px/1.5 system-ui;resize:vertical}
+.mic-btn{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;background:#1a2333;border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0}
+.mic-btn.listening{background:#ff4444;color:#fff;border-color:#ff4444;animation:pulseMic 1s infinite}
+.mic-btn:disabled{opacity:.35;cursor:default}
+@keyframes pulseMic{0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,.55)}50%{box-shadow:0 0 0 9px rgba(255,68,68,0)}}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit}
+input[type=file]{padding:6px}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.5;cursor:default}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>💬 Chat Story <small>v2.8</small></h1>
+  <small>Fake chat conversation video — bubbles, ticks, avatars, formatting, auto-generate, voice input, typing, sound</small>
+
+  <div class="card">
+    <h2>✨ Auto-generate script</h2>
+    <small>Describe the topic — type it or tap the mic and speak it — AI writes the chat for you in the exact format below, matched to the length you pick. It will never write the actual Qur'an ayah or hadith wording itself — it leaves a clear bracketed spot for you to paste the authentic text in.</small>
+    <div class="ta-wrap" style="margin-top:8px">
+      <textarea id="genTopic" style="min-height:70px" placeholder="e.g. A friend confesses he almost stopped praying, until one hadith changed everything"></textarea>
+      <button type="button" class="mic-btn" id="genMicBtn" title="Speak your topic">🎤</button>
+    </div>
+    <div class="row">
+      <select id="genLength">
+        <option value="20">~20 sec</option>
+        <option value="40" selected>~40 sec</option>
+        <option value="60">~1 min</option>
+        <option value="90">~1.5 min</option>
+        <option value="120">~2 min</option>
+      </select>
+      <button class="btn gold" id="genBtn" type="button">✨ Generate chat</button>
+    </div>
+    <div id="genKeyRow" class="row" style="margin-top:8px"></div>
+    <small>No key yet? Get a free one at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--accent)">aistudio.google.com</a> — 2 minutes, no card needed. It's saved only in this browser, never sent to me.</small>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="whatsapp">WhatsApp</div>
+      <div class="p" data-v="imessage">iMessage</div>
+      <div class="p" data-v="instagram">Instagram DM</div>
+      <div class="p" data-v="telegram">Telegram</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Contacts</h2>
+    <div class="row">
+      <input id="leftName" placeholder="Left name" value="Ahmad">
+      <input id="rightName" placeholder="Right name" value="You">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Avatars (optional)</h2>
+    <div class="row">
+      <div>
+        <div class="label">Left avatar (contact)</div>
+        <input type="file" id="leftAvatarFile" accept="image/*">
+      </div>
+      <div>
+        <div class="label">Right avatar (you)</div>
+        <input type="file" id="rightAvatarFile" accept="image/*">
+      </div>
+    </div>
+    <small>Square photos work best — they're cropped into a circle, just like a real chat app. Leave blank for colored initials.</small>
+  </div>
+
+  <div class="card">
+    <h2>Script — one line per message</h2>
+    <small>Format: <code>Name: message</code>. Add <code>*bold*</code>, <code>_italic_</code>, <code>~strikethrough~</code>. Start a line with <code>&gt;</code> for a highlighted quote block — great for an ayah or hadith. Add 🎤 at the start of a line for a voice-note bubble. Use the mic button to dictate instead of typing.</small>
+    <div class="ta-wrap" style="margin-top:8px">
+      <textarea id="script">Ahmad: *assalamu alaykum*, you good? 😊
+You: wa alaykum salam, _alhamdulillah_. you?
+Ahmad: I need to tell you something that changed my life
+You: go ahead 👀
+Ahmad: I almost gave up salah... until one hadith stopped me
+You: which one?
+Ahmad: > "The first thing a person will be asked about on the Day of Judgment is their prayer" 🕌</textarea>
+      <button type="button" class="mic-btn" id="scriptMicBtn" title="Dictate the script">🎤</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div id="estLine" style="font-size:13px;color:var(--muted);margin-bottom:8px">Estimated length: —</div>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option></select>
+      <select id="speed"><option value="1800">Normal</option><option value="1200">Fast</option><option value="2600">Slow</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="soundType">
+        <option value="bell">🔔 WhatsApp-style bell</option>
+        <option value="pop">💬 Soft pop</option>
+        <option value="click">⌨ Keyboard click</option>
+        <option value="none">🔇 Silent</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview chat</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+let settings={ theme:'whatsapp' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  whatsapp:{ bg:'#0b141a', header:'#1f2c34', headerText:'#fff', right:'#005c4b', left:'#1f2c34', textR:'#e9edef', textL:'#e9edef', tick:'#53bdeb', accent:'#25D366' },
+  imessage:{ bg:'#ffffff', header:'#f6f6f6', headerText:'#111', right:'#0b84ff', left:'#e5e5ea', textR:'#fff', textL:'#111', tick:'#8e8e93', accent:'#0b84ff' },
+  instagram:{ bg:'#000000', header:'#000000', headerText:'#fff', right:'#3797f0', left:'#262626', textR:'#fff', textL:'#fff', tick:'#8e8e8e', accent:'#e1306c' },
+  telegram:{ bg:'#0e1621', header:'#17212b', headerText:'#fff', right:'#2b5278', left:'#182533', textR:'#fff', textL:'#fff', tick:'#4fae4e', accent:'#2AABEE' }
+};
+
+/* ===== voice dictation (browser speech recognition) — live interim text ===== */
+function addMic(textareaId, btnId){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = $(btnId);
+  if(!SR){
+    btn.disabled = true;
+    btn.title = 'Voice input needs Chrome or Edge';
+    return;
+  }
+  let rec = null, listening = false, baseText = '';
+  btn.onclick = () => {
+    if(listening){ rec && rec.stop(); return; }
+    const ta = $(textareaId);
+    baseText = ta.value.trim();
+    rec = new SR();
+    rec.lang = 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onstart = () => { listening = true; btn.classList.add('listening'); btn.textContent = '⏹'; };
+    rec.onerror = (e) => {
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){ toast('Microphone permission was blocked — allow it in your browser and try again'); }
+      else if(e.error !== 'no-speech'){ toast('Voice input hiccup — tap the mic to try again'); }
+    };
+    rec.onend = () => { listening = false; btn.classList.remove('listening'); btn.textContent = '🎤'; ta.dispatchEvent(new Event('input')); };
+    rec.onresult = (e) => {
+      let session = '';
+      for(let i = 0; i < e.results.length; i++){ session += e.results[i][0].transcript; }
+      session = session.trim();
+      ta.value = baseText ? (session ? baseText + ' ' + session : baseText) : session;
+    };
+    try{ rec.start(); } catch(err){ toast('Could not start the microphone — try again'); }
+  };
+}
+addMic('genTopic','genMicBtn');
+addMic('script','scriptMicBtn');
+
+/* ===== avatars ===== */
+let leftAvatarImg=null, rightAvatarImg=null;
+function bindAvatar(inputId, which){
+  $(inputId).addEventListener('change', e=>{
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    const img=new Image();
+    img.onload=()=>{ if(which==='left') leftAvatarImg=img; else rightAvatarImg=img; toast('✓ '+(which==='left'?'Left':'Right')+' avatar set'); };
+    img.onerror=()=>{ toast('Could not read that image.'); };
+    img.src=URL.createObjectURL(f);
+  });
+}
+bindAvatar('leftAvatarFile','left');
+bindAvatar('rightAvatarFile','right');
+
+function drawAvatar(ctx, cx, cy, r, img, name, color){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.closePath(); ctx.clip();
+  if(img && img.complete && img.naturalWidth){
+    const s=Math.min(img.naturalWidth, img.naturalHeight);
+    const sx=(img.naturalWidth-s)/2, sy=(img.naturalHeight-s)/2;
+    ctx.drawImage(img, sx, sy, s, s, cx-r, cy-r, r*2, r*2);
+  } else {
+    ctx.fillStyle=color; ctx.fillRect(cx-r, cy-r, r*2, r*2);
+    ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(r*0.85)+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(initials(name), cx, cy+r*0.04);
+  }
+  ctx.restore();
+}
+
+/* ===== message formatting: *bold* _italic_ ~strike~ and leading "> " quote ===== */
+function parseFormatting(text){
+  const runs=[];
+  const regex=/(\*[^*\n]+\*)|(_[^_\n]+_)|(~[^~\n]+~)/g;
+  let lastIndex=0, match;
+  while((match=regex.exec(text))!==null){
+    if(match.index>lastIndex) runs.push({text:text.slice(lastIndex,match.index), bold:false, italic:false, strike:false});
+    if(match[1]) runs.push({text:match[1].slice(1,-1), bold:true, italic:false, strike:false});
+    else if(match[2]) runs.push({text:match[2].slice(1,-1), bold:false, italic:true, strike:false});
+    else if(match[3]) runs.push({text:match[3].slice(1,-1), bold:false, italic:false, strike:true});
+    lastIndex=regex.lastIndex;
+  }
+  if(lastIndex<text.length) runs.push({text:text.slice(lastIndex), bold:false, italic:false, strike:false});
+  return runs;
+}
+function tokenize(text){
+  const runs=parseFormatting(text);
+  const tokens=[];
+  for(const run of runs){
+    const parts=run.text.split(/(\s+)/);
+    for(const p of parts){
+      if(p==='') continue;
+      tokens.push({text:p, bold:run.bold, italic:run.italic, strike:run.strike, isSpace:/^\s+$/.test(p)});
+    }
+  }
+  return tokens;
+}
+function tokFont(tok,fs){ return (tok.italic?'italic ':'')+(tok.bold?'bold ':'')+fs+'px system-ui'; }
+function lineWidth(ctx,line,fs){
+  let w=0;
+  for(const tok of line){ ctx.font=tokFont(tok,fs); w+=ctx.measureText(tok.text).width; }
+  return w;
+}
+function wrapFormatted(ctx,text,maxW,fs){
+  const tokens=tokenize(text);
+  const lines=[]; let cur=[]; let curW=0;
+  for(const tok of tokens){
+    ctx.font=tokFont(tok,fs);
+    const w=ctx.measureText(tok.text).width;
+    if(tok.isSpace){
+      if(cur.length===0) continue;
+      if(curW+w>maxW){ lines.push(cur); cur=[]; curW=0; continue; }
+      cur.push(tok); curW+=w; continue;
+    }
+    if(curW+w>maxW && cur.length>0){
+      if(cur[cur.length-1].isSpace){ const sp=cur.pop(); ctx.font=tokFont(sp,fs); curW-=ctx.measureText(sp.text).width; }
+      lines.push(cur); cur=[]; curW=0;
+    }
+    cur.push(tok); curW+=w;
+  }
+  if(cur.length){ if(cur[cur.length-1].isSpace) cur.pop(); lines.push(cur); }
+  return lines;
+}
+
+function parseScript(){
+  const lines=$('script').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const right=$('rightName').value.trim();
+  return lines.map(l=>{
+    let voice=false;
+    if(l.startsWith('🎤')){ voice=true; l=l.slice(2).trim(); }
+    const i=l.indexOf(':');
+    if(i===-1) return null;
+    const name=l.slice(0,i).trim();
+    let text=l.slice(i+1).trim();
+    let quote=false;
+    if(text.startsWith('>')){ quote=true; text=text.slice(1).trim(); }
+    return { from: name===right?'right':'left', text, name, voice, quote };
+  }).filter(Boolean);
+}
+function shapeWH(){ return $('shape').value==='tall'?[1080,1920]:[1920,1080]; }
+
+/* ===== auto-generate (Gemini) ===== */
+const LS_KEY='sf_gemini_key';
+function getKey(){ return localStorage.getItem(LS_KEY)||''; }
+function setKey(k){ localStorage.setItem(LS_KEY,k); renderKeyRow(); }
+function clearKey(){ localStorage.removeItem(LS_KEY); renderKeyRow(); }
+function renderKeyRow(){
+  const row=$('genKeyRow'); const k=getKey();
+  if(k){
+    row.innerHTML='<small style="flex:1">🔑 API key saved. <a href="#" id="changeKeyLink" style="color:var(--accent)">Change</a></small>';
+    $('changeKeyLink').onclick=(e)=>{ e.preventDefault(); clearKey(); };
+  } else {
+    row.innerHTML='<input id="genKeyInput" type="password" placeholder="Paste free Gemini API key"><button class="btn" id="saveKeyBtn" type="button" style="flex:0 0 auto;width:auto;padding:8px 14px">Save</button>';
+    $('saveKeyBtn').onclick=()=>{ const v=$('genKeyInput').value.trim(); if(!v){ toast('Paste a key first'); return; } setKey(v); toast('✓ Key saved'); };
+  }
+}
+renderKeyRow();
+
+function estimateMsgCount(){
+  return $('script').value.split('\n').map(l=>l.trim()).filter(Boolean).length;
+}
+function updateEstimate(){
+  const n=estimateMsgCount();
+  const speed=+$('speed').value;
+  const label={1200:'Fast',1800:'Normal',2600:'Slow'}[speed]||'';
+  if(!n){ $('estLine').textContent='Estimated length: — add script lines'; return; }
+  const secs=Math.round((n*2*speed)/1000);
+  $('estLine').textContent='Estimated length: ~'+secs+'s ('+n+' messages × '+label+' speed)';
+}
+$('script').addEventListener('input',updateEstimate);
+$('speed').addEventListener('change',updateEstimate);
+updateEstimate();
+
+$('genBtn').onclick=async ()=>{
+  const key=getKey();
+  if(!key){ toast('Paste your free Gemini API key first — link is just below the button'); return; }
+  const topic=$('genTopic').value.trim();
+  if(!topic){ toast('Describe the topic first — type it or use the mic'); return; }
+  const seconds=+$('genLength').value;
+  const speed=+$('speed').value;
+  const targetCount=Math.max(4, Math.round((seconds*1000)/(2*speed)));
+  const left=$('leftName').value.trim()||'Ahmad';
+  const right=$('rightName').value.trim()||'You';
+  const btn=$('genBtn');
+  btn.disabled=true; btn.textContent='Generating…';
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),25000);
+  try{
+    const prompt=`You are writing a short two-person WhatsApp-style chat script for a video.
+
+Topic / brief: "${topic}"
+
+Rules — follow exactly:
+1. Output ONLY the chat lines. No intro, no explanation, no markdown code fences, nothing else before or after.
+2. One message per line, format exactly: Name: message text
+3. Use these two names only, exactly as written: "${left}" and "${right}".
+4. Write approximately ${targetCount} lines total — not far above or below that number.
+5. Natural, emotionally engaging conversational tone, like a real DM exchange, not formal writing.
+6. You may use *word* for bold, _word_ for italic, ~word~ for strikethrough — sparingly, where a real person would emphasize something.
+7. You may start a line with 🎤 to mark it as a voice note instead of typed text.
+8. CRITICAL: never write the literal wording of a Qur'an ayah or a hadith yourself, even partially or closely paraphrased. If the conversation calls for quoting one, instead write a line in exactly this shape:
+${right}: > [PASTE EXACT HADITH HERE — tell me which one, e.g. Sahih Bukhari, Book of Prayer, on the importance of salah]
+so the user can paste the authentic text in themselves. Name which hadith or ayah would fit inside the brackets, but do not write its wording.
+9. Keep each message short — one or two sentences, like a real chat message, not a paragraph.`;
+
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({ contents:[{role:'user',parts:[{text:prompt}]}], generationConfig:{temperature:0.9,maxOutputTokens:2048} }),
+      signal: controller.signal
+    });
+    if(!res.ok){
+      if(res.status===400||res.status===401||res.status===403) throw new Error('That API key was rejected — double-check it was copied in full.');
+      if(res.status===404) throw new Error("Google changed the model name again — tell me and I'll update it.");
+      if(res.status===429) throw new Error('Free quota reached for now — wait a bit and try again.');
+      throw new Error('Generation failed (error '+res.status+').');
+    }
+    const data=await res.json();
+    let text=(data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || []).map(p=>p.text||'').join('');
+    text=text.trim().replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
+    if(!text) throw new Error('No script came back — try rewording the topic.');
+    $('script').value=text;
+    updateEstimate();
+    toast(/\[PASTE EXACT|\[INSERT/i.test(text) ? '✓ Generated — fill in the bracketed hadith/ayah spot(s) before recording' : '✓ Script generated');
+  } catch(err){
+    if(err.name==='AbortError'){ toast('Taking too long — check your internet connection and try again'); }
+    else { toast(err.message || 'Something went wrong'); }
+  } finally {
+    clearTimeout(timeoutId);
+    btn.disabled=false; btn.textContent='✨ Generate chat';
+  }
+};
+
+/* ===== synthesized sounds ===== */
+let actx=null;
+function ensureAudio(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+
+function playPop(from){
+  const type=$('soundType').value;
+  if(type==='none') return;
+  const ctx=ensureAudio();
+  if(ctx.state==='suspended'){ ctx.resume(); }
+  const t=ctx.currentTime;
+
+  if(type==='bell'){
+    const freqs = from==='right' ? [1300,1900] : [900,1300];
+    freqs.forEach((f,i)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(0,t+i*0.09);
+      g.gain.linearRampToValueAtTime(0.22,t+i*0.09+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,t+i*0.09+0.3);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t+i*0.09); o.stop(t+i*0.09+0.32);
+    });
+  } else if(type==='pop'){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    const startFreq = from==='right' ? 1100 : 750;
+    const endFreq = from==='right' ? 500 : 350;
+    o.type='sine'; o.frequency.setValueAtTime(startFreq,t); o.frequency.exponentialRampToValueAtTime(endFreq,t+0.08);
+    g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(t+0.13);
+  } else if(type==='click'){
+    const bufferSize=Math.floor(ctx.sampleRate*0.03);
+    const buf=ctx.createBuffer(1,bufferSize,ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<bufferSize;i++) d[i]=(Math.random()*2-1)*(1-i/bufferSize);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value= from==='right'?2500:1800;
+    const g=ctx.createGain(); g.gain.value=0.7;
+    src.connect(f); f.connect(g); g.connect(ctx.destination); src.start();
+  }
+}
+
+let cv,ctx,W,H,msgs=[],visible=0,showTyping=false,typingFor=null,rafId,lastStep=0,SPEED=1800;
+let mr,chunks=[],blob,pngBlob;
+let scrollOffset=0;
+
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+
+function drawTicks(ctx,x,y,size,color){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(1.5,size*0.22); ctx.lineCap='round'; ctx.lineJoin='round';
+  for(let i=0;i<2;i++){
+    const ox=i*size*0.42;
+    ctx.beginPath();
+    ctx.moveTo(x+ox, y);
+    ctx.lineTo(x+ox+size*0.28, y+size*0.3);
+    ctx.lineTo(x+ox+size*0.75, y-size*0.32);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function measureAll(ctx,W,fs){
+  const maxBubbleW=W*0.62;
+  const barW=W*0.012, barGap=W*0.015;
+  return msgs.map(m=>{
+    const innerPad = m.quote ? (barW+barGap) : 0;
+    const maxTextW = maxBubbleW - W*0.06 - innerPad;
+    const lines = wrapFormatted(ctx, m.text, maxTextW, fs);
+    let maxLineW=0;
+    for(const line of lines){ const w=lineWidth(ctx,line,fs); if(w>maxLineW) maxLineW=w; }
+    const bh = lines.length*fs*1.35 + W*0.045 + (m.voice?W*0.02:0);
+    const bw = m.voice ? W*0.42 : Math.min(maxBubbleW, maxLineW + W*0.06 + innerPad);
+    return { lines, bh, bw, innerPad };
+  });
+}
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(!lastStep) lastStep=ts;
+  const elapsed=ts-lastStep;
+  if(elapsed>SPEED){
+    lastStep=ts;
+    if(showTyping){ showTyping=false; playPop(msgs[visible].from); visible++; }
+    else if(visible<msgs.length){ showTyping=true; typingFor=msgs[visible].from; }
+  }
+
+  const th=THEMES[settings.theme];
+  ctx.fillStyle=th.bg; ctx.fillRect(0,0,W,H);
+
+  const barH=H*0.075;
+  ctx.fillStyle=th.header; ctx.fillRect(0,0,W,barH);
+  const avR=barH*0.3;
+  drawAvatar(ctx, W*0.1, barH/2, avR, leftAvatarImg, $('leftName').value, th.accent);
+  ctx.fillStyle=th.headerText; ctx.font='bold '+Math.round(barH*0.36)+'px system-ui'; ctx.textAlign='left';
+  ctx.fillText($('leftName').value||'Chat', W*0.1+avR*1.6, barH*0.42);
+  ctx.font=Math.round(barH*0.24)+'px system-ui'; ctx.globalAlpha=0.7;
+  ctx.fillText(showTyping && typingFor==='left' ? 'typing…' : 'online', W*0.1+avR*1.6, barH*0.68);
+  ctx.globalAlpha=1;
+
+  const padX=W*0.1, bAvR=W*0.026, avGap=W*0.012, fs=Math.round(W*0.034);
+  const metas=measureAll(ctx,W,fs);
+  let totalH=0;
+  for(let i=0;i<visible;i++) totalH+=metas[i].bh+W*0.025;
+  if(showTyping) totalH+=W*0.09+W*0.025;
+  const viewH=H-barH-W*0.04;
+  const maxScroll=Math.max(0,totalH-viewH);
+  scrollOffset += (maxScroll-scrollOffset)*0.18;
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0,barH,W,H-barH); ctx.clip();
+  let y=barH+W*0.04-scrollOffset;
+  ctx.font=fs+'px system-ui';
+  for(let i=0;i<visible && i<msgs.length;i++){
+    const m=msgs[i], mt=metas[i];
+    const bx= m.from==='right' ? W-padX-mt.bw : padX;
+    const avCy=y+mt.bh/2;
+    if(m.from==='right') drawAvatar(ctx, W-padX+avGap+bAvR, avCy, bAvR, rightAvatarImg, $('rightName').value, th.right);
+    else drawAvatar(ctx, padX-avGap-bAvR, avCy, bAvR, leftAvatarImg, $('leftName').value, th.left);
+    ctx.fillStyle = m.from==='right' ? th.right : th.left;
+    roundRect(ctx,bx,y,mt.bw,mt.bh,W*0.02); ctx.fill();
+    if(m.quote){
+      ctx.fillStyle = th.accent;
+      const barX=bx+W*0.018, barY=y+W*0.02, barH2=mt.bh-W*0.04, barW2=W*0.012;
+      roundRect(ctx, barX, barY, barW2, barH2, barW2/2); ctx.fill();
+    }
+    if(m.voice){
+      ctx.fillStyle = m.from==='right' ? th.textR : th.textL;
+      ctx.beginPath(); ctx.arc(bx+mt.bw*0.14, y+mt.bh/2, mt.bh*0.28, 0, 7); ctx.fill();
+      ctx.fillStyle = m.from==='right' ? th.right : th.left;
+      ctx.beginPath(); ctx.moveTo(bx+mt.bw*0.14-mt.bh*0.08, y+mt.bh/2-mt.bh*0.12); ctx.lineTo(bx+mt.bw*0.14+mt.bh*0.14, y+mt.bh/2); ctx.lineTo(bx+mt.bw*0.14-mt.bh*0.08, y+mt.bh/2+mt.bh*0.12); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = m.from==='right' ? th.textR : th.textL; ctx.lineWidth=W*0.003; ctx.globalAlpha=0.6;
+      ctx.beginPath();
+      for(let b=0;b<14;b++){ const bx2=bx+mt.bw*0.32+b*(mt.bw*0.5/14); const hh=mt.bh*(0.15+Math.sin(b*1.3+i)*0.1+0.15); ctx.moveTo(bx2,y+mt.bh/2-hh/2); ctx.lineTo(bx2,y+mt.bh/2+hh/2); }
+      ctx.stroke(); ctx.globalAlpha=1;
+    } else {
+      ctx.textAlign='left';
+      const textColor = m.from==='right' ? th.textR : th.textL;
+      const textX0 = bx+W*0.03+mt.innerPad;
+      let ty=y+W*0.03;
+      for(const line of mt.lines){
+        let tx=textX0;
+        for(const tok of line){
+          ctx.font=tokFont(tok,fs);
+          ctx.fillStyle=textColor;
+          const tw=ctx.measureText(tok.text).width;
+          if(!tok.isSpace) ctx.fillText(tok.text, tx, ty);
+          if(tok.strike && !tok.isSpace){
+            ctx.strokeStyle=textColor; ctx.lineWidth=Math.max(1,fs*0.06);
+            ctx.beginPath(); ctx.moveTo(tx, ty-fs*0.3); ctx.lineTo(tx+tw, ty-fs*0.3); ctx.stroke();
+          }
+          tx+=tw;
+        }
+        ty+=fs*1.35;
+      }
+    }
+    if(m.from==='right'){
+      drawTicks(ctx, bx+mt.bw-W*0.045, y+mt.bh-W*0.028, W*0.028, th.tick);
+    }
+    y+=mt.bh+W*0.025;
+  }
+  if(showTyping){
+    const bw=W*0.18, bh=W*0.075;
+    const bx= typingFor==='right' ? W-padX-bw : padX;
+    const avCy=y+bh/2;
+    if(typingFor==='right') drawAvatar(ctx, W-padX+avGap+bAvR, avCy, bAvR, rightAvatarImg, $('rightName').value, th.right);
+    else drawAvatar(ctx, padX-avGap-bAvR, avCy, bAvR, leftAvatarImg, $('leftName').value, th.left);
+    ctx.fillStyle = typingFor==='right' ? th.right : th.left;
+    roundRect(ctx,bx,y,bw,bh,W*0.02); ctx.fill();
+    const dotR=W*0.009, cy=y+bh/2, phase=Math.floor((ts/220)%3);
+    for(let d=0;d<3;d++){
+      ctx.fillStyle = typingFor==='right' ? th.textR : th.textL;
+      ctx.globalAlpha = (phase===d)?1:0.35;
+      ctx.beginPath(); ctx.arc(bx+bw*0.28+d*W*0.028, cy, dotR,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+function stopLoop(){ cancelAnimationFrame(rafId); }
+function resetState(){ visible=0; showTyping=false; lastStep=0; scrollOffset=0; }
+
+$('openBtn').onclick=()=>{
+  msgs=parseScript(); if(!msgs.length){ toast('Add at least one line: Name: message'); return; }
+  ensureAudio(); if(actx.state==='suspended') actx.resume();
+  resetState(); SPEED=+$('speed').value;
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  $('player').classList.add('show');
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAudio();
+  const stream=cv.captureStream(30);
+  resetState();
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(stream,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'chat-story-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<!-- dua-card.html — v1 — StoryForge Formats · Pack 1 · 🤲 Dua Card. Authentic duas from Hisnul Muslim (Fortress of the Muslim) by Sa'id al-Qahtani — 132 chapters, 267+ duas from the Qur'an and Sunnah. Pick a chapter (when you wake up, before eating, entering a mosque, …), pick the dua inside, and the card is ready. Arabic + transliteration + English translation + "Say X times" badge when repetition applies + source. Same look as the hadith card: auto-size (short dua = big text, long dua = smaller), four themes, three motion effects, fits WhatsApp Status · Instagram Reels/Stories · TikTok · YouTube Shorts · Facebook Reels/Stories (1080×1920) and 16:9 for YouTube/Facebook feed. Save as PNG or record a video with your voice. Source: hisnmuslim.com/api — free, no key. Never AI-written text. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>StoryForge — Dua Card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#E9C46A;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,"Segoe UI",Roboto,Arial,sans-serif}
+.hidden{display:none !important}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 160px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header .logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;font-size:20px}
+header b{font-size:18px}
+header small{display:block;color:var(--muted);font-size:12px}
+header a{margin-left:auto;color:var(--muted);font-size:13px;text-decoration:none}
+.ver{display:inline-block;background:var(--accent);color:#111;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;flex:none}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--accent);color:#111;border-color:var(--accent)}
+.big{width:100%;padding:16px;font-size:18px;font-weight:800;border-radius:14px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.hint b{color:var(--text)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.preview{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;display:none}
+.preview.show{display:block}
+.preview .ti{font-size:14px;color:var(--accent);font-weight:700;margin-bottom:8px}
+.preview .ar{font-family:"Amiri Quran",Amiri,serif;direction:rtl;text-align:right;font-size:22px;line-height:2.1;margin:0 0 10px;color:#fff}
+.preview .tr{font-size:14px;line-height:1.6;margin:0 0 8px;color:var(--muted);font-style:italic}
+.preview .en{font-size:15px;line-height:1.6;margin:0 0 8px}
+.preview .rp{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(233,196,106,.18);color:var(--accent);border:1px solid rgba(233,196,106,.5);margin-right:6px}
+.preview .meta{font-size:13px;color:var(--muted);line-height:1.5;margin-top:6px}
+.preview .meta b{color:var(--text)}
+.navrow{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.navrow .nav{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;flex:none}
+.navrow .nav.on{background:var(--accent);color:#111;border-color:var(--accent)}
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.themes label{position:relative;display:block;cursor:pointer}
+.themes label input{position:absolute;opacity:0;pointer-events:none}
+.themes .sw{height:52px;border-radius:10px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;text-align:center;padding:4px}
+.themes input:checked+.sw{border-color:var(--accent);box-shadow:0 0 0 2px rgba(233,196,106,.25)}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 35%);display:flex;justify-content:center}
+.startbar .big{max-width:720px}
+#player{position:fixed;inset:0;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column}
+#stage{position:relative;max-width:100%;max-height:100%;background:#000}
+#stage canvas{display:block;width:100%;height:auto;max-width:100vw;max-height:calc(100vh - 120px)}
+#ptop{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;z-index:6;pointer-events:none}
+.pill{background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 10px;font-size:13px;display:flex;gap:6px;align-items:center;color:#fff;max-width:72vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#recDot{width:10px;height:10px;border-radius:50%;background:var(--bad);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+#pbar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;z-index:6}
+.cbtn{width:52px;height:52px;border-radius:50%;background:rgba(20,26,38,.9);border:1px solid rgba(255,255,255,.25);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;padding:0;flex:none}
+.cbtn svg{width:22px;height:22px;display:block}
+.cbtn.gold{background:var(--accent);color:#111;border-color:#fff;font-weight:800;font-size:12px;width:62px;height:62px}
+.cbtn.rec{width:62px;height:62px;background:var(--bad);border-color:#fff;font-weight:800}
+.cbtn.rec.on{border-radius:18px}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:140px;font-weight:800;color:#fff;text-shadow:0 0 30px #000;pointer-events:none;z-index:7}
+#after{position:absolute;inset:0;background:rgba(0,0,0,.94);z-index:8;display:flex;flex-direction:column;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow:auto}
+#after video{width:100%;max-height:52vh;border-radius:12px;background:#000}
+#after img{max-width:100%;max-height:52vh;border-radius:12px;align-self:center;background:#000}
+#after .row .btn{flex:1}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(0,0,0,.72);z-index:9;color:#fff;font-size:15px;text-align:center;padding:20px}
+.spin{width:34px;height:34px;border:4px solid rgba(255,255,255,.25);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <header><div class="logo">🤲</div><div><b>Dua Card <span class="ver">v1</span></b><small>Hisnul Muslim · 267 authentic duas from Qur'an &amp; Sunnah</small></div><a href="index.html">← All tools</a></header>
+
+  <div class="card">
+    <h2>📖 Pick a dua</h2>
+    <div><div class="label">Occasion / chapter</div><select id="chapter" disabled><option>Loading chapters…</option></select></div>
+    <div class="row">
+      <div><div class="label">Dua in this chapter</div><select id="duaIdx" disabled><option>Pick a chapter first</option></select></div>
+      <div style="flex:0 0 auto"><button class="btn" id="randBtn">🎲 Random dua</button></div>
+    </div>
+    <div class="preview" id="prev">
+      <div class="ti" id="prevTi"></div>
+      <div class="ar" id="prevAr"></div>
+      <div class="tr hidden" id="prevTr"></div>
+      <div class="en" id="prevEn"></div>
+      <div><span class="rp hidden" id="prevRp"></span></div>
+      <div class="meta" id="prevMeta"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🪧 What to show on the card</h2>
+    <label class="check"><input type="checkbox" id="tArabic" checked> Show Arabic text (recommended)</label>
+    <label class="check"><input type="checkbox" id="tTranslit" checked> Show transliteration (helps non-Arabic speakers recite)</label>
+    <label class="check"><input type="checkbox" id="tEnglish" checked> Show English translation</label>
+    <label class="check"><input type="checkbox" id="tRepeat" checked> Show "Say X times" when the dua is repeated</label>
+    <label class="check"><input type="checkbox" id="tRef" checked> Show the source (Hisnul Muslim + chapter)</label>
+  </div>
+
+  <div class="card">
+    <h2>✨ Motion (drawn behind the text — never blocks it)</h2>
+    <label class="check"><input type="checkbox" id="mPart" checked> 🌟 Gold particles drifting slowly</label>
+    <label class="check"><input type="checkbox" id="mBubbles"> 💧 Water bubbles rising from the bottom</label>
+    <label class="check"><input type="checkbox" id="mGlow" checked> ✨ Soft glow pulses in the corners</label>
+    <div class="hint">Tick any mix. All three off = still card.</div>
+  </div>
+
+  <div class="card">
+    <h2>🎨 Look</h2>
+    <div class="row">
+      <div><div class="label">Shape</div><select id="shape">
+        <option value="tall">Tall 9:16 — WhatsApp Status · Reels · Stories · TikTok · Shorts</option>
+        <option value="wide">Wide 16:9 — YouTube · Facebook feed</option>
+      </select></div>
+    </div>
+    <div><div class="label">Theme</div>
+      <div class="themes" id="themes">
+        <label><input type="radio" name="theme" value="dark" checked><div class="sw" style="background:linear-gradient(135deg,#0b0f17,#1a2333);color:#E9C46A">Dark &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="cream"><div class="sw" style="background:linear-gradient(135deg,#f5efe0,#e8ddc3);color:#2d4a3a">Cream &amp; Green</div></label>
+        <label><input type="radio" name="theme" value="navy"><div class="sw" style="background:linear-gradient(135deg,#0f2744,#1a3a5c);color:#E9C46A">Navy &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="emerald"><div class="sw" style="background:linear-gradient(135deg,#0d2a24,#1a4038);color:#f0d78c">Emerald</div></label>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="mic" checked> Record my voice with the video</label>
+    <label class="check"><input type="checkbox" id="countOn" checked> Count down 3 · 2 · 1 before recording</label>
+  </div>
+
+  <div class="hint">Text source: hisnmuslim.com (Hisnul Muslim by Sa'id al-Qahtani) — all duas are authentic, from the Qur'an and the Sunnah. Needs internet to load the duas the first time.</div>
+</div>
+
+<div class="startbar"><button class="btn gold big" id="openBtn" disabled>Pick a dua to start</button></div>
+
+<div id="player" class="hidden">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="ptop">
+    <span class="pill hidden" id="recPill"><span id="recDot"></span><span id="recTime">0:00</span></span>
+    <span class="pill" id="infoPill">Ready</span>
+  </div>
+  <div id="pbar">
+    <button class="cbtn" id="closeBtn" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="cbtn gold" id="pngBtn" title="Save as picture">PNG</button>
+    <button class="cbtn rec" id="recBtn" title="Record video">REC</button>
+    <button class="cbtn" id="backBtn" title="Back to picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+  </div>
+  <div id="count" class="hidden">3</div>
+  <div id="busy"><div class="spin"></div><div id="busyTxt">Drawing the card…</div></div>
+  <div id="after" class="hidden">
+    <b style="font-size:18px">✓ Your card is ready</b>
+    <video id="takeVid" class="hidden" controls playsinline></video>
+    <img id="takeImg" class="hidden" alt="">
+    <div class="hint" id="takeInfo"></div>
+    <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button><button class="btn hidden" id="shareTake">📤 Share</button></div>
+    <div class="row"><button class="btn" id="againBtn">Back to the card</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const KEY='forge:dua:';
+function toast(m,ms){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms||3400); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+const HISN='https://www.hisnmuslim.com/api/';
+let chapters=[]; /* [{ID, TITLE}] */
+let chapterCache={}; /* chapterId -> array of duas */
+let current=null; /* {chapterTitle, dua} */
+
+async function fetchJson(url){ const r=await fetch(url); if(!r.ok) throw new Error('Server error'); const t=await r.text(); return JSON.parse(t.replace(/^\uFEFF/,'')); }
+
+async function loadChapters(){
+  try{
+    const j=await fetchJson(HISN+'en/husn_en.json');
+    chapters=(j.English||[]).map(x=>({ id:x.ID, title:x.TITLE })).sort((a,b)=>a.id-b.id);
+    const sel=$('chapter'); sel.innerHTML=chapters.map(c=>'<option value="'+c.id+'">'+esc(c.id+'. '+c.title)+'</option>').join('');
+    sel.disabled=false;
+    const saved=localStorage.getItem(KEY+'chapter');
+    if(saved && chapters.some(c=>String(c.id)===saved)) sel.value=saved;
+    await loadDuasForChapter();
+  }catch(e){
+    toast('Could not load Hisnul Muslim. Check your internet and reload.',6000);
+  }
+}
+async function loadDuasForChapter(){
+  const cid=$('chapter').value, cTitle=(chapters.find(c=>String(c.id)===cid)||{}).title||'';
+  $('duaIdx').disabled=true; $('duaIdx').innerHTML='<option>Loading…</option>';
+  try{
+    let duas=chapterCache[cid];
+    if(!duas){
+      const j=await fetchJson(HISN+'en/'+cid+'.json');
+      /* the top-level key is the chapter title; grab the first array value */
+      const key=Object.keys(j).find(k=>Array.isArray(j[k]));
+      duas=key?j[key]:[];
+      chapterCache[cid]=duas;
+    }
+    $('duaIdx').innerHTML=duas.map((d,i)=>'<option value="'+i+'">Dua '+(i+1)+(d.REPEAT&&+d.REPEAT>1?' · say '+d.REPEAT+'×':'')+'</option>').join('');
+    $('duaIdx').disabled=false;
+    const sdi=localStorage.getItem(KEY+'duaIdx');
+    if(sdi!==null && +sdi<duas.length) $('duaIdx').value=sdi;
+    renderPreview();
+  }catch(e){
+    $('duaIdx').innerHTML='<option>Error loading</option>';
+    toast('Could not load duas for this chapter.',5000);
+  }
+}
+$('chapter').addEventListener('change',()=>{ localStorage.setItem(KEY+'chapter',$('chapter').value); loadDuasForChapter(); });
+$('duaIdx').addEventListener('change',()=>{ localStorage.setItem(KEY+'duaIdx',$('duaIdx').value); renderPreview(); });
+
+function cleanTxt(s){ return String(s||'').replace(/^\s*[\(\[﴿]+\s*/,'').replace(/\s*[\)\]﴾]+\s*$/,'').trim(); }
+function stripBrackets(s){ return String(s||'').replace(/^[\(\[]\s*/,'').replace(/\s*[\)\]]$/,'').trim(); }
+
+function renderPreview(){
+  const cid=$('chapter').value, duas=chapterCache[cid]||[], di=+$('duaIdx').value||0;
+  const d=duas[di]; if(!d){ $('prev').classList.remove('show'); $('openBtn').disabled=true; return; }
+  const cTitle=(chapters.find(c=>String(c.id)===cid)||{}).title||'';
+  current={ chapterId:cid, chapterTitle:cTitle, duaIndex:di, dua:d };
+  $('prevTi').textContent=cTitle;
+  $('prevAr').textContent=cleanTxt(d.ARABIC_TEXT);
+  const tl=stripBrackets(d.LANGUAGE_ARABIC_TRANSLATED_TEXT||'');
+  if(tl){ $('prevTr').textContent=tl; $('prevTr').classList.remove('hidden'); } else { $('prevTr').classList.add('hidden'); }
+  $('prevEn').textContent=stripBrackets(d.TRANSLATED_TEXT||'');
+  const rp=+d.REPEAT||1;
+  if(rp>1){ $('prevRp').textContent='Say '+rp+' times'; $('prevRp').classList.remove('hidden'); } else { $('prevRp').classList.add('hidden'); }
+  $('prevMeta').innerHTML='<b>Hisnul Muslim</b> · Chapter '+cid+' · Dua '+(di+1);
+  $('prev').classList.add('show');
+  $('openBtn').disabled=false;
+  $('openBtn').textContent='Make the card';
+  $('openBtn').classList.add('gold');
+}
+
+$('randBtn').onclick=async()=>{
+  if(!chapters.length){ toast('Still loading chapters…'); return; }
+  const ch=chapters[Math.floor(Math.random()*chapters.length)];
+  $('chapter').value=ch.id; localStorage.setItem(KEY+'chapter',ch.id);
+  await loadDuasForChapter();
+  const duas=chapterCache[ch.id]||[];
+  if(duas.length){ const r=Math.floor(Math.random()*duas.length); $('duaIdx').value=r; localStorage.setItem(KEY+'duaIdx',r); renderPreview(); }
+};
+
+/* ---------- canvas card (reuses hadith-card patterns) ---------- */
+const THEMES={
+  dark:{ bg1:'#0b0f17', bg2:'#1a2333', text:'#f5f5f0', sub:'#c8d0dc', accent:'#E9C46A', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(130,180,220,0.25)' },
+  cream:{ bg1:'#f5efe0', bg2:'#e8ddc3', text:'#1f2d26', sub:'#4a5c54', accent:'#2d4a3a', ornament:'rgba(45,74,58,0.14)', bubble:'rgba(60,120,100,0.22)' },
+  navy:{ bg1:'#0f2744', bg2:'#1a3a5c', text:'#f5f5f0', sub:'#bcd0e8', accent:'#E9C46A', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(140,200,230,0.3)' },
+  emerald:{ bg1:'#0d2a24', bg2:'#1a4038', text:'#f5efe0', sub:'#b9d4cc', accent:'#f0d78c', ornament:'rgba(240,215,140,0.18)', bubble:'rgba(140,210,180,0.28)' }
+};
+const currentTheme=()=>THEMES[document.querySelector('input[name=theme]:checked').value];
+const currentShape=()=>$('shape').value==='tall' ? [1080,1920] : [1920,1080];
+
+function wrapWords(ctx,text,maxW){
+  const words=String(text).split(/\s+/).filter(Boolean); const lines=[]; let cur=[];
+  for(const w of words){
+    const trial=cur.concat([w]).join(' ');
+    if(ctx.measureText(trial).width<=maxW || !cur.length) cur.push(w);
+    else{ lines.push(cur); cur=[w]; }
+  }
+  if(cur.length) lines.push(cur); return lines;
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function cornerOrnaments(ctx,W,H,c){
+  ctx.save(); ctx.strokeStyle=c.ornament; ctx.lineWidth=Math.round(Math.min(W,H)*0.004);
+  const r=Math.min(W,H)*0.09;
+  for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94]]){
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,r*0.66,0,6.283); ctx.stroke();
+    for(let k=0;k<8;k++){ const a=k*Math.PI/4; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r*0.5,cy+Math.sin(a)*r*0.5); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+const anim={ particles:[], bubbles:[], glowPhase:0, lastW:0, lastH:0 };
+function resetParticles(W,H){
+  anim.lastW=W; anim.lastH=H;
+  anim.particles=[]; const n=Math.round((W*H)/36000);
+  for(let i=0;i<n;i++) anim.particles.push({ x:Math.random()*W, y:Math.random()*H, r:1+Math.random()*2.5, vx:(Math.random()-.5)*0.25, vy:-0.15-Math.random()*0.25, a:0.3+Math.random()*0.5, ph:Math.random()*6.283 });
+  anim.bubbles=[];
+}
+function stepAndDrawMotion(ctx,W,H,c,dt){
+  if(anim.lastW!==W||anim.lastH!==H) resetParticles(W,H);
+  anim.glowPhase+=dt;
+  if($('mGlow').checked){
+    for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94],[W*0.93,H*0.06],[W*0.07,H*0.94]]){
+      const ph=(Math.sin(anim.glowPhase*1.3+(cx+cy)*0.001)+1)/2;
+      const r=W*(0.06+ph*0.05);
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      g.addColorStop(0,'rgba(233,196,106,'+(0.18*ph).toFixed(3)+')');
+      g.addColorStop(1,'rgba(233,196,106,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.fill();
+    }
+  }
+  if($('mPart').checked){
+    for(const p of anim.particles){
+      p.x+=p.vx; p.y+=p.vy; p.ph+=dt*1.5;
+      if(p.y<-10){ p.y=H+10; p.x=Math.random()*W; }
+      if(p.x<-10) p.x=W+10; if(p.x>W+10) p.x=-10;
+      const tw=0.7+0.3*Math.sin(p.ph);
+      ctx.fillStyle='rgba(233,196,106,'+(p.a*tw*0.6).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill();
+    }
+  }
+  if($('mBubbles').checked){
+    if(Math.random()<0.08) anim.bubbles.push({ x:Math.random()*W, y:H+20, r:4+Math.random()*8, vy:-(0.6+Math.random()*0.9), vx:(Math.random()-.5)*0.2, a:0.3+Math.random()*0.4, wob:Math.random()*6.283 });
+    anim.bubbles=anim.bubbles.filter(b=>b.y>-20);
+    for(const b of anim.bubbles){
+      b.y+=b.vy; b.wob+=dt*2; b.x+=Math.sin(b.wob)*0.3+b.vx;
+      ctx.strokeStyle=c.bubble; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,6.283); ctx.stroke();
+      ctx.fillStyle=c.bubble.replace(/0\.\d+/,'0.1'); ctx.fill();
+    }
+  }
+}
+
+function measureBlock(ctx,text,fs,fontFam,maxW,lineH){ ctx.font=fs+'px '+fontFam; const lines=wrapWords(ctx,text,maxW); return { lines, h:lines.length*fs*lineH }; }
+function fitSizes(ctx,W,targetH,innerW,arText,trText,enText,showAr,showTr,showEn){
+  let scale=1.0;
+  const refArFs=W*0.055, refTrFs=W*0.028, refEnFs=W*0.034;
+  const arLH=1.9, trLH=1.5, enLH=1.52;
+  for(let iter=0;iter<6;iter++){
+    const arFs=Math.round(refArFs*scale), trFs=Math.round(refTrFs*scale), enFs=Math.round(refEnFs*scale);
+    let totalH=0;
+    if(showAr && arText){ const m=measureBlock(ctx,arText,arFs,'"Amiri Quran", Amiri, serif',innerW,arLH); totalH+=m.h+arFs*0.3; }
+    if(showTr && trText){ const m=measureBlock(ctx,trText,trFs,'italic 400 Rubik,sans-serif',innerW,trLH); totalH+=m.h+trFs*0.3; }
+    if(showEn && enText){ const m=measureBlock(ctx,enText,enFs,'Rubik,sans-serif',innerW,enLH); totalH+=m.h; }
+    if(totalH<=1) break;
+    if(totalH>targetH){ scale*=targetH/totalH*0.98; if(scale<0.4){ scale=0.4; break; } }
+    else if(totalH<targetH*0.72){ scale*=Math.min(1.5, targetH*0.88/totalH); if(scale>1.6){ scale=1.6; break; } }
+    else break;
+  }
+  return { arFs:Math.round(refArFs*scale), trFs:Math.round(refTrFs*scale), enFs:Math.round(refEnFs*scale) };
+}
+
+function drawCard(ctx,W,H,dt){
+  if(!current) return;
+  const c=currentTheme();
+  const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,c.bg1); g.addColorStop(1,c.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  cornerOrnaments(ctx,W,H,c);
+  stepAndDrawMotion(ctx,W,H,c,dt||0.016);
+
+  const tall=H>W;
+  const padX=Math.round(W*0.08), innerW=W-padX*2;
+  const safeTop=Math.round(H*0.08), safeBot=Math.round(H*0.08);
+
+  const badgeFs=Math.round(W*(tall?0.028:0.022));
+  const titleFs=Math.round(W*(tall?0.028:0.021));
+  const refFs=Math.round(W*(tall?0.024:0.018));
+  const repFs=Math.round(W*(tall?0.028:0.02));
+  const headerH=badgeFs*1.3+Math.round(W*0.012)+Math.round(W*0.025)+titleFs*1.4;
+
+  const d=current.dua;
+  const arText=cleanTxt(d.ARABIC_TEXT);
+  const trText=stripBrackets(d.LANGUAGE_ARABIC_TRANSLATED_TEXT||'');
+  const enText=stripBrackets(d.TRANSLATED_TEXT||'');
+  const rp=+d.REPEAT||1;
+  const showAr=$('tArabic').checked && !!arText;
+  const showTr=$('tTranslit').checked && !!trText;
+  const showEn=$('tEnglish').checked && !!enText;
+  const showRep=$('tRepeat').checked && rp>1;
+  const showRef=$('tRef').checked;
+  const refH=showRef?refFs*1.6:0;
+  const repH=showRep?repFs*2.1:0;
+  const dividerArTr=showAr&&showTr?Math.round(W*0.015):0;
+  const dividerTrEn=showTr&&showEn?Math.round(W*0.015):0;
+  const dividerArEn=showAr&&!showTr&&showEn?Math.round(W*0.02):0;
+
+  const bodyZoneTop=safeTop+headerH;
+  const bodyZoneBot=safeBot+refH+repH;
+  const bodyZoneH=H-bodyZoneTop-bodyZoneBot-dividerArTr-dividerTrEn-dividerArEn;
+
+  const fit=fitSizes(ctx,W,bodyZoneH,innerW,arText,trText,enText,showAr,showTr,showEn);
+  const arFs=fit.arFs, trFs=fit.trFs, enFs=fit.enFs;
+
+  ctx.font=arFs+'px "Amiri Quran", Amiri, serif';
+  const arLines=showAr?wrapWords(ctx,arText,innerW):[];
+  const arH=arLines.length*arFs*1.9;
+  ctx.font='italic '+trFs+'px Rubik,sans-serif';
+  const trLines=showTr?wrapWords(ctx,trText,innerW):[];
+  const trH=trLines.length*trFs*1.5;
+  ctx.font=enFs+'px Rubik,sans-serif';
+  const enLines=showEn?wrapWords(ctx,enText,innerW):[];
+  const enH=enLines.length*enFs*1.52;
+  const totalBodyH=arH+(showAr?arFs*0.3:0)+dividerArTr+trH+(showTr?trFs*0.3:0)+dividerTrEn+dividerArEn+enH;
+
+  /* badge */
+  ctx.save(); ctx.font='700 '+badgeFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('🤲  DUA', W/2, safeTop);
+  ctx.strokeStyle=c.accent; ctx.lineWidth=Math.max(2,W*0.003);
+  const bLY=safeTop+badgeFs+Math.round(W*0.012), bLW=Math.min(innerW*0.3, W*0.22);
+  ctx.beginPath(); ctx.moveTo(W/2-bLW/2,bLY); ctx.lineTo(W/2+bLW/2,bLY); ctx.stroke();
+  ctx.restore();
+
+  /* chapter title under badge */
+  ctx.save(); ctx.font='600 '+titleFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.textAlign='center'; ctx.textBaseline='top';
+  const titleLines=wrapWords(ctx,current.chapterTitle||'',innerW).slice(0,2);
+  let ty=bLY+Math.round(W*0.025);
+  for(const ln of titleLines){ ctx.fillText(ln.join(' '),W/2,ty); ty+=titleFs*1.3; }
+  ctx.restore();
+
+  let y=bodyZoneTop+Math.max(0,(bodyZoneH-totalBodyH)/2);
+
+  if(showAr){
+    ctx.save();
+    ctx.font='500 '+arFs+'px "Amiri Quran", Amiri, serif';
+    ctx.fillStyle=c.text; ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='top';
+    const lh=arFs*1.9;
+    for(const ln of arLines){ ctx.fillText(ln.join(' '),W/2,y); y+=lh; }
+    ctx.restore();
+    y+=arFs*0.3+dividerArTr;
+  }
+
+  if(showTr){
+    ctx.save();
+    ctx.font='italic 400 '+trFs+'px Rubik,sans-serif';
+    ctx.fillStyle=c.sub; ctx.direction='ltr'; ctx.textAlign='center'; ctx.textBaseline='top';
+    const lh=trFs*1.5;
+    for(const ln of trLines){ ctx.fillText(ln.join(' '),W/2,y); y+=lh; }
+    ctx.restore();
+    y+=trFs*0.3+dividerTrEn;
+  } else if(showAr && showEn){
+    y+=dividerArEn;
+    ctx.save(); ctx.strokeStyle=c.accent; ctx.globalAlpha=0.45; ctx.lineWidth=Math.max(1,W*0.0018);
+    ctx.beginPath(); ctx.moveTo(W/2-W*0.05,y); ctx.lineTo(W/2+W*0.05,y); ctx.stroke(); ctx.restore();
+    y+=Math.round(W*0.02);
+  }
+
+  if(showEn){
+    ctx.save();
+    ctx.font=enFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.direction='ltr'; ctx.textAlign='center'; ctx.textBaseline='top';
+    const lh=enFs*1.52;
+    for(const ln of enLines){ ctx.fillText(ln.join(' '),W/2,y); y+=lh; }
+    ctx.restore();
+  }
+
+  /* bottom: repeat badge + reference */
+  let by=H-safeBot;
+  if(showRef){
+    ctx.save(); ctx.font='700 '+refFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    const refTxt='Hisnul Muslim  ·  '+(current.chapterTitle||'');
+    ctx.fillText(refTxt,W/2,by); ctx.restore();
+    by-=refFs*1.5;
+  }
+  if(showRep){
+    const label='Say '+rp+' times';
+    ctx.save(); ctx.font='700 '+Math.round(repFs*0.95)+'px Rubik,sans-serif';
+    const tw=ctx.measureText(label).width, bw=tw+repFs*1.4, bh=repFs*1.7, bx=(W-bw)/2;
+    ctx.fillStyle='rgba(233,196,106,0.22)'; roundRect(ctx,bx,by-bh,bw,bh,bh*0.5); ctx.fill();
+    ctx.strokeStyle=c.accent; ctx.lineWidth=Math.max(1,W*0.002); ctx.stroke();
+    ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(label, W/2, by-bh/2);
+    ctx.restore();
+  }
+}
+
+/* ---------- player ---------- */
+let cv=null, ctx=null, W=0, H=0, mr=null, chunks=[], blob=null, url='', recTimer=0, recT0=0, micStream=null, pngBlob=null, rafId=0, lastT=0;
+function sizeCanvas(){
+  const [cw,ch]=currentShape();
+  cv.width=cw; cv.height=ch; W=cw; H=ch;
+  const aw=Math.min(window.innerWidth, (window.innerHeight-140)*(cw/ch));
+  $('stage').style.width=Math.round(aw)+'px';
+  resetParticles(W,H);
+}
+function loop(t){
+  rafId=requestAnimationFrame(loop);
+  if(!lastT) lastT=t; const dt=Math.min(0.08,(t-lastT)/1000); lastT=t;
+  if(ctx) drawCard(ctx,W,H,dt);
+}
+
+async function openPlayer(){
+  if(!current){ toast('Pick a dua first.'); return; }
+  $('player').classList.remove('hidden'); $('busy').classList.remove('hidden');
+  cv=$('cv'); ctx=cv.getContext('2d');
+  await document.fonts.ready;
+  sizeCanvas();
+  $('infoPill').textContent=current.chapterTitle+' · Dua '+(current.duaIndex+1);
+  $('busy').classList.add('hidden');
+  cancelAnimationFrame(rafId); lastT=0; rafId=requestAnimationFrame(loop);
+  try{ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({navigationUI:'hide'}); }catch{}
+}
+function closePlayer(){
+  if(mr && mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; stopRec(); }
+  cancelAnimationFrame(rafId);
+  try{ document.fullscreenElement && document.exitFullscreen(); }catch{}
+  $('player').classList.add('hidden'); $('after').classList.add('hidden');
+}
+$('openBtn').onclick=openPlayer;
+$('closeBtn').onclick=closePlayer;
+$('backBtn').onclick=closePlayer;
+window.addEventListener('resize',()=>{ if(!$('player').classList.contains('hidden')) sizeCanvas(); });
+
+for(const id of ['tArabic','tTranslit','tEnglish','tRepeat','tRef','shape','mPart','mBubbles','mGlow']) $(id).addEventListener('change',()=>{ if(ctx) sizeCanvas(); });
+
+/* ---------- PNG + VIDEO ---------- */
+function baseName(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); const nm=('dua-'+(current.chapterTitle||'').replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,40)+'-'+(current.duaIndex+1)); return nm+'-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function dl(file){ const u=URL.createObjectURL(file),a=document.createElement('a'); a.href=u; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); }
+$('pngBtn').onclick=()=>{
+  if(!cv) return;
+  cv.toBlob(b=>{ if(!b){ toast('Could not make the picture.'); return; } pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+function pickType(){ const t=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']; return t.find(x=>window.MediaRecorder && MediaRecorder.isTypeSupported(x))||''; }
+async function startRec(){
+  if(!cv){ toast('The card is not ready.'); return; }
+  if(!window.MediaRecorder){ toast('This browser cannot record. Use Google Chrome.'); return; }
+  let stream; try{ stream=cv.captureStream(30); }catch{ toast('This browser cannot record the card.'); return; }
+  if($('mic').checked){ try{ micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>stream.addTrack(t)); }catch{ toast('Microphone not allowed — recording without voice.',4000); } }
+  if($('countOn').checked){ const c=$('count'); c.classList.remove('hidden'); for(const n of [3,2,1]){ c.textContent=n; await sleep(900); } c.classList.add('hidden'); }
+  const mt=pickType(); try{ mr=new MediaRecorder(stream,{mimeType:mt||undefined,videoBitsPerSecond:7000000,audioBitsPerSecond:192000}); }catch{ mr=new MediaRecorder(stream); }
+  chunks=[]; mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; } };
+  mr.start(500); recT0=performance.now();
+  $('recBtn').classList.add('on'); $('recBtn').textContent='STOP'; $('recPill').classList.remove('hidden');
+  clearInterval(recTimer); recTimer=setInterval(()=>{ const s=Math.floor((performance.now()-recT0)/1000); $('recTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+}
+function stopRec(){ if(mr && mr.state!=='inactive') mr.stop(); clearInterval(recTimer); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; $('recPill').classList.add('hidden'); }
+$('recBtn').onclick=()=>{ if(mr && mr.state==='recording') stopRec(); else startRec(); };
+
+function takeFile(){
+  if(pngBlob) return new File([pngBlob], baseName()+'.png', {type:'image/png'});
+  const ext=/mp4/.test(blob.type)?'.mp4':'.webm'; return new File([blob], baseName()+ext, {type:blob.type});
+}
+function showAfter(kind){
+  if(url) URL.revokeObjectURL(url);
+  const file=takeFile(); url=URL.createObjectURL(file);
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video') $('takeVid').src=url; else $('takeImg').src=url;
+  const mb=(file.size/1048576).toFixed(1);
+  $('takeInfo').textContent=file.name+' · '+(kind==='video'?(/mp4/.test(file.type)?'MP4':'WebM'):'PNG')+' · '+mb+' MB';
+  let can=false; try{ can=!!(navigator.canShare && navigator.canShare({files:[file]})); }catch{}
+  $('shareTake').classList.toggle('hidden',!can);
+  $('after').classList.remove('hidden');
+}
+$('saveTake').onclick=()=>{ dl(takeFile()); toast('✓ Saved to your Downloads folder',4000); };
+$('shareTake').onclick=async()=>{ try{ await navigator.share({files:[takeFile()], title:'Dua · '+(current.chapterTitle||'')}); }catch(e){ if(e&&e.name!=='AbortError') toast('Sharing did not work. Use Save.'); } };
+$('againBtn').onclick=()=>{ $('after').classList.add('hidden'); if($('takeVid').pause) $('takeVid').pause(); };
+
+/* ---------- remember choices ---------- */
+(function(){
+  for(const id of ['shape']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.value=v; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.value)); }
+  for(const id of ['tArabic','tTranslit','tEnglish','tRepeat','tRef','mPart','mBubbles','mGlow','mic','countOn']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.checked=v==='1'; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.checked?'1':'0')); }
+  const th=localStorage.getItem(KEY+'theme'); if(th){ const r=document.querySelector('input[name=theme][value='+th+']'); if(r) r.checked=true; }
+  document.querySelectorAll('input[name=theme]').forEach(r=>r.addEventListener('change',()=>localStorage.setItem(KEY+'theme',r.value)));
+})();
+loadChapters();
+</script>
+</body>
+</html>

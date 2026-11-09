@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<!-- hadith-card.html — v3 — StoryForge Formats · Pack 1 · 📜 Hadith Card. NEW in v3: (1) Auto-size — the Arabic + English scale UP for short hadiths and DOWN for long ones, so every card fills the shape properly, no empty bottom. (2) Content is centred vertically inside the safe area (middle ~84%) so WhatsApp / Instagram / TikTok / Facebook / YouTube overlays never cover the hadith. (3) The broken word-highlight is removed — the card is clean and static; voice-follow highlight will return later via the Quran Studio-style engine. v2: Scholarly lesson from HadeethEnc on an opt-in source, three motion effects (gold particles · water bubbles · corner glow pulses). v1: Exact text from fawazahmed0 (6 books + Nawawi 40 + Qudsi 40). The picker warns on daif (weak) hadith in red and blocks them from the card. Save as PNG, or record a video with your voice. One size fits WhatsApp Status, Instagram Reels/Stories, TikTok, YouTube Shorts, Facebook Reels/Stories (1080×1920). -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>StoryForge — Hadith Card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#E9C46A;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,"Segoe UI",Roboto,Arial,sans-serif}
+.hidden{display:none !important}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 160px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header .logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;font-size:20px}
+header b{font-size:18px}
+header small{display:block;color:var(--muted);font-size:12px}
+header a{margin-left:auto;color:var(--muted);font-size:13px;text-decoration:none}
+.ver{display:inline-block;background:var(--accent);color:#111;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;flex:none}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--accent);color:#111;border-color:var(--accent)}
+.big{width:100%;padding:16px;font-size:18px;font-weight:800;border-radius:14px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.hint b{color:var(--text)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.preview{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;display:none}
+.preview.show{display:block}
+.preview .ti{font-size:14px;color:var(--accent);font-weight:700;margin-bottom:6px}
+.preview .ar{font-family:"Amiri Quran",Amiri,serif;direction:rtl;text-align:right;font-size:22px;line-height:2.1;margin:0 0 10px;color:#fff}
+.preview .en{font-size:15px;line-height:1.6;margin:0 0 10px}
+.preview .les{font-size:13px;line-height:1.55;color:var(--muted);margin:8px 0 10px;padding:8px 10px;background:rgba(233,196,106,0.07);border-left:3px solid var(--accent);border-radius:4px}
+.preview .les b{color:var(--text)}
+.preview .les ul{margin:4px 0 0;padding-left:20px}
+.preview .meta{font-size:13px;color:var(--muted);line-height:1.5}
+.preview .meta b{color:var(--text)}
+.gbadge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;margin-right:6px}
+.gbadge.sahih{background:rgba(95,211,141,.18);color:var(--ok);border:1px solid rgba(95,211,141,.4)}
+.gbadge.hasan{background:rgba(233,196,106,.18);color:var(--accent);border:1px solid rgba(233,196,106,.5)}
+.gbadge.daif{background:rgba(255,107,107,.18);color:var(--bad);border:1px solid rgba(255,107,107,.5)}
+.gbadge.mixed,.gbadge.unknown{background:rgba(147,161,184,.18);color:var(--muted);border:1px solid var(--line)}
+.warn{background:rgba(255,107,107,.14);border:1px solid rgba(255,107,107,.5);color:#ffd0d0;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;margin-top:8px}
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.themes label{position:relative;display:block;cursor:pointer}
+.themes label input{position:absolute;opacity:0;pointer-events:none}
+.themes .sw{height:52px;border-radius:10px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;text-align:center;padding:4px}
+.themes input:checked+.sw{border-color:var(--accent);box-shadow:0 0 0 2px rgba(233,196,106,.25)}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 35%);display:flex;justify-content:center}
+.startbar .big{max-width:720px}
+#player{position:fixed;inset:0;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column}
+#stage{position:relative;max-width:100%;max-height:100%;background:#000}
+#stage canvas{display:block;width:100%;height:auto;max-width:100vw;max-height:calc(100vh - 120px)}
+#ptop{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;z-index:6;pointer-events:none}
+.pill{background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 10px;font-size:13px;display:flex;gap:6px;align-items:center;color:#fff;max-width:72vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#recDot{width:10px;height:10px;border-radius:50%;background:var(--bad);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+#pbar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;z-index:6}
+.cbtn{width:52px;height:52px;border-radius:50%;background:rgba(20,26,38,.9);border:1px solid rgba(255,255,255,.25);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;padding:0;flex:none}
+.cbtn svg{width:22px;height:22px;display:block}
+.cbtn.gold{background:var(--accent);color:#111;border-color:#fff;font-weight:800;font-size:12px;width:62px;height:62px}
+.cbtn.rec{width:62px;height:62px;background:var(--bad);border-color:#fff;font-weight:800}
+.cbtn.rec.on{border-radius:18px}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:140px;font-weight:800;color:#fff;text-shadow:0 0 30px #000;pointer-events:none;z-index:7}
+#after{position:absolute;inset:0;background:rgba(0,0,0,.94);z-index:8;display:flex;flex-direction:column;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow:auto}
+#after video{width:100%;max-height:52vh;border-radius:12px;background:#000}
+#after img{max-width:100%;max-height:52vh;border-radius:12px;align-self:center;background:#000}
+#after .row .btn{flex:1}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(0,0,0,.72);z-index:9;color:#fff;font-size:15px;text-align:center;padding:20px}
+.spin{width:34px;height:34px;border:4px solid rgba(255,255,255,.25);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <header><div class="logo">📜</div><div><b>Hadith Card <span class="ver">v3</span></b><small>Auto-sized · fits WhatsApp · Instagram · TikTok · YouTube · Facebook</small></div><a href="index.html">← All tools</a></header>
+
+  <div class="card">
+    <h2>📖 Pick a hadith</h2>
+    <div class="row">
+      <div><div class="label">Book</div><select id="book">
+        <option value="hadeethenc">📘 Lessons Collection (HadeethEnc — includes scholarly lesson)</option>
+        <option value="bukhari">Sahih al-Bukhari</option>
+        <option value="muslim">Sahih Muslim</option>
+        <option value="abudawud">Sunan Abu Dawud</option>
+        <option value="tirmidhi">Jami at-Tirmidhi</option>
+        <option value="nasai">Sunan an-Nasa'i</option>
+        <option value="ibnmajah">Sunan Ibn Majah</option>
+        <option value="nawawi">Forty Hadith of an-Nawawi</option>
+        <option value="qudsi">Forty Hadith Qudsi</option>
+      </select></div>
+      <div><div class="label">Hadith number</div><input type="number" id="num" min="1" value="1"></div>
+    </div>
+    <div class="hint" id="rangeHint"></div>
+    <div class="row">
+      <button class="btn" id="getBtn">📖 Get this hadith</button>
+      <button class="btn" id="randBtn">🎲 Random (Sahih / Hasan)</button>
+    </div>
+    <div class="preview" id="prev">
+      <div class="ti hidden" id="prevTi"></div>
+      <div class="ar" id="prevAr"></div>
+      <div class="en" id="prevEn"></div>
+      <div class="les hidden" id="prevLes"></div>
+      <div class="meta" id="prevMeta"></div>
+      <div class="warn hidden" id="warn">⚠️ Weak hadith (<b id="warnGrade">daif</b>) — scholars advise not sharing. Pick another, or tap Random.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🪧 What to show on the card</h2>
+    <label class="check"><input type="checkbox" id="tArabic" checked> Show Arabic text (recommended)</label>
+    <label class="check"><input type="checkbox" id="tRef" checked> Show the reference (e.g. Sahih al-Bukhari 6018)</label>
+    <label class="check"><input type="checkbox" id="tNarr"> Show the narrator (e.g. Narrated by Abu Hurairah)</label>
+    <label class="check"><input type="checkbox" id="tGrade"> Show the grade on the card (Sahih / Hasan). Weak hadith are blocked.</label>
+    <label class="check"><input type="checkbox" id="tLesson" checked> Show the scholarly lesson (only when the source has one)</label>
+  </div>
+
+  <div class="card">
+    <h2>✨ Motion (drawn behind the text — never blocks it)</h2>
+    <label class="check"><input type="checkbox" id="mPart" checked> 🌟 Gold particles drifting slowly</label>
+    <label class="check"><input type="checkbox" id="mBubbles"> 💧 Water bubbles rising from the bottom</label>
+    <label class="check"><input type="checkbox" id="mGlow" checked> ✨ Soft glow pulses in the corners</label>
+    <div class="hint">Tick any mix. All three off = still card.</div>
+  </div>
+
+  <div class="card">
+    <h2>🎨 Look</h2>
+    <div class="row">
+      <div><div class="label">Shape</div><select id="shape">
+        <option value="tall">Tall 9:16 — WhatsApp Status · Reels · Stories · TikTok · Shorts</option>
+        <option value="wide">Wide 16:9 — YouTube · Facebook feed</option>
+      </select></div>
+    </div>
+    <div><div class="label">Theme</div>
+      <div class="themes" id="themes">
+        <label><input type="radio" name="theme" value="dark" checked><div class="sw" style="background:linear-gradient(135deg,#0b0f17,#1a2333);color:#E9C46A">Dark &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="cream"><div class="sw" style="background:linear-gradient(135deg,#f5efe0,#e8ddc3);color:#2d4a3a">Cream &amp; Green</div></label>
+        <label><input type="radio" name="theme" value="navy"><div class="sw" style="background:linear-gradient(135deg,#0f2744,#1a3a5c);color:#E9C46A">Navy &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="emerald"><div class="sw" style="background:linear-gradient(135deg,#0d2a24,#1a4038);color:#f0d78c">Emerald</div></label>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="mic" checked> Record my voice with the video</label>
+    <label class="check"><input type="checkbox" id="countOn" checked> Count down 3 · 2 · 1 before recording</label>
+  </div>
+
+  <div class="hint">The lesson comes from HadeethEnc (IslamHouse / Daar al-Islaam) — scholar-written, never AI. The six books come from fawazahmed0/hadith-api with multi-scholar grades.</div>
+</div>
+
+<div class="startbar"><button class="btn gold big" id="openBtn" disabled>Pick a hadith to start</button></div>
+
+<div id="player" class="hidden">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="ptop">
+    <span class="pill hidden" id="recPill"><span id="recDot"></span><span id="recTime">0:00</span></span>
+    <span class="pill" id="infoPill">Ready</span>
+  </div>
+  <div id="pbar">
+    <button class="cbtn" id="closeBtn" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="cbtn gold" id="pngBtn" title="Save as picture">PNG</button>
+    <button class="cbtn rec" id="recBtn" title="Record video">REC</button>
+    <button class="cbtn" id="backBtn" title="Back to picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+  </div>
+  <div id="count" class="hidden">3</div>
+  <div id="busy"><div class="spin"></div><div id="busyTxt">Drawing the card…</div></div>
+  <div id="after" class="hidden">
+    <b style="font-size:18px">✓ Your card is ready</b>
+    <video id="takeVid" class="hidden" controls playsinline></video>
+    <img id="takeImg" class="hidden" alt="">
+    <div class="hint" id="takeInfo"></div>
+    <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button><button class="btn hidden" id="shareTake">📤 Share</button></div>
+    <div class="row"><button class="btn" id="againBtn">Back to the card</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const KEY='forge:hc:';
+function toast(m,ms){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms||3400); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+const BOOKS={
+  hadeethenc:{name:'HadeethEnc Lessons', last:6000, auto:'sahih', source:'hadeethenc'},
+  bukhari:{name:'Sahih al-Bukhari', last:7563, auto:'sahih', source:'fawaz'},
+  muslim:{name:'Sahih Muslim', last:7563, auto:'sahih', source:'fawaz'},
+  abudawud:{name:'Sunan Abu Dawud', last:5274, auto:null, source:'fawaz'},
+  tirmidhi:{name:'Jami at-Tirmidhi', last:3956, auto:null, source:'fawaz'},
+  nasai:{name:'Sunan an-Nasa\'i', last:5761, auto:null, source:'fawaz'},
+  ibnmajah:{name:'Sunan Ibn Majah', last:4341, auto:null, source:'fawaz'},
+  nawawi:{name:'Forty Hadith of an-Nawawi', last:42, auto:'sahih', source:'fawaz'},
+  qudsi:{name:'Forty Hadith Qudsi', last:40, auto:'sahih', source:'fawaz'}
+};
+const FAWAZ='https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/';
+const HENC='https://hadeethenc.com/api/v1/hadeeths/';
+
+let current=null;
+
+function updateRange(){ const b=$('book').value, info=BOOKS[b]; $('num').max=info.last; $('rangeHint').textContent='Numbers 1 to '+info.last+' are available.'; }
+$('book').addEventListener('change',updateRange); updateRange();
+
+async function fawazOne(ed,n){
+  try{ const r=await fetch(FAWAZ+ed+'/'+n+'.min.json'); if(r.ok) return await r.json(); }catch(e){}
+  const r2=await fetch(FAWAZ+ed+'/'+n+'.json'); if(!r2.ok) throw new Error('Could not reach the hadith server.'); return await r2.json();
+}
+async function fetchFawaz(bk,n){
+  const [en,ar]=await Promise.all([fawazOne('eng-'+bk,n), fawazOne('ara-'+bk,n)]);
+  const he=(en&&en.hadiths&&en.hadiths[0])||null, ha=(ar&&ar.hadiths&&ar.hadiths[0])||null;
+  if(!he) throw new Error('No English text for this number.');
+  return { bk, name:BOOKS[bk].name, number:he.hadithnumber, en:he.text||'', ar:ha?ha.text:'', grades:he.grades||[], ref:he.reference||null, title:'', lesson:'', lessonList:[], attribution:'' };
+}
+async function fetchHadeethEnc(id){
+  const r=await fetch(HENC+'one/?language=en&id='+id);
+  if(!r.ok) throw new Error('No lesson for this number.');
+  const j=await r.json();
+  if(!j || !j.hadeeth) throw new Error('No lesson for this number.');
+  const grade=/authent/i.test(j.grade||'') ? 'Sahih' : (j.grade||'');
+  return {
+    bk:'hadeethenc', name:'HadeethEnc', number:j.id, en:String(j.hadeeth||'').trim(),
+    ar:String(j.hadeeth_ar||j.hadeeth||'').trim(),
+    grades:[{name:'HadeethEnc Board', grade:grade||'Sahih'}],
+    ref:null, title:j.title||'', lesson:j.explanation||'', lessonList:Array.isArray(j.hints)?j.hints:[],
+    attribution:j.attribution||''
+  };
+}
+async function fetchHadith(bk,n){ return BOOKS[bk].source==='hadeethenc' ? fetchHadeethEnc(n) : fetchFawaz(bk,n); }
+
+function narratorOf(en){ const m=String(en).match(/^Narrated by ([^:]+)[:.]/i)||String(en).match(/^Narrated ([^:]+):/i)||String(en).match(/^([^\(]+?)\(may Allah be pleased with (?:him|her|them)\) reported/i); return m?m[1].trim().replace(/\s+/g,' '):''; }
+function bodyOf(en){ let t=String(en).replace(/^Narrated(?: by)? [^:]+:\s*/i,'').trim(); t=t.replace(/^[^\(]+\(may Allah be pleased with (?:him|her|them)\) reported that the Messenger of Allah \(may Allah's peace and blessings be upon him\) said:\s*/i,'The Prophet (ﷺ) said: '); t=t.replace(/^[^\(]+\(may Allah be pleased with (?:him|her|them)\) reported[^:]*:\s*/i,''); return t.trim(); }
+function cleanAr(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+
+function summariseGrades(bk,grades){
+  if(BOOKS[bk].auto==='sahih') return { level:'sahih', text:'Sahih', raw:grades||[] };
+  if(!grades||!grades.length) return { level:'unknown', text:'Grade not stated', raw:[] };
+  const pick=grades.find(g=>/al-?albani/i.test(g.name))||grades[0];
+  const g=String(pick.grade||'').toLowerCase();
+  let level='mixed', text=pick.grade||'Mixed';
+  if(/very\s*daif|munkar|mawdu|fabric/.test(g)){ level='daif'; text='Very weak'; }
+  else if(/daif|weak/.test(g)){ level='daif'; text='Daif (weak)'; }
+  else if(/hasan\s*sahih/.test(g)){ level='hasan'; text='Hasan Sahih'; }
+  else if(/sahih/.test(g)){ level='sahih'; text='Sahih'; }
+  else if(/hasan/.test(g)){ level='hasan'; text='Hasan'; }
+  return { level, text, raw:grades };
+}
+
+function renderPreview(h){
+  current=h;
+  const g=summariseGrades(h.bk,h.grades);
+  $('prevTi').textContent=h.title||'';
+  $('prevTi').classList.toggle('hidden',!h.title);
+  $('prevAr').textContent=cleanAr(h.ar);
+  $('prevEn').textContent=h.en;
+  if(h.lesson || (h.lessonList && h.lessonList.length)){
+    let s='<b>📘 Scholarly lesson:</b> '+esc(h.lesson||'');
+    if(h.lessonList && h.lessonList.length) s+='<ul>'+h.lessonList.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+    $('prevLes').innerHTML=s; $('prevLes').classList.remove('hidden');
+  } else { $('prevLes').classList.add('hidden'); }
+  const narr=narratorOf(h.en);
+  let meta='<b>'+esc(h.name)+(h.title?'':' '+esc(String(h.number)))+'</b>';
+  if(h.attribution) meta+=' · '+esc(h.attribution);
+  if(narr) meta+=' · Narrated by '+esc(narr);
+  meta+='<br><span class="gbadge '+g.level+'">'+esc(g.text)+'</span>';
+  $('prevMeta').innerHTML=meta;
+  $('prev').classList.add('show');
+  const bad=(g.level==='daif');
+  $('warn').classList.toggle('hidden',!bad);
+  if(bad) $('warnGrade').textContent=g.text;
+  $('openBtn').disabled=false;
+  $('openBtn').textContent=bad?'This hadith is weak — pick another':'Make the card';
+  $('openBtn').classList.toggle('gold',!bad);
+}
+$('getBtn').onclick=async()=>{
+  const bk=$('book').value, n=clamp(+$('num').value||1,1,BOOKS[bk].last);
+  $('getBtn').disabled=true; $('getBtn').textContent='Getting…';
+  try{ const h=await fetchHadith(bk,n); renderPreview(h); }
+  catch(e){ toast(e.message||'Could not get the hadith',5000); }
+  finally{ $('getBtn').disabled=false; $('getBtn').textContent='📖 Get this hadith'; }
+};
+$('randBtn').onclick=async()=>{
+  const bk=$('book').value;
+  $('randBtn').disabled=true; $('randBtn').textContent='Finding one…';
+  try{
+    for(let tries=0;tries<15;tries++){
+      const n=1+Math.floor(Math.random()*BOOKS[bk].last);
+      try{
+        const h=await fetchHadith(bk,n);
+        const g=summariseGrades(bk,h.grades);
+        if(g.level==='sahih'||g.level==='hasan'){ $('num').value=n; renderPreview(h); return; }
+      }catch(e){ continue; }
+    }
+    toast('Could not find one by random — pick a number.',5000);
+  }finally{ $('randBtn').disabled=false; $('randBtn').textContent='🎲 Random (Sahih / Hasan)'; }
+};
+
+/* ---------- canvas card ---------- */
+const THEMES={
+  dark:{ bg1:'#0b0f17', bg2:'#1a2333', text:'#f5f5f0', sub:'#c8d0dc', accent:'#E9C46A', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(130,180,220,0.25)' },
+  cream:{ bg1:'#f5efe0', bg2:'#e8ddc3', text:'#1f2d26', sub:'#4a5c54', accent:'#2d4a3a', ornament:'rgba(45,74,58,0.14)', bubble:'rgba(60,120,100,0.22)' },
+  navy:{ bg1:'#0f2744', bg2:'#1a3a5c', text:'#f5f5f0', sub:'#bcd0e8', accent:'#E9C46A', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(140,200,230,0.3)' },
+  emerald:{ bg1:'#0d2a24', bg2:'#1a4038', text:'#f5efe0', sub:'#b9d4cc', accent:'#f0d78c', ornament:'rgba(240,215,140,0.18)', bubble:'rgba(140,210,180,0.28)' }
+};
+const currentTheme=()=>THEMES[document.querySelector('input[name=theme]:checked').value];
+const currentShape=()=>$('shape').value==='tall' ? [1080,1920] : [1920,1080];
+
+function wrapWords(ctx,text,maxW){
+  const words=String(text).split(/\s+/).filter(Boolean); const lines=[]; let cur=[];
+  for(const w of words){
+    const trial=cur.concat([w]).join(' ');
+    if(ctx.measureText(trial).width<=maxW || !cur.length) cur.push(w);
+    else{ lines.push(cur); cur=[w]; }
+  }
+  if(cur.length) lines.push(cur); return lines;
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function cornerOrnaments(ctx,W,H,c){
+  ctx.save(); ctx.strokeStyle=c.ornament; ctx.lineWidth=Math.round(Math.min(W,H)*0.004);
+  const r=Math.min(W,H)*0.09;
+  for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94]]){
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,r*0.66,0,6.283); ctx.stroke();
+    for(let k=0;k<8;k++){ const a=k*Math.PI/4; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r*0.5,cy+Math.sin(a)*r*0.5); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+/* ---------- motion ---------- */
+const anim={ particles:[], bubbles:[], glowPhase:0, lastW:0, lastH:0 };
+function resetParticles(W,H){
+  anim.lastW=W; anim.lastH=H;
+  anim.particles=[]; const n=Math.round((W*H)/36000);
+  for(let i=0;i<n;i++) anim.particles.push({ x:Math.random()*W, y:Math.random()*H, r:1+Math.random()*2.5, vx:(Math.random()-.5)*0.25, vy:-0.15-Math.random()*0.25, a:0.3+Math.random()*0.5, ph:Math.random()*6.283 });
+  anim.bubbles=[];
+}
+function stepAndDrawMotion(ctx,W,H,c,dt){
+  if(anim.lastW!==W||anim.lastH!==H) resetParticles(W,H);
+  anim.glowPhase+=dt;
+  if($('mGlow').checked){
+    for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94],[W*0.93,H*0.06],[W*0.07,H*0.94]]){
+      const ph=(Math.sin(anim.glowPhase*1.3+(cx+cy)*0.001)+1)/2;
+      const r=W*(0.06+ph*0.05);
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      g.addColorStop(0,'rgba(233,196,106,'+(0.18*ph).toFixed(3)+')');
+      g.addColorStop(1,'rgba(233,196,106,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.fill();
+    }
+  }
+  if($('mPart').checked){
+    for(const p of anim.particles){
+      p.x+=p.vx; p.y+=p.vy; p.ph+=dt*1.5;
+      if(p.y<-10){ p.y=H+10; p.x=Math.random()*W; }
+      if(p.x<-10) p.x=W+10; if(p.x>W+10) p.x=-10;
+      const tw=0.7+0.3*Math.sin(p.ph);
+      ctx.fillStyle='rgba(233,196,106,'+(p.a*tw*0.6).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill();
+    }
+  }
+  if($('mBubbles').checked){
+    if(Math.random()<0.08) anim.bubbles.push({ x:Math.random()*W, y:H+20, r:4+Math.random()*8, vy:-(0.6+Math.random()*0.9), vx:(Math.random()-.5)*0.2, a:0.3+Math.random()*0.4, wob:Math.random()*6.283 });
+    anim.bubbles=anim.bubbles.filter(b=>b.y>-20);
+    for(const b of anim.bubbles){
+      b.y+=b.vy; b.wob+=dt*2; b.x+=Math.sin(b.wob)*0.3+b.vx;
+      ctx.strokeStyle=c.bubble; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,6.283); ctx.stroke();
+      ctx.fillStyle=c.bubble.replace(/0\.\d+/,'0.1'); ctx.fill();
+    }
+  }
+}
+
+/* ---------- auto-fit: find font sizes that fill the body zone ---------- */
+function measureBlock(ctx,text,fs,fontFam,maxW,lineH){
+  ctx.font=fs+'px '+fontFam;
+  const lines=wrapWords(ctx,text,maxW);
+  return { lines, h:lines.length*fs*lineH };
+}
+function fitSizes(ctx,W,targetH,innerW,arText,enText,showAr,showEn){
+  /* ratio: Arabic font is about 1.35x English for similar visual weight */
+  let scale=1.0;
+  const refArFs=W*0.055, refEnFs=W*0.038;
+  const arLH=1.9, enLH=1.52;
+  for(let iter=0;iter<6;iter++){
+    const arFs=Math.round(refArFs*scale), enFs=Math.round(refEnFs*scale);
+    let totalH=0;
+    if(showAr && arText){
+      const m=measureBlock(ctx,arText,arFs,'"Amiri Quran", Amiri, serif',innerW,arLH); totalH+=m.h; totalH+=arFs*0.4; /* small gap */
+    }
+    if(showEn && enText){
+      const m=measureBlock(ctx,enText,enFs,'400 '+' Rubik,sans-serif',innerW,enLH); totalH+=m.h;
+    }
+    if(totalH<=1) break;
+    if(totalH>targetH){ scale*=targetH/totalH*0.98; if(scale<0.4){ scale=0.4; break; } }
+    else if(totalH<targetH*0.72){ scale*=Math.min(1.5, targetH*0.88/totalH); if(scale>1.6){ scale=1.6; break; } }
+    else break;
+  }
+  return { arFs:Math.round(refArFs*scale), enFs:Math.round(refEnFs*scale) };
+}
+
+/* ---------- draw card ---------- */
+function drawCard(ctx,W,H,dt){
+  if(!current) return;
+  const c=currentTheme();
+  const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,c.bg1); g.addColorStop(1,c.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  cornerOrnaments(ctx,W,H,c);
+  stepAndDrawMotion(ctx,W,H,c,dt||0.016);
+
+  const tall=H>W;
+  const padX=Math.round(W*0.08), innerW=W-padX*2;
+  /* safe zones: platform overlays live in the top ~8% and bottom ~8%. Content goes in the middle 84% */
+  const safeTop=Math.round(H*0.08), safeBot=Math.round(H*0.08);
+
+  /* fixed heights */
+  const badgeFs=Math.round(W*(tall?0.028:0.022));
+  const narrFs=Math.round(W*(tall?0.025:0.018));
+  const refFs=Math.round(W*(tall?0.024:0.018));
+  const lesFs=Math.round(W*(tall?0.023:0.016));
+  const headerH=badgeFs*1.3+Math.round(W*0.012)+Math.round(W*0.025); /* badge + line + spacing */
+
+  const narr=narratorOf(current.en);
+  const body=bodyOf(current.en);
+  const showAr=$('tArabic').checked && !!current.ar;
+  const showRef=$('tRef').checked;
+  const showNarr=$('tNarr').checked && !!narr;
+  const gr=summariseGrades(current.bk,current.grades);
+  const showGrade=$('tGrade').checked && (gr.level==='sahih'||gr.level==='hasan');
+  const showLes=$('tLesson').checked && (current.lesson||(current.lessonList&&current.lessonList.length));
+  const narrH=showNarr?narrFs*1.5:0;
+  const refH=showRef?refFs*1.6:0;
+  const gradeH=showGrade?refFs*2.1:0;
+  const lesLines=showLes?3:0;
+  const lesH=showLes?lesFs*1.4+lesLines*lesFs*1.35+lesFs*0.8:0;
+  const dividerH=showAr?Math.round(W*0.025):0;
+
+  const bodyZoneTop=safeTop+headerH+narrH;
+  const bodyZoneBot=safeBot+refH+gradeH+lesH;
+  const bodyZoneH=H-bodyZoneTop-bodyZoneBot-dividerH;
+
+  const fit=fitSizes(ctx,W,bodyZoneH,innerW,cleanAr(current.ar),body||current.en,showAr,true);
+  const arFs=fit.arFs, enFs=fit.enFs;
+
+  /* measure final heights */
+  ctx.font=arFs+'px "Amiri Quran", Amiri, serif';
+  const arLines=showAr?wrapWords(ctx,cleanAr(current.ar),innerW):[];
+  const arH=arLines.length*arFs*1.9;
+  ctx.font=enFs+'px Rubik,sans-serif';
+  const enLines=wrapWords(ctx,body||current.en,innerW);
+  const enH=enLines.length*enFs*1.52;
+  const gapArEn=showAr?arFs*0.4:0;
+  const totalBodyH=arH+gapArEn+(showAr?dividerH:0)+enH;
+
+  /* top: badge */
+  ctx.save(); ctx.font='700 '+badgeFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('📜  HADITH', W/2, safeTop);
+  ctx.strokeStyle=c.accent; ctx.lineWidth=Math.max(2,W*0.003);
+  const bLY=safeTop+badgeFs+Math.round(W*0.012), bLW=Math.min(innerW*0.3, W*0.22);
+  ctx.beginPath(); ctx.moveTo(W/2-bLW/2,bLY); ctx.lineTo(W/2+bLW/2,bLY); ctx.stroke();
+  ctx.restore();
+
+  if(showNarr){
+    ctx.save(); ctx.font='500 '+narrFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText('Narrated by '+narr, W/2, safeTop+headerH-narrFs*0.5);
+    ctx.restore();
+  }
+
+  /* body — vertically centered in bodyZone */
+  let y=bodyZoneTop+Math.max(0,(bodyZoneH-totalBodyH)/2);
+
+  if(showAr){
+    ctx.save();
+    ctx.font='500 '+arFs+'px "Amiri Quran", Amiri, serif';
+    ctx.fillStyle=c.text; ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='top';
+    const lh=arFs*1.9;
+    for(const ln of arLines){ ctx.fillText(ln.join(' '),W/2,y); y+=lh; }
+    ctx.restore();
+    y+=gapArEn;
+    /* divider */
+    ctx.save(); ctx.strokeStyle=c.accent; ctx.globalAlpha=0.45; ctx.lineWidth=Math.max(1,W*0.0018);
+    ctx.beginPath(); ctx.moveTo(W/2-W*0.05,y+dividerH*0.4); ctx.lineTo(W/2+W*0.05,y+dividerH*0.4); ctx.stroke(); ctx.restore();
+    y+=dividerH;
+  }
+
+  ctx.save();
+  ctx.font=enFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.direction='ltr'; ctx.textAlign='center'; ctx.textBaseline='top';
+  const enLH=enFs*1.52;
+  for(const ln of enLines){ ctx.fillText(ln.join(' '),W/2,y); y+=enLH; }
+  ctx.restore();
+
+  /* lesson strip (above reference/grade) */
+  if(showLes){
+    const txt=current.lesson||(current.lessonList&&current.lessonList[0])||'';
+    if(txt){
+      ctx.save();
+      ctx.font='400 '+lesFs+'px Rubik,sans-serif';
+      const lesWrapLines=wrapWords(ctx,txt,W-padX*1.6).slice(0,3);
+      const bandH=lesFs*1.4+lesWrapLines.length*lesFs*1.35+lesFs*0.6;
+      const by=H-safeBot-refH-gradeH-bandH;
+      ctx.fillStyle='rgba(233,196,106,0.09)';
+      roundRect(ctx,padX*0.6,by,W-padX*1.2,bandH,lesFs*0.4); ctx.fill();
+      ctx.strokeStyle=c.accent; ctx.globalAlpha=0.35; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
+      ctx.font='700 '+Math.round(lesFs*0.95)+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText('📘 Lesson', padX*0.8, by+lesFs*0.4);
+      ctx.font='400 '+lesFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text;
+      let ly=by+lesFs*1.7;
+      for(const ln of lesWrapLines){ ctx.fillText(ln.join(' '), padX*0.8, ly); ly+=lesFs*1.35; }
+      ctx.restore();
+    }
+  }
+
+  /* bottom: grade + reference */
+  let by=H-safeBot;
+  if(showRef){
+    ctx.save(); ctx.font='700 '+refFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    const refTxt=current.name+(current.title?'':'  ·  '+(current.ref ? current.ref.book+':'+current.ref.hadith : current.number))+(current.attribution?'  ·  '+current.attribution:'');
+    ctx.fillText(refTxt,W/2,by); ctx.restore();
+    by-=refFs*1.5;
+  }
+  if(showGrade){
+    const label=gr.level==='sahih'?'Sahih':gr.level==='hasan'?'Hasan':gr.text;
+    ctx.save(); ctx.font='700 '+Math.round(refFs*0.95)+'px Rubik,sans-serif';
+    const tw=ctx.measureText(label).width, bw=tw+refFs*1.4, bh=refFs*1.6, bx=(W-bw)/2;
+    const bg=gr.level==='sahih'?'rgba(95,211,141,0.22)':'rgba(233,196,106,0.22)';
+    const bd=gr.level==='sahih'?'#5fd38d':'#E9C46A';
+    ctx.fillStyle=bg; roundRect(ctx,bx,by-bh,bw,bh,bh*0.5); ctx.fill();
+    ctx.strokeStyle=bd; ctx.lineWidth=Math.max(1,W*0.002); ctx.stroke();
+    ctx.fillStyle=bd; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(label, W/2, by-bh/2);
+    ctx.restore();
+  }
+}
+
+/* ---------- player ---------- */
+let cv=null, ctx=null, W=0, H=0, mr=null, chunks=[], blob=null, url='', recTimer=0, recT0=0, micStream=null, pngBlob=null, rafId=0, lastT=0;
+function sizeCanvas(){
+  const [cw,ch]=currentShape();
+  cv.width=cw; cv.height=ch; W=cw; H=ch;
+  const aw=Math.min(window.innerWidth, (window.innerHeight-140)*(cw/ch));
+  $('stage').style.width=Math.round(aw)+'px';
+  resetParticles(W,H);
+}
+function loop(t){
+  rafId=requestAnimationFrame(loop);
+  if(!lastT) lastT=t; const dt=Math.min(0.08,(t-lastT)/1000); lastT=t;
+  if(ctx) drawCard(ctx,W,H,dt);
+}
+
+async function openPlayer(){
+  if(!current){ toast('Pick a hadith first.'); return; }
+  const gr=summariseGrades(current.bk,current.grades);
+  if(gr.level==='daif'){ toast('This hadith is weak — scholars advise not sharing it.',5500); return; }
+  $('player').classList.remove('hidden'); $('busy').classList.remove('hidden');
+  cv=$('cv'); ctx=cv.getContext('2d');
+  await document.fonts.ready;
+  sizeCanvas();
+  $('infoPill').textContent=current.name+(current.title?'':' · '+current.number);
+  $('busy').classList.add('hidden');
+  cancelAnimationFrame(rafId); lastT=0; rafId=requestAnimationFrame(loop);
+  try{ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({navigationUI:'hide'}); }catch{}
+}
+function closePlayer(){
+  if(mr && mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; stopRec(); }
+  cancelAnimationFrame(rafId);
+  try{ document.fullscreenElement && document.exitFullscreen(); }catch{}
+  $('player').classList.add('hidden'); $('after').classList.add('hidden');
+}
+$('openBtn').onclick=openPlayer;
+$('closeBtn').onclick=closePlayer;
+$('backBtn').onclick=closePlayer;
+window.addEventListener('resize',()=>{ if(!$('player').classList.contains('hidden')) sizeCanvas(); });
+
+for(const id of ['tArabic','tRef','tNarr','tGrade','tLesson','shape','mPart','mBubbles','mGlow']) $(id).addEventListener('change',()=>{ if(ctx) sizeCanvas(); });
+
+/* ---------- PNG + VIDEO ---------- */
+function baseName(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); const nm=((current.title||current.name)+'-'+current.number).replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,46); return nm+'-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function dl(file){ const u=URL.createObjectURL(file),a=document.createElement('a'); a.href=u; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); }
+$('pngBtn').onclick=()=>{
+  if(!cv) return;
+  cv.toBlob(b=>{ if(!b){ toast('Could not make the picture.'); return; } pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+function pickType(){ const t=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']; return t.find(x=>window.MediaRecorder && MediaRecorder.isTypeSupported(x))||''; }
+async function startRec(){
+  if(!cv){ toast('The card is not ready.'); return; }
+  if(!window.MediaRecorder){ toast('This browser cannot record. Use Google Chrome.'); return; }
+  let stream; try{ stream=cv.captureStream(30); }catch{ toast('This browser cannot record the card.'); return; }
+  if($('mic').checked){ try{ micStream=await navigator.mediaDevices.getUserMedia({audio:true}); micStream.getAudioTracks().forEach(t=>stream.addTrack(t)); }catch{ toast('Microphone not allowed — recording without voice.',4000); } }
+  if($('countOn').checked){ const c=$('count'); c.classList.remove('hidden'); for(const n of [3,2,1]){ c.textContent=n; await sleep(900); } c.classList.add('hidden'); }
+  const mt=pickType(); try{ mr=new MediaRecorder(stream,{mimeType:mt||undefined,videoBitsPerSecond:7000000,audioBitsPerSecond:192000}); }catch{ mr=new MediaRecorder(stream); }
+  chunks=[]; mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; } };
+  mr.start(500); recT0=performance.now();
+  $('recBtn').classList.add('on'); $('recBtn').textContent='STOP'; $('recPill').classList.remove('hidden');
+  clearInterval(recTimer); recTimer=setInterval(()=>{ const s=Math.floor((performance.now()-recT0)/1000); $('recTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+}
+function stopRec(){ if(mr && mr.state!=='inactive') mr.stop(); clearInterval(recTimer); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; $('recPill').classList.add('hidden'); }
+$('recBtn').onclick=()=>{ if(mr && mr.state==='recording') stopRec(); else startRec(); };
+
+function takeFile(){
+  if(pngBlob) return new File([pngBlob], baseName()+'.png', {type:'image/png'});
+  const ext=/mp4/.test(blob.type)?'.mp4':'.webm'; return new File([blob], baseName()+ext, {type:blob.type});
+}
+function showAfter(kind){
+  if(url) URL.revokeObjectURL(url);
+  const file=takeFile(); url=URL.createObjectURL(file);
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video') $('takeVid').src=url; else $('takeImg').src=url;
+  const mb=(file.size/1048576).toFixed(1);
+  $('takeInfo').textContent=file.name+' · '+(kind==='video'?(/mp4/.test(file.type)?'MP4':'WebM'):'PNG')+' · '+mb+' MB';
+  let can=false; try{ can=!!(navigator.canShare && navigator.canShare({files:[file]})); }catch{}
+  $('shareTake').classList.toggle('hidden',!can);
+  $('after').classList.remove('hidden');
+}
+$('saveTake').onclick=()=>{ dl(takeFile()); toast('✓ Saved to your Downloads folder',4000); };
+$('shareTake').onclick=async()=>{ try{ await navigator.share({files:[takeFile()], title:(current.title||current.name)+' '+current.number}); }catch(e){ if(e&&e.name!=='AbortError') toast('Sharing did not work. Use Save.'); } };
+$('againBtn').onclick=()=>{ $('after').classList.add('hidden'); if($('takeVid').pause) $('takeVid').pause(); };
+
+/* ---------- remember choices ---------- */
+(function(){
+  for(const id of ['book','num','shape']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.value=v; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.value)); el.addEventListener('input',()=>localStorage.setItem(KEY+id,el.value)); }
+  for(const id of ['tArabic','tRef','tNarr','tGrade','tLesson','mPart','mBubbles','mGlow','mic','countOn']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.checked=v==='1'; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.checked?'1':'0')); }
+  const th=localStorage.getItem(KEY+'theme'); if(th){ const r=document.querySelector('input[name=theme][value='+th+']'); if(r) r.checked=true; }
+  document.querySelectorAll('input[name=theme]').forEach(r=>r.addEventListener('change',()=>localStorage.setItem(KEY+'theme',r.value)));
+  updateRange();
+})();
+</script>
+</body>
+</html>

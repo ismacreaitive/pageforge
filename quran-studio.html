@@ -1,0 +1,2524 @@
+<!DOCTYPE html>
+<!-- quran-studio.html — v13 — StoryForge Quran Studio: chosen cover saved inside the MP4 as the video's picture (folder, gallery, WhatsApp) + on screen only a quick blink (0.1 s, or none, or 0.7 s), cover choice never erased, phrase-by-phrase long ayat, background changes after each scene, exact aligner, meaning visuals, golden icons -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryForge — Quran Studio</title>
+<link rel="stylesheet" href="forge.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=Lora:ital,wght@1,500;1,600&family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+.hidden{display:none !important}
+.sec{font-size:13px;font-weight:700;margin-top:4px}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel-2);display:flex;flex-direction:column;gap:8px}
+.pick{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel-2);font-size:13px}
+.pick:hover{border-color:var(--accent)}
+.credit{font-size:12px;color:var(--muted)}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+#view{display:block;max-width:100%;max-height:calc(100vh - 140px);border-radius:10px;background:#000;margin:0 auto}
+.units{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto}
+.unit{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel);font-size:12px;display:flex;gap:6px;align-items:center}
+.unit .ar{font-family:"Amiri Quran",Amiri,serif;font-size:17px;direction:rtl;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px}
+.unit b{color:var(--accent);white-space:nowrap}
+.unit .tm{color:var(--muted);font-variant-numeric:tabular-nums}
+.unit .mini{flex:none;padding:3px 7px}
+.unit.on{border-color:var(--accent)}
+.tapbig{font-size:24px;padding:22px;width:100%;font-weight:800}
+.mq{display:flex;gap:6px;align-items:center}
+.mq select{flex:1}
+.qres{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow:auto}
+.qhit{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel)}
+.qhit b{font-size:12px;color:var(--accent)}
+.qhit .ar{font-family:"Amiri Quran",Amiri,serif;font-size:19px;line-height:1.8;direction:rtl;text-align:right;color:var(--text);margin-top:4px}
+.qhit .en{font-size:12px;color:var(--muted);line-height:1.5}
+.qhit .row{margin-top:6px}
+.qhit .mini{flex:none}
+#qSel{color:var(--ok)}
+#qFind{font-size:15px}
+#findSet{font-size:14px}
+.flash{outline:3px solid var(--accent) !important;outline-offset:4px;border-radius:8px}
+.mic.on{border-color:#ff6b6b;color:#ff6b6b}
+.slider b{min-width:46px;text-align:right;color:var(--text)}
+#photoThumb{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex:none}
+#mvList{max-height:460px}
+.mvrow{border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--panel);font-size:12px;display:flex;flex-direction:column;gap:6px}
+.mvrow b{color:var(--accent)}
+.mvrow select{flex:1;min-width:0;font-size:12px}
+.mvrow .mini{flex:none;padding:3px 7px}
+.mvrow .num{flex:none;width:14px;color:var(--muted);font-weight:700}
+.mvth{width:56px;height:36px;object-fit:cover;border-radius:6px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:14px;background:var(--panel-2);border:1px solid var(--line)}
+#kGem{font-family:monospace;font-size:12px}
+.aibox{border:1px solid var(--accent);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--panel)}
+.cvgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cv{border:2px solid var(--line);border-radius:10px;padding:5px;background:var(--panel);display:flex;flex-direction:column;gap:5px;position:relative}
+.cv.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.cv.on::after{content:"✓ CHOSEN";position:absolute;top:10px;left:10px;background:var(--accent);color:#000;font-weight:800;font-size:11px;padding:3px 7px;border-radius:6px}
+.cv img{width:100%;border-radius:7px;display:block}
+.cv .mini{flex:1;padding:4px 6px}
+#cvInfo b{color:var(--accent)}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">📖</div>StoryForge <small>Quran Studio · your recitation with the exact ayat, word by word</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <input type="text" id="findSet" placeholder="🔎 Jump to a setting: AI timing, cover, phrase, visuals, maqam, keys…" autocomplete="off" spellcheck="false">
+
+  <div class="sec">1 · Your recitation</div>
+  <label class="drop" id="drop"><input type="file" id="fileIn" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">📖</div><strong>Drop your recitation video or audio here</strong><span>Your voice stays exactly as it is.</span></label>
+  <div class="file-info" id="fileInfo">No file chosen yet</div>
+
+  <div class="sec">2 · Which ayat did you recite?</div>
+  <div class="box">
+    <div class="label" style="margin:0">🔍 Search the ayah you recited</div>
+    <div class="row"><input type="text" id="qFind" placeholder="e.g. allazina aamanu wa lam yalbisu · patience and prayer · 2:255" autocomplete="off" spellcheck="false"><button class="mini mic" id="micBtn" style="flex:none" title="Say or recite it">🎤</button><button class="mini" id="qFindBtn" style="flex:none">Search</button></div>
+    <div class="row" style="align-items:center"><div class="ptext" style="margin:0;flex:1">Type, or press 🎤 and recite a few words. <b>Spelling mistakes are fine.</b></div><select id="micLang" style="flex:none;width:auto"><option value="ar-SA">🎤 Arabic</option><option value="en-US">🎤 English</option></select></div>
+    <div class="qres hidden" id="qRes"></div>
+    <div class="row" style="align-items:center"><div class="ptext" id="qSel" style="margin:0;flex:1"></div><button class="mini" id="toMinus" style="flex:none" title="One ayah less">− 1 ayah</button><button class="mini" id="toPlus" style="flex:none" title="One more ayah">+ 1 ayah</button></div>
+    <details><summary class="ptext" style="cursor:pointer;margin:0">Choose by number instead</summary>
+      <div class="stack" style="gap:8px;margin-top:8px">
+        <div><div class="label">Surah</div><select id="qSurah"><option value="">Loading the list…</option></select></div>
+        <div class="row"><div><div class="label">From ayah</div><input type="number" id="qFrom" min="1" value="1"></div><div><div class="label">To ayah</div><input type="number" id="qTo" min="1" value="1"></div></div>
+      </div>
+    </details>
+    <label class="check"><input type="checkbox" id="qAudh"> I said A'udhu billah first</label>
+    <label class="check"><input type="checkbox" id="qBism" checked> I recited Bismillah first</label>
+    <div><div class="label">Translation</div><select id="qTr"></select></div>
+    <button class="primary" id="loadBtn">📖 Get the ayat and line them up with my voice</button>
+  </div>
+
+  <div class="sec">3 · Check the timing</div>
+  <div class="box">
+    <div class="aibox" id="aiBox">
+      <button class="primary" id="aiSync">🎧 Let the Quran AI listen and time every word</button>
+      <div><div class="label">Listener</div><select id="aiQ">
+        <option value="align">Exact aligner: follows every letter, waits for every madd (about 360 MB, once)</option>
+        <option value="fast">Whisper Quran AI, fast (about 600 MB, once, needs a graphics card)</option>
+        <option value="best">Whisper Quran AI, best (about 1.5 GB, once, needs a graphics card)</option>
+      </select></div>
+      <div class="ptext" id="aiInfo" style="margin:0">The AI only listens for when each word starts. The words on screen always come from the exact mushaf text.</div>
+    </div>
+    <div class="ptext" id="syncInfo" style="margin:0">Choose your recitation and the ayat first.</div>
+    <div class="row"><button class="mini" id="playBtn">▶ Preview</button><button class="mini" id="tapAyat">🕋 Tap each ayah start</button><button class="mini" id="resetSync">↺ Automatic</button></div>
+    <div><div class="label">Gold highlight style</div><select id="hlMode">
+      <option value="quick">Gold sweep, quick (each word fills the moment you start it)</option>
+      <option value="word">Gold, one word at a time</option>
+      <option value="sweep">Gold flowing slowly (fills across the whole word)</option>
+      <option value="ayah">No highlight</option>
+    </select></div>
+    <label class="slider">Gold highlight: later ◀ ▶ earlier <input type="range" id="hlLead" min="-40" max="40" step="5" value="10"><b id="leadVal">0.10 s</b></label>
+    <div><div class="label">Tapping speed (for ✋ and 🕋)</div><select id="tapRate"><option value="1">Normal speed</option><option value="0.75">Slower (¾ speed)</option><option value="0.5">Half speed (easiest, most exact)</option></select></div>
+    <button class="primary hidden tapbig" id="tapBtn">TAP</button>
+    <div class="ptext hidden" id="tapHelp" style="margin:0"></div>
+    <div class="units" id="unitList"></div>
+  </div>
+
+  <div class="sec">4 · Look</div>
+  <div class="box">
+    <div class="row">
+      <div><div class="label">Shape</div><select id="format"><option value="9:16">Vertical 9:16 (Shorts, Reels, TikTok, Status)</option><option value="16:9">Wide 16:9 (YouTube)</option><option value="1:1">Square 1:1</option></select></div>
+      <div><div class="label">Quality</div><select id="quality"><option value="720">720p (faster)</option><option value="1080" selected>1080p (best)</option></select></div>
+    </div>
+    <div><div class="label">Show me</div><select id="meMode">
+      <option value="bubble">🧑 My photo in a talking bubble (no video of me)</option>
+      <option value="frame">🖼️ Me in a frame, the ayat beside it (never covers my face)</option>
+      <option value="asis">Me full screen, the ayat on top</option>
+      <option value="cut">Me full screen on a new background (my room is removed)</option>
+      <option value="none">Only the background (just my voice)</option>
+    </select></div>
+    <div class="row hidden" id="photoBox" style="align-items:center">
+      <img id="photoThumb" alt="" class="hidden">
+      <label class="pick" style="flex:none">🧑 Choose my photo<input type="file" id="photoIn" accept="image/*" hidden></label>
+      <input type="text" id="pName" placeholder="Name under the photo (optional)">
+    </div>
+    <div><div class="label">Background</div><select id="bgSel"></select></div>
+    <div><div class="label">Change my background</div><select id="bgChange">
+      <option value="scene">Every time a meaning scene ends (uses my library)</option>
+      <option value="ayah">Every ayah (uses my library)</option>
+      <option value="never">Never (keep one background)</option>
+    </select></div>
+    <label class="pick">🖼️ Add my own pictures or videos as backgrounds<input type="file" id="bgUp" accept="image/*,video/*" multiple hidden></label>
+    <div class="row">
+      <div><div class="label">Text</div><select id="textMode"><option value="both">Arabic + translation</option><option value="ar">Arabic only</option><option value="tr">Translation only</option></select></div>
+      <div><div class="label">Text style</div><select id="txtStyle"><option value="classic">Classic: gold line, elegant translation</option><option value="card">Modern: on a soft dark box</option></select></div>
+    </div>
+    <div><div class="label">Long ayat</div><select id="txtSplit">
+      <option value="auto">Auto: phrase by phrase when the ayah is long</option>
+      <option value="phrase">Always phrase by phrase (at the waqf signs and my pauses)</option>
+      <option value="whole">Whole ayah (turns pages by lines)</option>
+    </select></div>
+    <div><div class="label">Text position</div><select id="txtPos"><option value="auto">Auto</option><option value="up">Higher</option><option value="mid">Middle</option><option value="low">Lower</option></select></div>
+    <label class="slider">Text size <input type="range" id="txtSize" min="80" max="130" step="5" value="100"><b id="sizeVal">100%</b></label>
+    <label class="check"><input type="checkbox" id="melOn" checked> 🎼 Melody line (the rise and fall of my voice)</label>
+    <label class="check"><input type="checkbox" id="hdrOn" checked> Surah name at the top</label>
+    <label class="check"><input type="checkbox" id="safeOn" checked> 📱 Safe layout for TikTok, Reels and Shorts (nothing at the top edge, the bottom or the right side)</label>
+    <label class="check"><input type="checkbox" id="zonesOn"> 👁 Show where the app buttons cover the video (only in this preview, never in the final video)</label>
+    <label class="check"><input type="checkbox" id="barOn"> Thin progress bar</label>
+    <label class="slider">Mosque echo <input type="range" id="echo" min="0" max="60" value="0"></label>
+    <div class="row">
+      <div><div class="label">Channel logo</div><select id="chan"></select></div>
+      <div style="flex:none;align-self:flex-end"><label class="pick" style="padding:7px 10px">🖼️ Upload logo<input type="file" id="logoIn" accept="image/*" hidden></label></div>
+    </div>
+    <div class="label" style="margin:0" id="mqLabel">Maqam badge</div>
+    <div id="mqRows" class="stack" style="gap:6px"></div>
+    <button class="mini" id="mqAdd">+ Add a maqam change</button>
+  </div>
+
+  <div class="sec">5 · Meaning visuals (chosen from the tafsir)</div>
+  <div class="box">
+    <label class="check"><input type="checkbox" id="mvOn" checked> 🎞️ Show visuals that follow the meaning of each ayah</label>
+    <label class="check"><input type="checkbox" id="icOn" checked> ✨ Golden icon moments (road, Kaaba, fire, scale, book…)</label>
+    <div><div class="label">How the scenes show</div><select id="mvLen">
+      <option value="alt">2–3 scenes per ayah, back to me in between (recommended)</option>
+      <option value="cont">2–3 scenes per ayah, one after another (no return to me)</option>
+      <option value="one">One short scene per ayah</option>
+    </select></div>
+    <div class="row">
+      <div><div class="label">Pictures from</div><select id="mvSrc"><option value="mix">Pixabay videos, then photos, then generated</option><option value="pixabay">Pixabay only</option><option value="gen">Generated pictures only</option><option value="lib">My background library only</option></select></div>
+      <div><div class="label">How often</div><select id="mvFreq"><option value="some">Some ayat (natural)</option><option value="most">Most ayat</option></select></div>
+    </div>
+    <div><div class="label">While a scene shows</div><select id="mvMe"><option value="hide">Hide me</option><option value="keep">Keep my photo or frame on top</option></select></div>
+    <details id="mvKeys"><summary class="ptext" style="cursor:pointer;margin:0">🔑 Keys (found automatically from your studio)</summary>
+      <div class="stack" style="gap:6px;margin-top:6px">
+        <div class="ptext" id="kInfo" style="margin:0"></div>
+        <div><div class="label">Gemini keys (one per line)</div><textarea id="kGem" rows="3" spellcheck="false"></textarea></div>
+        <div class="row"><div><div class="label">Groq key</div><input type="text" id="kGroq" spellcheck="false"></div><div><div class="label">Pixabay key</div><input type="text" id="kPix" spellcheck="false"></div></div>
+        <button class="mini" id="kSave">💾 Save keys</button>
+      </div>
+    </details>
+    <button class="primary" id="mvPlan">🎞️ Plan the visuals from the tafsir</button>
+    <div class="ptext" id="mvInfo" style="margin:0">Press "Get the ayat" first, then plan the visuals. You check every choice before the video is made.</div>
+    <div class="units" id="mvList"></div>
+  </div>
+
+  <div class="sec">6 · Cover and video</div>
+  <div class="box" id="cvBox">
+    <div class="label" style="margin:0">🖼️ Cover (thumbnail)</div>
+    <label class="check"><input type="checkbox" id="cvFirst" checked> Use the chosen cover as the video's picture (shows in your folder, phone gallery and WhatsApp)</label>
+    <div><div class="label">When the video plays, the cover shows</div><select id="cvHold">
+      <option value="blink">As a quick blink, then the recitation starts (0.1 s)</option>
+      <option value="none">Not at all (only as the video's picture)</option>
+      <option value="long">Clearly, then fades into the recitation (0.7 s)</option>
+    </select></div>
+    <label class="check"><input type="checkbox" id="cvTitle" checked> Big surah name on the cover</label>
+    <button class="mini" id="cvSuggest">✨ Show the 4 best covers</button>
+    <div class="ptext" id="cvInfo" style="margin:0">After "Get the ayat", tap the button. If you don't choose, the best cover is chosen for you when the video is made.</div>
+    <div class="cvgrid" id="cvGrid"></div>
+  </div>
+  <div><div class="label">Make</div><select id="range"><option value="all">The whole recitation</option><option value="part">Only some ayat (for a Short)</option></select></div>
+  <div class="row hidden" id="partRow"><div><div class="label">From</div><select id="pFrom"></select></div><div><div class="label">To</div><select id="pTo"></select></div></div>
+  <button class="primary big" id="makeBtn">✨ Make my Quran video</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="dlBtn">⬇ Download video</button></div>
+
+  <div class="sec">7 · Ready to post</div>
+  <div class="box" id="postBox">
+    <div class="ptext" id="postEmpty" style="margin:0">Your title, description and hashtags appear here after "Get the ayat".</div>
+    <div class="row"><input type="text" id="postTitle" placeholder="Title"><button class="mini cp" data-t="postTitle" style="flex:none">📋</button></div>
+    <div class="row"><textarea id="postDesc" rows="6" placeholder="Description and hashtags"></textarea><button class="mini cp" data-t="postDesc" style="flex:none">📋</button></div>
+    <div class="row"><input type="text" id="postTags" placeholder="Tags (YouTube)"><button class="mini cp" data-t="postTags" style="flex:none">📋</button></div>
+  </div>
+  <div class="credit">Quran text, translations and Tafsir al-Muyassar from alquran.cloud · Exact aligner: wav2vec2-large-xlsr-53-arabic by Jonatas Grosman (Apache 2.0), int8 ONNX by the fuKhushu project · Whisper Quran listener (Apache 2.0) · all run in your browser · Arabic font Amiri Quran · visuals from Pixabay and Pollinations · no Quran text is written by AI</div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Drop your recitation on the left, search the ayah you recited, then press "Get the ayat".</span></div>
+  <div class="stage"><canvas id="view" width="540" height="960"></canvas></div>
+  <video id="vid" muted playsinline preload="auto" class="hidden"></video>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const fmt=s=>{ s=Math.max(0,s||0); return Math.floor(s/60)+':'+(s%60).toFixed(1).padStart(4,'0'); };
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const easeOut=t=>1-Math.pow(1-t,3);
+const AR_DIG='٠١٢٣٤٥٦٧٨٩', arNum=n=>String(n).replace(/\d/g,d=>AR_DIG[d]);
+const AR_FONT='"Amiri Quran", Amiri, "Traditional Arabic", serif', LAT='Rubik, "Segoe UI", Roboto, Arial, sans-serif', SERIF='Lora, Georgia, "Times New Roman", serif', GOLD='#E9C46A', CREAM='#F5E6C8';
+const BISM_AR='بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ', BISM_EN='In the name of Allah, the Entirely Merciful, the Especially Merciful.';
+const AUDH_AR='أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَٰنِ ٱلرَّجِيمِ', AUDH_EN='I seek refuge in Allah from Satan, the expelled.';
+const MAQ={ bayati:['Bayati','البياتي'], hijaz:['Hijaz','الحجاز'], saba:['Saba','الصبا'], nahawand:['Nahawand','النهاوند'], rast:['Rast','الرست'], sikah:['Sikah','السيكاه'], ajam:['Ajam','العجم'], kurd:['Kurd','الكرد'] };
+const TRANS=[['en.sahih','English · Saheeh International'],['en.pickthall','English · Pickthall'],['en.hilali','English · Hilali & Khan'],['fr.hamidullah','French · Hamidullah'],['ha.gumi','Hausa · Gumi'],['yo.mikail','Yoruba · Mikail'],['sw.barwani','Swahili · Barwani'],['ur.jalandhry','Urdu · Jalandhry']];
+const FORMATS={ '9:16':[1080,1920], '16:9':[1920,1080], '1:1':[1080,1080] };
+const HAS_LETTER=/[\u0621-\u064A\u066E-\u06D3\u06D5\u06FA-\u06FC]/;
+const LETTERS=/[\u0621-\u064A\u0671-\u06D3]/g;
+const WAQF=/[\u06D6-\u06DC]/;
+const VIDEO_ME=['asis','cut','frame'];
+const DESIGNED=['stars','light','waves'];
+/* how long the chosen cover shows on screen at the start: [seconds on screen, fade seconds] */
+const COVER_HOLD={ blink:[0.1,0], none:[0,0], long:[0.7,0.25] };
+const S={ file:null, isVideo:false, raw:null, proc:null, procKey:'', A:null, pitch:null, units:[], autoB:null, Bn:null, WT:null, man:{ b:null, w:{}, ai:null }, sig:'', surah:null, items:[], bgItem:null, lib:[], pv:null, tap:null, busy:false, cancel:false, url:'', resultUrl:'', resultName:'', lastT:0, mq:[], mark:{ name:'', img:null }, photo:null,
+  vis:[], used:new Set(), visTok:0, visEls:new Set(), covers:[], coverSel:-1, coverStale:false };
+let surahs=null, MBP=null, LASTCARD=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const fontsReady=Promise.race([Promise.all([document.fonts.load('48px "Amiri Quran"','بِسْمِ ٱللَّهِ'),document.fonts.load('48px Amiri','سورة'),document.fonts.load('italic 600 40px Lora','Aa'),document.fonts.load('700 40px Rubik','Aa'),document.fonts.load('600 40px Rubik','Aa'),document.fonts.load('500 40px Rubik','Aa'),document.fonts.load('400 40px Rubik','Aa')]),sleep(8000)]).catch(()=>{});
+
+/* ---------- meaning visuals: the fixed, halal list the AI may choose from (no faces anywhere) ---------- */
+const SCENES={
+  fire:{ l:'Fire and flames (Hellfire, punishment)', q:'fire flames', g:'towering flames and glowing embers in darkness, deep red glow, cinematic, no people' },
+  fireShadows:{ l:'Faceless shadows before the fire', q:'', g:'distant dark faceless silhouettes seen from behind walking toward a sea of flames, smoke, no faces visible, cinematic' },
+  smoke:{ l:'Dark smoke (Shaytan, whispers)', q:'dark smoke', g:'swirling black smoke in darkness, ominous, cinematic, no people' },
+  storm:{ l:'Storm and lightning (warning)', q:'storm lightning', g:'violent storm with lightning over a dark sea, cinematic, no people' },
+  ruins:{ l:'Ancient ruins (destroyed nations)', q:'ancient ruins desert', g:'ancient ruined city in the desert at dusk, broken columns, blowing sand, no people, cinematic' },
+  chains:{ l:'Chains (bondage, punishment)', q:'iron chains', g:'heavy iron chains in darkness, dramatic light, no people' },
+  lost:{ l:'A path lost in fog (misguidance, shirk)', q:'foggy forest path', g:'a lone path disappearing into thick dark fog, eerie, no people' },
+  garden:{ l:'Garden of flowers (Paradise)', q:'flower garden', g:'lush paradise garden full of flowers, soft golden light, a gentle stream, no people, cinematic' },
+  river:{ l:'Rivers under trees (Paradise)', q:'river forest', g:'clear river flowing beneath green trees, soft light, peaceful, no people' },
+  waterfall:{ l:'Waterfall (mercy, provision)', q:'waterfall', g:'majestic waterfall in a green valley, mist and sunlight, no people' },
+  fruit:{ l:'Fruit trees (provision, Paradise)', q:'fruit tree', g:'branches heavy with ripe fruit in sunlight, close up, no people' },
+  light:{ l:'Light through clouds (guidance, hope)', q:'sun rays clouds', g:'rays of light breaking through clouds, golden and heavenly, no people' },
+  dawn:{ l:'Dawn over the earth (a new day, Fajr)', q:'sunrise', g:'dawn breaking over quiet hills, first light, no people' },
+  stars:{ l:'Night sky with stars (signs of Allah)', q:'night sky stars', g:'milky way night sky over a silent desert, countless stars, no people' },
+  space:{ l:'Earth, sun and moon (creation)', q:'planet earth space', g:'the earth seen from space with the sun rising over the horizon, no people' },
+  ocean:{ l:'Ocean waves and ships (signs)', q:'ocean waves', g:'deep ocean waves under a dramatic sky, a lone sailing ship, no people' },
+  rain:{ l:'Rain falling (mercy, revival)', q:'rain drops', g:'gentle rain falling on green leaves, close up, no people' },
+  sprout:{ l:'Plants growing (life, resurrection)', q:'plant growing', g:'a green sprout rising from dark soil in morning light, macro, no people' },
+  desert:{ l:'Desert dunes (journey, history)', q:'desert dunes', g:'golden sand dunes under a clear sky, wind blowing sand, no people' },
+  road:{ l:'A long road (journey, path, travel)', q:'empty road', g:'a long empty road through mountains toward the horizon at sunrise, no people' },
+  mountains:{ l:'Mountains (signs, firmness)', q:'mountains clouds', g:'majestic mountains above the clouds at sunrise, no people' },
+  cattle:{ l:'Grazing cattle and camels (blessings)', q:'cattle grazing', g:'camels and cattle grazing on a green pasture at sunset, no people' },
+  kaaba:{ l:'The Kaaba (prayer, Hajj, qibla)', q:'kaaba mecca', g:'', crowd:true },
+  mosque:{ l:'A mosque (prayer, worship)', q:'mosque', g:'a beautiful mosque with minarets at sunset, no people' },
+  book:{ l:'An open book of light (revelation, knowledge)', q:'old book', g:'an ancient open book glowing with soft golden light on a wooden stand, no writing visible, no people' },
+  prayer:{ l:'Faceless person in prayer (worship)', q:'silhouette prayer sunset', g:'silhouette of a person in prostration at sunset seen from behind, no face visible' },
+  scale:{ l:'Golden balance scale (justice, Judgement)', q:'balance scale', g:'a golden balance scale glowing in darkness, dramatic light, no people' },
+  gold:{ l:'Gold and wealth (this world)', q:'gold coins', g:'a pile of gold coins and jewels in dramatic light, no people' },
+  autumn:{ l:'Falling leaves (life passing, death)', q:'autumn leaves falling', g:'dry leaves falling from a tree in the autumn wind, melancholic, no people' }
+};
+/* golden icons drawn by code (24 × 24 grid, no faces) */
+const ICONS={
+  road:{ l:'Road (journey, travel, path)', d:'M9 3 5 21 M15 3l4 18 M12 4v2 M12 9v2.5 M12 14v3 M12 19.5V21' },
+  kaaba:{ l:'Kaaba (prayer, Hajj, qibla)', d:'M4 8l8-3 8 3v11l-8 3-8-3z M4 8l8 3 8-3 M12 11v11 M4 11.5l8 3 8-3', fd:'M4 8l8-3 8 3v11l-8 3-8-3z', fill:'#151515' },
+  mosque:{ l:'Mosque (prayer, worship)', d:'M3 21h18 M5 21v-8h14v8 M12 3c-3 2-5 4-5 7h10c0-3-2-5-5-7z M12 1v2 M3 21V9 M21 21V9 M2.3 9h1.4 M20.3 9h1.4 M10 21v-4a2 2 0 0 1 4 0v4' },
+  fire:{ l:'Fire (Hellfire, punishment)', d:'M12 22c4 0 7-3 7-7 0-4-3-6-4-10-1 3-3 4-4 4 0-2 0-4-2-6-1 4-4 6-4 11 0 4 3 8 7 8z M12 22c-2 0-3-1.5-3-3.5 0-2 2-3 3-5 1 2 3 3 3 5s-1 3.5-3 3.5z' },
+  smoke:{ l:'Dark smoke (Shaytan, whispers)', d:'M6 21c-2-2 0-4 2-4s3-3 1-5 M12 21c-2-2 0-4 2-4s3-3 1-5-1-5 1-7 M18 21c-2-2 0-4 2-4' },
+  scale:{ l:'Balance scale (justice, Judgement)', d:'M12 3v18 M8 21h8 M4 6h16 M5 6l-3 7h6z M19 6l-3 7h6z' },
+  book:{ l:'Open book (revelation, knowledge)', d:'M2 5c3-1 7-1 10 1v15c-3-2-7-2-10-1z M22 5c-3-1-7-1-10 1v15c3-2 7-2 10-1z' },
+  sun:{ l:'Sun (creation, day)', d:'M7 12a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M12 1v3 M12 20v3 M1 12h3 M20 12h3 M4.2 4.2l2.1 2.1 M17.7 17.7l2.1 2.1 M4.2 19.8l2.1-2.1 M17.7 6.3l2.1-2.1' },
+  moon:{ l:'Crescent moon (night, months)', d:'M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z' },
+  star:{ l:'Star (signs, guidance)', d:'M12 2l3 6.5 7 1-5 5 1.2 7L12 18l-6.2 3.5L7 14.5l-5-5 7-1z' },
+  drop:{ l:'Water drop (rain, mercy, life)', d:'M12 2C9 7 6 10 6 14a6 6 0 0 0 12 0c0-4-3-7-6-12z' },
+  wave:{ l:'Waves (sea, flood)', d:'M2 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0 M2 14c2-2 4-2 6 0s4 2 6 0 4-2 6 0 M2 19c2-2 4-2 6 0s4 2 6 0 4-2 6 0' },
+  ship:{ l:'Ship (ark, journey by sea)', d:'M3 15h18l-3 5H6z M12 15V3 M12 4l6 9h-6' },
+  tree:{ l:'Tree (life, Paradise)', d:'M12 22v-7 M12 15c-5 0-8-3-8-6 0-4 4-7 8-7s8 3 8 7c0 3-3 6-8 6z M12 15l-3-3 M12 13l3-3' },
+  sprout:{ l:'Sprout (growth, resurrection)', d:'M12 22V12 M12 12C12 7 8 4 3 4c0 5 4 8 9 8z M12 14c0-4 3-7 9-7 0 5-4 7-9 7z' },
+  mountain:{ l:'Mountain (firmness, signs)', d:'M2 20l7-12 4 6 3-4 6 10z M9 8l2 3' },
+  storm:{ l:'Storm cloud (warning, punishment)', d:'M7 17a5 5 0 1 1 1-9.9A6 6 0 0 1 19 9a4 4 0 0 1-1 8 M13 12l-3 5h4l-3 5' },
+  clock:{ l:'Clock (time, the Hour)', d:'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M12 7v5l3 2' },
+  heart:{ l:'Heart (faith, the heart)', d:'M12 21C5 15 2 12 2 8a5 5 0 0 1 10-1 5 5 0 0 1 10 1c0 4-3 7-10 13z' },
+  eye:{ l:'Eye (seeing, reflection)', d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0' },
+  hands:{ l:'Hands raised in dua', d:'M8 21v-5l-3-4V5a1.5 1.5 0 0 1 3 0v6 M16 21v-5l3-4V5a1.5 1.5 0 0 0-3 0v6 M8 11V3.5a1.5 1.5 0 0 1 3 0V12 M16 11V3.5a1.5 1.5 0 0 0-3 0V12' },
+  shield:{ l:'Shield (protection, refuge)', d:'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z M9 12l2 2 4-4' },
+  lock:{ l:'Lock (sealed hearts, prison)', d:'M6 11h12v10H6z M8 11V7a4 4 0 0 1 8 0v4 M12 15v2' },
+  coins:{ l:'Coins (wealth, charity)', d:'M4 7a8 3 0 1 0 16 0a8 3 0 1 0-16 0 M4 7v5c0 1.7 3.6 3 8 3s8-1.3 8-3V7 M4 12v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5' }
+};
+const PEOPLE=/\b(wom[ae]n|m[ae]n|girls?|boys?|people|persons?|child|children|kids?|baby|face|faces|portrait|model|lady|ladies|selfie|couple|family|bride|groom|human|humans|crowd)\b/i;
+
+/* ---------- small helpers for the page ---------- */
+function toast(m){ const t=$('toast'); if(!t) return; t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3800); }
+function showNote(m,ok){ const n=$('note'); n.textContent=m; n.className='note'+(ok ? ' ok' : ''); n.classList.remove('hidden'); n.scrollIntoView({ behavior:'smooth', block:'center' }); }
+function setHint(m){ $('hint').textContent=m; }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+const tick=()=>new Promise(r=>setTimeout(r,0));
+const redraw=()=>{ if(!S.pv) drawPreview(S.lastT); };
+
+/* ---------- jump to a setting ---------- */
+const FINDS=[
+  [['ai','ai timing','listen','listener','aligner','automatic timing','detect','recognise','recognize','whisper','word timing'],'aiSync'],
+  [['cover','thumbnail','thumb','first frame','blink'],'cvBox'],
+  [['phrase','split','long ayah','long ayat','waqf','pause'],'txtSplit'],
+  [['change background','background change','rotate','switch background'],'bgChange'],
+  [['shape','ratio','aspect','size of video','vertical','wide','square','9:16','16:9','1:1','portrait','landscape'],'format'],
+  [['show me','me','face','cut','remove room','green screen','bubble','avatar','photo','picture of me','frame'],'meMode'],
+  [['background','bg','backdrop','image','video background','wallpaper','upload background'],'bgSel'],
+  [['visual','visuals','b-roll','broll','bureau','bureaus','meaning','tafsir','footage','pixabay','scenes'],'mvOn'],
+  [['icon','icons','kaaba','road','golden icon'],'icOn'],
+  [['key','keys','api','gemini','groq','pixabay key'],'mvKeys'],
+  [['logo','channel','brand','watermark'],'chan'],
+  [['highlight','gold','karaoke','sweep','word by word'],'hlMode'],
+  [['timing','early','late','offset','sync'],'hlLead'],
+  [['tap speed','slow','half speed','tapping'],'tapRate'],
+  [['maqam','badge','bayati','hijaz','saba','nahawand','rast','sikah','ajam','kurd'],'mqLabel'],
+  [['echo','reverb','mosque echo'],'echo'],
+  [['translation','language','hausa','yoruba','french','urdu','swahili'],'qTr'],
+  [['style','classic','modern','box','elegant'],'txtStyle'],
+  [['text','arabic only','english only','translation only'],'textMode'],
+  [['position','place','higher','lower','middle','up','down'],'txtPos'],
+  [['text size','font','bigger','smaller','size'],'txtSize'],
+  [['melody','pitch','line','voice line'],'melOn'],
+  [['safe','tiktok','reels','shorts','instagram','youtube shorts','blocked','covered'],'safeOn'],
+  [['zones','buttons','overlay','check','where'],'zonesOn'],
+  [['search','ayah','verse','surah','find'],'qFind'],
+  [['mic','voice search','microphone','recite'],'micBtn'],
+  [['quality','720','1080','hd'],'quality'],
+  [['short','part','some ayat','range','clip'],'range'],
+  [['make','export','render','create video','download'],'makeBtn'],
+  [['preview','play','watch'],'playBtn'],
+  [['tap','ayah start'],'tapAyat'],
+  [['post','title','description','hashtag','tags','caption'],'postBox'],
+  [['progress','bar'],'barOn'],
+  [['surah name','header','title on top'],'hdrOn'],
+  [['file','upload recitation','drop','recording'],'drop']
+];
+function findSetting(){
+  const q=$('findSet').value.trim().toLowerCase(); if(!q) return;
+  let id=null;
+  for(const [keys,target] of FINDS){ if(keys.some(k=>k===q)){ id=target; break; } }
+  if(!id) for(const [keys,target] of FINDS){ if(keys.some(k=>k.includes(q) || q.includes(k))){ id=target; break; } }
+  let el=id ? $(id) : null;
+  if(!el){ el=[...document.querySelectorAll('aside .label, aside .sec, aside label.check, aside label.slider, aside button')].find(x=>x.textContent.toLowerCase().includes(q)) || null; }
+  if(!el){ toast('No setting found for "'+q+'". Try: AI timing, cover, phrase, visuals, logo, maqam, keys'); return; }
+  if(el.tagName==='DETAILS') el.open=true;
+  let d=el.closest('details'); while(d){ d.open=true; d=d.parentElement && d.parentElement.closest('details'); }
+  const target=el.closest('label') || el.closest('.box > div') || el;
+  target.scrollIntoView({ behavior:'smooth', block:'center' });
+  target.classList.add('flash'); setTimeout(()=>target.classList.remove('flash'),1800);
+  if(el.focus && /INPUT|SELECT|BUTTON|TEXTAREA/.test(el.tagName)) setTimeout(()=>el.focus({ preventScroll:true }),350);
+}
+$('findSet').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); findSetting(); } });
+$('findSet').addEventListener('change',findSetting);
+
+/* ---------- browser storage (the same database the video maker uses) ---------- */
+function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('storyforge',2); r.onupgradeneeded=()=>{ const db=r.result; if(!db.objectStoreNames.contains('sounds')) db.createObjectStore('sounds',{ keyPath:'id' }); if(!db.objectStoreNames.contains('bgs')) db.createObjectStore('bgs',{ keyPath:'id' }); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbAll(store){
+  const db=await openDB();
+  try{ if(!db.objectStoreNames.contains(store)) return []; return await new Promise((res,rej)=>{ const q=db.transaction(store).objectStore(store).getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
+  finally{ db.close(); }
+}
+async function idbPut(store,rec){
+  const db=await openDB();
+  try{ await new Promise((res,rej)=>{ const t=db.transaction(store,'readwrite'); t.objectStore(store).put(rec); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('storage full')); }); }
+  finally{ db.close(); }
+}
+
+/* ---------- saved settings (only in this browser) ---------- */
+const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','echo','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
+{ const ver=localStorage.getItem('forge:qs:ver');
+  if(!['8','9','10','11','12','13'].includes(ver)){ localStorage.setItem('forge:qs:set:hlMode','quick'); localStorage.setItem('forge:qs:set:mvLen','alt'); }
+  if(!['10','11','12','13'].includes(ver)) localStorage.setItem('forge:qs:set:aiQ','align');
+  if(!['12','13'].includes(ver)) localStorage.setItem('forge:qs:set:cvFirst','1');
+  if(ver!=='13') localStorage.setItem('forge:qs:set:cvHold','blink');
+  localStorage.setItem('forge:qs:ver','13'); }
+const PROF_KEY='forge:pe:profiles';
+function loadProfiles(){ let P=null; try{ P=JSON.parse(localStorage.getItem(PROF_KEY)||'null'); }catch{} if(!P || !Array.isArray(P.list) || !P.list.length) P={ cur:'ummah', list:[{ id:'edge', name:'CreAItive EDGE', logo:'', settings:{} },{ id:'ummah', name:'Ummah Digital', logo:'', settings:{} }] }; return P; }
+function fillSelects(){
+  $('qTr').innerHTML=TRANS.map(([v,l])=>'<option value="'+v+'">'+esc(l)+'</option>').join('');
+  const list=loadProfiles().list;
+  $('chan').innerHTML=list.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'<option value="">No logo</option>';
+  $('chan').value=list.some(p=>p.id==='ummah') ? 'ummah' : list[0].id;
+}
+function persist(){
+  for(const id of SET){
+    const el=$(id); if(!el) continue;
+    const k='forge:qs:set:'+id, v=localStorage.getItem(k);
+    if(v!==null){ if(el.type==='checkbox') el.checked=v==='1'; else el.value=v; }
+    if(el.tagName==='SELECT' && el.selectedIndex<0) el.selectedIndex=0;
+    const save=()=>localStorage.setItem(k, el.type==='checkbox' ? (el.checked ? '1' : '0') : el.value);
+    el.addEventListener('change',save); el.addEventListener('input',save);
+  }
+}
+async function loadMark(){
+  const id=$('chan').value; S.mark={ name:'', img:null }; if(!id) return;
+  const p=loadProfiles().list.find(x=>x.id===id);
+  S.mark.name=p ? p.name : '';
+  if(p && p.logo){ try{ const im=new Image(); im.src=p.logo; await im.decode(); S.mark.img=im; }catch{} }
+}
+async function resizeToDataURL(f,max,type){
+  const bmp=await createImageBitmap(f), s=Math.min(1,max/Math.max(bmp.width,bmp.height)), c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(bmp.width*s)); c.height=Math.max(1,Math.round(bmp.height*s)); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  return c.toDataURL(type||'image/png',0.9);
+}
+$('logoIn').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  if(!$('chan').value){ toast('First choose the channel the logo belongs to'); return; }
+  try{
+    const url=await resizeToDataURL(f,256,'image/png');
+    const P=loadProfiles(); let p=P.list.find(x=>x.id===$('chan').value);
+    if(!p){ p={ id:$('chan').value, name:$('chan').selectedOptions[0].textContent, logo:'', settings:{} }; P.list.push(p); }
+    p.logo=url; localStorage.setItem(PROF_KEY,JSON.stringify(P));
+    await loadMark(); redraw(); toast('✓ Logo saved for '+p.name+' (the video maker uses it too)');
+  }catch{ toast('Could not read that picture. Try a PNG or JPG.'); }
+};
+
+/* ---------- keys: found automatically in this browser (your studio saves them on the same site) ---------- */
+function scanKeys(){
+  const out={ gem:new Set(), groq:new Set(), pix:new Set() };
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i); if(!k || k.startsWith('forge:qs:keys') || k.startsWith('forge:qs:pix:')) continue;
+    const v=localStorage.getItem(k)||''; if(v.length>300000) continue;
+    (v.match(/AIza[0-9A-Za-z_\-]{35}/g)||[]).forEach(x=>out.gem.add(x));
+    (v.match(/gsk_[0-9A-Za-z]{40,64}/g)||[]).forEach(x=>out.groq.add(x));
+    (v.match(/\b\d{5,10}-[0-9a-f]{24,40}\b/g)||[]).forEach(x=>out.pix.add(x));
+  }
+  return out;
+}
+function initKeys(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem('forge:qs:keys')||'null'); }catch{}
+  const found=scanKeys();
+  $('kGem').value=(saved && saved.gem ? saved.gem : [...found.gem]).join('\n');
+  $('kGroq').value=saved && saved.groq!=null ? saved.groq : ([...found.groq][0]||'');
+  $('kPix').value=saved && saved.pix!=null ? saved.pix : ([...found.pix][0]||'');
+  keyInfo(saved ? 'Using the keys you saved here.' : 'Found automatically in your studio.');
+}
+function getKeys(){
+  const gem=[...new Set($('kGem').value.split(/[\s,]+/).map(x=>x.trim()).filter(x=>x.length>20))];
+  return { gem, groq:[...new Set($('kGroq').value.split(/[\s,]+/).filter(x=>x.length>20))], pix:$('kPix').value.trim() };
+}
+function keyInfo(prefix){ const K=getKeys(); $('kInfo').innerHTML=esc(prefix)+' Gemini: <b>'+K.gem.length+'</b> · Groq: <b>'+K.groq.length+'</b> · Pixabay: <b>'+(K.pix ? '✓' : '✕')+'</b>'; }
+$('kSave').onclick=()=>{ const K=getKeys(); localStorage.setItem('forge:qs:keys',JSON.stringify({ gem:K.gem, groq:K.groq.join('\n'), pix:K.pix })); keyInfo('✓ Saved.'); };
+
+/* ---------- my photo for the talking bubble ---------- */
+async function loadPhoto(){
+  const url=localStorage.getItem('forge:qs:photo'); S.photo=null;
+  if(url){ try{ const im=new Image(); im.src=url; await im.decode(); S.photo=im; $('photoThumb').src=url; $('photoThumb').classList.remove('hidden'); }catch{} }
+}
+$('photoIn').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ const url=await resizeToDataURL(f,600,'image/jpeg'); localStorage.setItem('forge:qs:photo',url); await loadPhoto(); redraw(); toast('✓ Photo saved'); }
+  catch{ toast('Could not read that picture. Try a JPG or PNG.'); }
+};
+function meUI(){
+  const me=$('meMode').value;
+  $('photoBox').classList.toggle('hidden',me!=='bubble');
+  if(me==='bubble' && !S.photo) toast('Choose your photo for the talking bubble');
+}
+
+/* ---------- Quran text ---------- */
+async function quranFetch(path){
+  for(const base of ['https://api.alquran.cloud/v1/','/quran-api/v1/']){
+    try{ const r=await fetch(base+path); if(!r.ok) continue; const j=await r.json(); if(j && j.code===200) return j.data; }catch{}
+  }
+  throw new Error('could not get the Quran text. Check your internet and try again');
+}
+async function loadSurahs(){
+  try{ surahs=JSON.parse(localStorage.getItem('forge:surahs')||'null'); }catch{ surahs=null; }
+  if(!surahs){
+    try{ surahs=(await quranFetch('surah')).map(s=>({ n:s.number, en:s.englishName, ar:s.name, c:s.numberOfAyahs })); localStorage.setItem('forge:surahs',JSON.stringify(surahs)); }
+    catch{ $('qSurah').innerHTML='<option value="">Could not load the list. Check your internet and refresh</option>'; return; }
+  }
+  $('qSurah').innerHTML=surahs.map(s=>'<option value="'+s.n+'">'+s.n+'. '+esc(s.en)+' · '+esc(s.ar)+' ('+s.c+' ayat)</option>').join('');
+  $('qSurah').value=localStorage.getItem('forge:qs:set:qSurah')||'1';
+  $('qFrom').value=localStorage.getItem('forge:qs:set:qFrom')||'1';
+  $('qTo').value=localStorage.getItem('forge:qs:set:qTo')||$('qFrom').value;
+  updSel();
+}
+function saveSel(){ ['qSurah','qFrom','qTo'].forEach(id=>localStorage.setItem('forge:qs:set:'+id,$(id).value)); }
+function updSel(){
+  const s=surahs && surahs.find(x=>x.n===+$('qSurah').value); if(!s){ $('qSel').textContent=''; return; }
+  let a=clamp(Math.round(+$('qFrom').value||1),1,s.c), b=clamp(Math.round(+$('qTo').value||a),1,s.c);
+  if(b<a) b=a;
+  $('qFrom').value=a; $('qTo').value=b; saveSel();
+  $('qSel').innerHTML='✓ Selected: <b>Surah '+esc(s.en)+' ('+s.n+'), '+(a===b ? 'ayah '+a : 'ayat '+a+' to '+b)+'</b>';
+}
+function setSel(s,a,b){ $('qSurah').value=String(s); $('qFrom').value=a; $('qTo').value=b; updSel(); }
+$('qSurah').addEventListener('change',()=>{ $('qFrom').value=1; $('qTo').value=1; updSel(); });
+$('qFrom').addEventListener('change',updSel);
+$('qTo').addEventListener('change',updSel);
+$('toMinus').onclick=()=>{ $('qTo').value=Math.max(+$('qFrom').value||1,(+$('qTo').value||1)-1); updSel(); };
+$('toPlus').onclick=()=>{ $('qTo').value=(+$('qTo').value||1)+1; updSel(); };
+
+/* ---------- search any ayah: Arabic, English or how it sounds — spelling mistakes are fine ---------- */
+let QIDX=null, QLOAD=null;
+const EN_STOP=new Set('the and of a an to is in who are those that be it its this was were for on with as by at from or not they them their he his him she her we our us you your i my me has have had will shall do does did so but if then than which what when there these upon unto'.split(' '));
+const ALIAS_SRC=[['ayatul kursi',2,255],['ayat al kursi',2,255],['ayatal kursi',2,255],['kursi',2,255],['throne verse',2,255],['amanar rasul',2,285],['amana rasul',2,285]];
+function normTr(s){
+  let t=String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/<[^>]+>/g,'').replace(/[^a-z]/g,'');
+  t=t.replace(/dh|th|zh/g,'z').replace(/kh/g,'k').replace(/gh/g,'g').replace(/q/g,'k').replace(/c/g,'k').replace(/ph/g,'f').replace(/ee/g,'i').replace(/oo/g,'u').replace(/e/g,'i').replace(/o/g,'u');
+  t=t.replace(/al(?=(sh|t|d|r|z|s|n|l))/g,'a');
+  return t.replace(/(.)\1+/g,'$1');
+}
+function normAr(s){
+  return String(s||'').replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/[^\u0621-\u064A]/g,'');
+}
+function enWords(s){ return String(s||'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>2 && !EN_STOP.has(w)).map(w=>w.length>4 ? w.replace(/(ing|ed|es|s)$/,'') : w); }
+const ALIAS=new Map(ALIAS_SRC.map(([k,s,a])=>[normTr(k),[s,a]]));
+function approxDist(p,t){
+  const m=p.length, n=t.length; if(!m) return 0; if(!n) return m;
+  let prev=new Uint16Array(m+1), cur=new Uint16Array(m+1), best=m;
+  for(let i=0;i<=m;i++) prev[i]=i;
+  for(let j=1;j<=n;j++){
+    cur[0]=0; const tc=t.charCodeAt(j-1);
+    for(let i=1;i<=m;i++){
+      const sub=prev[i-1]+(p.charCodeAt(i-1)===tc ? 0 : 1), ins=prev[i]+1, del=cur[i-1]+1;
+      cur[i]=sub<ins ? (sub<del ? sub : del) : (ins<del ? ins : del);
+    }
+    if(cur[m]<best){ best=cur[m]; if(best===0) return 0; }
+    const tmp=prev; prev=cur; cur=tmp;
+  }
+  return best;
+}
+function lev(a,b){
+  const m=a.length, n=b.length; if(!m) return n; if(!n) return m;
+  let prev=new Uint16Array(n+1), cur=new Uint16Array(n+1);
+  for(let j=0;j<=n;j++) prev[j]=j;
+  for(let i=1;i<=m;i++){
+    cur[0]=i; const ac=a.charCodeAt(i-1);
+    for(let j=1;j<=n;j++){ const sub=prev[j-1]+(ac===b.charCodeAt(j-1) ? 0 : 1), ins=cur[j-1]+1, del=prev[j]+1; cur[j]=sub<ins ? (sub<del ? sub : del) : (ins<del ? ins : del); }
+    const tmp=prev; prev=cur; cur=tmp;
+  }
+  return prev[n];
+}
+async function quranEdition(ed){
+  const url='https://api.alquran.cloud/v1/quran/'+ed; let c=null;
+  try{ c=await caches.open('forge-quran-v1'); const hit=await c.match(url); if(hit){ const j=await hit.json(); if(j && j.code===200) return j.data; } }catch{}
+  for(const base of ['https://api.alquran.cloud/v1/','/quran-api/v1/']){
+    try{
+      const r=await fetch(base+'quran/'+ed); if(!r.ok) continue;
+      const copy=r.clone(), j=await r.json();
+      if(j && j.code===200){ if(c){ try{ await c.put(url,copy); }catch{} } return j.data; }
+    }catch{}
+  }
+  throw new Error('could not download the Quran text. Check your internet and try again');
+}
+async function quranIndex(){
+  if(QIDX) return QIDX;
+  if(!QLOAD) QLOAD=(async()=>{
+    const [ar,en,tr]=await Promise.all(['quran-uthmani','en.sahih','en.transliteration'].map(quranEdition));
+    const idx=[];
+    ar.surahs.forEach((s,si)=>s.ayahs.forEach((a,ai)=>{
+      const e=((en.surahs[si]||{}).ayahs||[])[ai], t=((tr.surahs[si]||{}).ayahs||[])[ai], et=e ? e.text : '', tt=String(t ? t.text : '').replace(/<[^>]+>/g,'');
+      idx.push({ s:s.number, a:a.numberInSurah, name:s.englishName, ar:a.text, en:et, kt:normTr(tt), ka:normAr(a.text), ke:' '+enWords(et).join(' ')+' ' });
+    }));
+    QIDX=idx; return idx;
+  })().catch(e=>{ QLOAD=null; throw e; });
+  return QLOAD;
+}
+async function findAyah(){
+  const raw=$('qFind').value.trim(); if(!raw) return toast('Type a few words to search, or press 🎤');
+  const box=$('qRes'); box.classList.remove('hidden');
+  box.innerHTML='<div class="muted">Searching… (the first search downloads the Quran text once, about 10 MB, then it is saved)</div>';
+  let idx;
+  try{ if(!surahs) await loadSurahs(); idx=await quranIndex(); }
+  catch(e){ box.innerHTML='<div class="muted">'+esc(e.message)+'.</div>'; return; }
+  await tick();
+  const hits=new Map(), push=(h,sc)=>{ const k=h.s+':'+h.a, o=hits.get(k); if(!o || o.sc<sc) hits.set(k,{ h, sc }); };
+  const ref=raw.match(/^(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/);
+  if(ref){ const h=idx.find(x=>x.s===+ref[1] && x.a===+ref[2]); if(h) push(h,1000); }
+  const kq=normTr(raw), al=ALIAS.get(kq);
+  if(al){ const h=idx.find(x=>x.s===al[0] && x.a===al[1]); if(h) push(h,999); }
+  const nm=raw.match(/^(.*?)(?:\s+(\d{1,3}))?$/), nk=normTr(nm[1]||'');
+  let surHits=[];
+  if(surahs && nk.length>=3 && !/[\u0600-\u06FF]/.test(raw)){
+    surHits=surahs.filter(s=>{ const n=normTr(s.en), n2=n.replace(/^a[lnrsz]?/,''), k2=nk.replace(/^a[lnrsz]?/,''); return n===nk || n2===k2 || (k2.length>=4 && (n2.startsWith(k2) || approxDist(k2,n2)<=1 && Math.abs(n2.length-k2.length)<=2)); }).slice(0,3);
+    if(nm[2] && surHits.length){ const h=idx.find(x=>x.s===surHits[0].n && x.a===+nm[2]); if(h) push(h,998); surHits=[]; }
+  }
+  if(/[\u0600-\u06FF]/.test(raw)){
+    const qa=normAr(raw).slice(0,80);
+    if(qa.length>=3){ const tol=Math.floor(qa.length*0.25); for(let k=0;k<idx.length;k++){ const x=idx[k], d=approxDist(qa,x.ka); if(d<=tol) push(x,100*(1-d/qa.length)+qa.length/10); if(k%800===0) await tick(); } }
+  }else{
+    const q=kq.slice(0,80);
+    if(q.length>=5){
+      const tol=Math.max(1,Math.floor(q.length*0.22));
+      for(let k=0;k<idx.length;k++){ const x=idx[k]; if(!x.kt) continue; const d=approxDist(q,x.kt); if(d<=tol) push(x,80*(1-d/q.length)+q.length/8); if(k%800===0) await tick(); }
+    }
+    const words=enWords(raw);
+    if(words.length){
+      const phrase=words.length>1 ? ' '+words.join(' ')+' ' : '';
+      for(const x of idx){ let m=0; for(const w of words) if(x.ke.includes(' '+w+' ')) m++; const f=m/words.length; if(f>=0.5) push(x,f*50+(phrase && x.ke.includes(phrase) ? 30 : 0)); }
+    }
+  }
+  const top=[...hits.values()].sort((p,q)=>q.sc-p.sc).slice(0,25);
+  const sHtml=surHits.map(s=>'<div class="qhit"><b>Surah '+s.n+' · '+esc(s.en)+' · '+esc(s.ar)+'</b><div class="en">The whole surah: ayah 1 to '+s.c+'</div><div class="row"><button class="mini" data-sel="'+s.n+':1:'+s.c+'">✓ Whole surah</button><button class="mini" data-sel="'+s.n+':1:1">Start at ayah 1</button></div></div>').join('');
+  const aHtml=top.map(({ h })=>'<div class="qhit"><b>'+h.s+':'+h.a+' · '+esc(h.name)+'</b><div class="ar">'+esc(h.ar)+'</div><div class="en">'+esc(h.en)+'</div><div class="row"><button class="mini" data-start="'+h.s+':'+h.a+'">✓ Start here</button><button class="mini" data-end="'+h.s+':'+h.a+'">■ End here</button></div></div>').join('');
+  box.innerHTML=(sHtml || aHtml)
+    ? '<div class="muted">Tap <b>✓ Start here</b> on the first ayah you recited. Recited more? Search your last ayah and tap <b>■ End here</b>, or use <b>+ 1 ayah</b> below.</div>'+sHtml+aHtml
+    : '<div class="muted">Nothing found. Try other words you remember, the English meaning (e.g. "patience and prayer"), or the surah name (e.g. "yasin").</div>';
+}
+$('qFindBtn').onclick=findAyah;
+$('qFind').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); findAyah(); } });
+$('qRes').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.sel){ const [s,a,c]=b.dataset.sel.split(':').map(Number); setSel(s,a,c); toast('Selected. Now press "Get the ayat".'); }
+  else if(b.dataset.start){ const [s,a]=b.dataset.start.split(':').map(Number); setSel(s,a,a); toast('Start set to '+s+':'+a+'. If you recited more, find your last ayah and tap "End here".'); }
+  else if(b.dataset.end){
+    const [s,a]=b.dataset.end.split(':').map(Number), cs=+$('qSurah').value, cf=+$('qFrom').value||1;
+    if(s!==cs){ setSel(s,a,a); toast('That ayah is in another surah, so it was set as the start.'); return; }
+    if(a<cf) setSel(s,a,cf); else setSel(s,cf,a);
+    toast('Selected '+s+':'+Math.min(a,cf)+' to '+Math.max(a,cf)+'. Now press "Get the ayat".');
+  }
+});
+
+/* ---------- 🎤 voice search (Google Chrome's own speech recognition) ---------- */
+let rec=null;
+$('micBtn').onclick=()=>{
+  const SR=window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('Voice search works in Google Chrome or Microsoft Edge. You can still type.'); return; }
+  if(rec){ try{ rec.stop(); }catch{} return; }
+  rec=new SR(); rec.lang=$('micLang').value; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
+  let text='';
+  rec.onresult=e=>{ text=[...e.results].map(r=>r[0].transcript).join(' ').trim(); $('qFind').value=text; };
+  rec.onerror=e=>{ toast(e.error==='not-allowed' ? 'Allow the microphone for this page (click the 🔒 next to the address), then try again.' : e.error==='no-speech' ? 'Nothing was heard. Press 🎤 and recite a few words.' : 'Voice search problem: '+e.error); };
+  rec.onend=()=>{ rec=null; $('micBtn').classList.remove('on'); $('micBtn').textContent='🎤'; if(text) findAyah(); };
+  try{ rec.start(); $('micBtn').classList.add('on'); $('micBtn').textContent='⏺'; toast('Listening… recite or say a few words of the ayah'); }catch{ rec=null; }
+};
+
+function tokenize(ar,num){
+  const out=[];
+  for(const w of String(ar).trim().split(/\s+/)){
+    if(!w) continue;
+    if(!HAS_LETTER.test(w) && out.length){ out[out.length-1].text+=' '+w; continue; }
+    out.push({ text:w, num:false });
+  }
+  out.forEach((k,i)=>{ k.wi=i; });
+  if(num) out.push({ text:'\u06DD'+arNum(num), num:true, wi:-1 });
+  return out;
+}
+const letters=t=>(String(t).match(LETTERS)||[]).length;
+function wordWeight(t,last){
+  const s=String(t), L=letters(s), madd=(s.match(/\u0653/g)||[]).length, shad=(s.match(/\u0651/g)||[]).length;
+  const longv=(s.match(/\u064E\u0627|\u064F\u0648|\u0650\u064A|\u0670|[\u06E5\u06E6]/g)||[]).length;
+  let w=L+longv+madd*3+shad*0.7+0.5; if(last) w*=1.6; return w;
+}
+
+/* ---------- your recording ---------- */
+function mono(buf){
+  if(buf.numberOfChannels===1) return buf.getChannelData(0);
+  const n=buf.length, m=new Float32Array(n), nc=buf.numberOfChannels;
+  for(let c=0;c<nc;c++){ const d=buf.getChannelData(c); for(let i=0;i<n;i++) m[i]+=d[i]/nc; }
+  return m;
+}
+function analyse(buf){
+  const d=mono(buf), R=buf.sampleRate, F=Math.max(1,Math.round(R*0.02)), n=Math.floor(d.length/F), env=new Float32Array(n);
+  for(let i=0;i<n;i++){ let s=0; for(let j=i*F,e=j+F;j<e;j++) s+=d[j]*d[j]; env[i]=Math.sqrt(s/F); }
+  const so=Float32Array.from(env).sort(), noise=so[Math.floor(n*0.1)]||0, loud=so[Math.floor(n*0.95)]||0;
+  return { env, n, fr:F/R, noise, loud, thr:noise+(loud-noise)*0.12 };
+}
+function voiceLevel(t){
+  const A=S.A; if(!A) return 0;
+  const k=Math.floor(t/A.fr); let s=0, c=0;
+  for(let j=k-3;j<=k+1;j++){ if(j>=0 && j<A.n){ s+=A.env[j]; c++; } }
+  if(!c) return 0;
+  return clamp((s/c-A.noise)/Math.max(1e-6,A.loud-A.noise),0,1);
+}
+function silentRun(t0,t1){
+  const A=S.A; if(!A || !(t1>t0)) return 0;
+  const f0=Math.max(0,Math.floor(t0/A.fr)), f1=Math.min(A.n,Math.ceil(t1/A.fr));
+  let best=0, run=0;
+  for(let f=f0;f<f1;f++){ if(A.env[f]<=A.thr){ run++; if(run>best) best=run; } else run=0; }
+  return best*A.fr;
+}
+const drop=$('drop');
+$('fileIn').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+async function loadFile(f){
+  if(!f || S.busy) return;
+  const isV=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);
+  const isA=f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(f.name);
+  if(!isV && !isA) return toast('Please choose a video or an audio file');
+  stopPreview();
+  $('fileInfo').textContent='Reading the sound from '+f.name+'…';
+  try{
+    const ac=new AudioContext(); let buf;
+    try{ buf=await ac.decodeAudioData(await f.arrayBuffer()); }finally{ ac.close(); }
+    if(!buf || buf.duration<1) throw new Error('no sound');
+    S.file=f; S.isVideo=isV; S.raw=buf; S.proc=null; S.procKey=''; S.A=analyse(buf); S.pitch=null; S.units=[]; S.Bn=null; S.WT=null; S.a16=null;
+    clearVis(); clearCovers();
+    if(S.url) URL.revokeObjectURL(S.url);
+    S.url=URL.createObjectURL(f);
+    const v=$('vid'); if(isV){ v.src=S.url; v.load(); } else { v.removeAttribute('src'); v.load(); }
+    $('fileInfo').textContent=(isV ? '🎬 ' : '🎵 ')+f.name+' · '+fmt(buf.duration).replace(/\.\d$/,'')+(isV ? '' : ' · audio only: use the photo bubble or a background');
+    $('unitList').innerHTML=''; $('syncInfo').textContent='Now search the ayah you recited, then press "Get the ayat".';
+    setHint('Now search the ayah you recited (step 2), then press "Get the ayat".');
+    if(isV && $('meMode').value==='cut') ensureSeg().catch(()=>{});
+    redraw();
+  }catch(e){
+    $('fileInfo').textContent='No file chosen yet';
+    showNote('Could not read the sound in '+f.name+'. Make sure it has sound, or convert it to MP4 or MP3 first.');
+  }
+}
+
+/* ---------- lining up each ayah with your voice (from the sound only) ---------- */
+function alignUnits(units,A){
+  const { env, n, fr, thr, loud }=A, N=units.length;
+  let a=0; while(a<n && env[a]<=thr) a++;
+  let b=n-1; while(b>0 && env[b]<=thr) b--;
+  if(a>=b) throw new Error('no recitation was found in this file');
+  const start=a*fr, end=(b+1)*fr, D=end-start;
+  const lens=units.map(u=>3+letters(u.ar)), tot=lens.reduce((x,y)=>x+y,0);
+  const first=Math.max(0,start-0.1), last=Math.min(n*fr,end+0.3);
+  const prop=()=>{ const o=[first]; let acc=0; for(let i=0;i<N-1;i++){ acc+=lens[i]; o.push(start+D*acc/tot); } o.push(last); return o; };
+  if(N===1) return [first,last];
+  const cands=[]; let q=-1;
+  for(let i=a;i<=b;i++){
+    if(env[i]<=thr){ if(q<0) q=i; }
+    else if(q>=0){ const len=(i-q)*fr; if(len>=0.2) cands.push({ t:(q+i)/2*fr, on:i*fr, s:len }); q=-1; }
+  }
+  if(cands.length<1.5*(N-1)){
+    const sm=new Float32Array(n);
+    for(let i=a;i<=b;i++){ let s=0,c=0; for(let k=-5;k<=5;k++){ const j=i+k; if(j>=a && j<=b){ s+=env[j]; c++; } } sm[i]=s/c; }
+    for(let i=a+10;i<b-10;i++){ if(sm[i]<sm[i-1] && sm[i]<=sm[i+1] && sm[i]<loud*0.35){ const t=i*fr; if(cands.every(c=>Math.abs(c.t-t)>0.6)) cands.push({ t, on:t, s:0.05 }); } }
+    cands.sort((x,y)=>x.t-y.t);
+  }
+  const K=cands.length;
+  if(K<N-1) return prop();
+  const P=[{ t:start, on:start, s:0 },...cands,{ t:end, on:end, s:0 }];
+  const AW=2.5, BW=1.4, INF=1e18;
+  const cost=(i,p,qq)=>{ const ex=D*lens[i]/tot, r=(P[qq].t-P[p].t)/ex-1; return AW*r*r; };
+  const rew=j=>BW*Math.min(P[j].s,1.5);
+  const dp=[], bk=[];
+  for(let i=0;i<N-1;i++){ dp.push(new Float64Array(K+2).fill(INF)); bk.push(new Int32Array(K+2).fill(-1)); }
+  for(let j=1;j<=K;j++) dp[0][j]=cost(0,0,j)-rew(j);
+  for(let i=1;i<N-1;i++){
+    const maxD=D*lens[i]/tot*4+8;
+    for(let j=i+1;j<=K;j++){
+      let best=INF, bi=-1;
+      for(let k=j-1;k>=i;k--){ if(P[j].t-P[k].t>maxD) break; const v=dp[i-1][k]; if(v>=INF) continue; const c=v+cost(i,k,j); if(c<best){ best=c; bi=k; } }
+      if(bi>=0){ dp[i][j]=best-rew(j); bk[i][j]=bi; }
+    }
+  }
+  let best=INF, bj=-1;
+  for(let j=N-1;j<=K;j++){ const v=dp[N-2][j]; if(v>=INF) continue; const c=v+cost(N-1,j,K+1); if(c<best){ best=c; bj=j; } }
+  if(bj<0) return prop();
+  const cuts=new Array(N-1); let j=bj;
+  for(let i=N-2;i>=0;i--){ cuts[i]=j; j=bk[i][j]; }
+  const o=[first]; cuts.forEach(c=>o.push(Math.max(0,P[c].on-0.08))); o.push(last);
+  for(let i=1;i<o.length;i++) if(o[i]<o[i-1]+0.3) o[i]=o[i-1]+0.3;
+  return o;
+}
+function autoWords(u,t0,t1){
+  const ws=u.tokens.filter(k=>!k.num), n=ws.length; if(!n) return [];
+  const W=ws.map((k,j)=>wordWeight(k.text,j===n-1)), tot=W.reduce((x,y)=>x+y,0)||1;
+  const { env, fr, thr, loud }=S.A, N=S.A.n;
+  const f0=Math.max(0,Math.floor(t0/fr)), f1=Math.min(N,Math.ceil(t1/fr));
+  let vs=f0; while(vs<f1 && env[vs]<=thr) vs++;
+  let ve=f1-1; while(ve>vs && env[ve]<=thr) ve--;
+  const prop=()=>{ const S0=vs*fr, D=Math.max(0.2,(ve+1-vs)*fr), o=[]; let acc=0; for(const w of W){ o.push(S0+D*acc/tot); acc+=w; } return o; };
+  if(n===1 || ve-vs<10) return [Math.max(t0,vs*fr-0.02)].concat(n>1 ? prop().slice(1) : []);
+  const S0=vs*fr, D=(ve+1-vs)*fr;
+  const sm=new Float32Array(ve-vs+1);
+  for(let f=vs;f<=ve;f++){ let s=0,c=0; for(let k=-2;k<=2;k++){ const g=f+k; if(g>=vs && g<=ve){ s+=env[g]; c++; } } sm[f-vs]=s/c; }
+  const cands=[]; let q=-1;
+  for(let f=vs+1;f<ve;f++){
+    if(env[f]<=thr){ if(q<0) q=f; continue; }
+    if(q>=0){ if(f-q>=3) cands.push({ t:f*fr-0.03, d:1+Math.min((f-q)*fr,1) }); q=-1; }
+    const i=f-vs; if(i<6 || i>sm.length-7) continue;
+    if(sm[i]<sm[i-1] && sm[i]<=sm[i+1]){ let mx=0; for(let k=i-6;k<=i+6;k++) if(sm[k]>mx) mx=sm[k]; const depth=(mx-sm[i])/(loud||1); if(depth>0.08) cands.push({ t:f*fr, d:depth }); }
+  }
+  cands.sort((x,y)=>x.t-y.t);
+  const C=[]; for(const c of cands){ const l=C[C.length-1]; if(l && c.t-l.t<0.09){ if(c.d>l.d) C[C.length-1]=c; } else C.push(c); }
+  const K=C.length;
+  if(K<n-1) return prop();
+  const P=[{ t:S0, d:0 },...C,{ t:S0+D, d:0 }], INF=1e18;
+  const cost=(i,p,qq)=>{ const ex=D*W[i]/tot, r=(P[qq].t-P[p].t)/ex-1; return 2*r*r; };
+  const rew=j=>1.2*Math.min(P[j].d,1.5);
+  const dp=[], bk=[];
+  for(let i=0;i<n-1;i++){ dp.push(new Float64Array(K+2).fill(INF)); bk.push(new Int32Array(K+2).fill(-1)); }
+  for(let j=1;j<=K;j++) dp[0][j]=cost(0,0,j)-rew(j);
+  for(let i=1;i<n-1;i++){
+    const maxD=D*W[i]/tot*4+1;
+    for(let j=i+1;j<=K;j++){
+      let best=INF, bi=-1;
+      for(let k=j-1;k>=i;k--){ if(P[j].t-P[k].t>maxD) break; const v=dp[i-1][k]; if(v>=INF) continue; const c=v+cost(i,k,j); if(c<best){ best=c; bi=k; } }
+      if(bi>=0){ dp[i][j]=best-rew(j); bk[i][j]=bi; }
+    }
+  }
+  let best=INF, bj=-1;
+  for(let j=n-1;j<=K;j++){ const v=dp[n-2][j]; if(v>=INF) continue; const c=v+cost(n-1,j,K+1); if(c<best){ best=c; bj=j; } }
+  if(bj<0) return prop();
+  const cuts=new Array(n-1); let j=bj;
+  for(let i=n-2;i>=0;i--){ cuts[i]=j; j=bk[i][j]; }
+  const out=[Math.max(t0,S0-0.02)]; cuts.forEach(c=>out.push(P[c].t));
+  for(let i=1;i<out.length;i++) if(out[i]<out[i-1]+0.12) out[i]=out[i-1]+0.12;
+  return out;
+}
+function loadMan(){
+  try{ const m=JSON.parse(localStorage.getItem('forge:qs:sync:'+S.sig)||'null'); S.man=m && typeof m==='object' ? { b:m.b||null, w:m.w||{}, ai:m.ai||null } : { b:null, w:{}, ai:null }; }
+  catch{ S.man={ b:null, w:{}, ai:null }; }
+}
+function saveMan(){ try{ localStorage.setItem('forge:qs:sync:'+S.sig,JSON.stringify(S.man)); }catch{} }
+const LAYOUT=new Map();
+function rebuild(){
+  const N=S.units.length, mb=S.man.b, ai=S.man.ai;
+  const aiB=ai && Array.isArray(ai.b) && ai.b.length===N+1 ? ai.b : null;
+  S.Bn=(mb && mb.length===N+1) ? mb.slice() : aiB ? aiB.slice() : S.autoB.slice();
+  S.WT=S.units.map((u,i)=>{
+    const w=S.man.w[i]; if(w && w.length===u.nw) return w.slice();
+    const aw=ai && ai.w && ai.w[i]; if(aw && aw.length===u.nw) return aw.slice();
+    return autoWords(u,S.Bn[i],S.Bn[i+1]);
+  });
+  LAYOUT.clear();
+  const nw=Object.keys(S.man.w).length, eng=ai && ai.eng==='ctc' ? 'the exact aligner' : 'the Quran AI';
+  const src=mb ? '✓ Using <b>your tapped ayah timing</b>' : aiB ? '✓ Using <b>'+eng+' timing</b> ('+Math.round((ai.rate||0)*100)+'% of the words were very clear)' : 'Using <b>automatic timing from the sound only</b>';
+  $('syncInfo').innerHTML=src+(nw ? ' · '+nw+' ayah'+(nw>1 ? 's' : '')+' with tapped word timing' : '')
+    +'.<br>Press ▶ to check. '+(aiB ? 'If one ayah is still not right, press ✋ on it (Half speed makes it easy).' : 'For the best result press <b>🎧 Let the Quran AI listen</b> above.');
+}
+function unitAt(t){ const B=S.Bn, N=S.units.length; let i=0; while(i<N-1 && t>=B[i+1]) i++; return i; }
+async function loadAyat(){
+  if(S.busy) return;
+  if(!S.raw) return toast('Choose your recitation first (step 1)');
+  if(!surahs) return toast('The surah list is still loading');
+  S.busy=true; stopPreview(); $('note').classList.add('hidden');
+  try{
+    updSel();
+    const s=+$('qSurah').value; if(!s) throw new Error('search and select the ayah you recited');
+    const a=+$('qFrom').value, b=+$('qTo').value;
+    setHint('Getting the exact Quran text and the tafsir…');
+    const tr=$('qTr').value;
+    let data;
+    try{ data=await quranFetch('surah/'+s+'/editions/quran-uthmani,'+tr+',ar.muyassar'); }
+    catch{ data=await quranFetch('surah/'+s+'/editions/quran-uthmani,'+tr); }
+    const arE=data[0], trE=data[1], tfE=data[2] && data[2].ayahs ? data[2] : null;
+    const units=[], bism=$('qBism').checked && s!==1 && s!==9;
+    if($('qAudh').checked) units.push({ kind:'audh', label:"A'udhu", ar:AUDH_AR, tr:AUDH_EN, num:0, tf:'' });
+    for(let k=a;k<=b;k++){
+      let t=arE.ayahs[k-1].text; const e=trE.ayahs[k-1].text;
+      if(k===1 && s!==1 && s!==9){ const ws=t.split(' '); if(/^بِسْمِ/.test(ws[0]) && ws.length>4) t=ws.slice(4).join(' '); }
+      if(k===a && bism) units.push({ kind:'bism', label:'Bismillah', ar:BISM_AR, tr:BISM_EN, num:0, tf:'' });
+      units.push({ kind:'ayah', label:'Ayah '+k, ar:t, tr:e, num:k, tf:tfE && tfE.ayahs[k-1] ? String(tfE.ayahs[k-1].text||'') : '' });
+    }
+    units.forEach(u=>{ u.tokens=tokenize(u.ar,u.num); u.nw=u.tokens.filter(k=>!k.num).length; });
+    if(S.raw.duration/units.length<1.2) throw new Error('you chose '+units.length+' parts, but the recording is only '+fmt(S.raw.duration)+' long. Select exactly the ayat you recited, and untick A\'udhu or Bismillah if you did not say them');
+    await fontsReady;
+    clearVis(); clearCovers();
+    S.units=units; S.surah={ n:s, ar:arE.name, en:arE.englishName, a, b };
+    setHint('Lining up each ayah and each word with your voice…'); await tick();
+    S.autoB=alignUnits(units,S.A);
+    S.sig=[S.file.name,S.file.size,s,a,b,$('qAudh').checked ? 1 : 0,bism ? 1 : 0].join('|');
+    loadMan(); rebuild(); renderUnits(); fillPart(); renderMq(); updatePost();
+    if(!S.pitch){ setHint('Reading the melody of your voice…'); await tick(); try{ S.pitch=await computePitch(); }catch(e){ console.warn(e); S.pitch=null; } }
+    await prepareBackground();
+    restoreVis();
+    setHint(S.man.ai ? '✓ Ready, with your saved AI timing. Press ▶ Preview to check.' : '✓ Ready. Press 🎧 "Let the Quran AI listen" in step 3 for exact word timing.');
+    S.lastT=Math.max(0,S.Bn[0]+0.6); seekStatic(S.lastT);
+  }catch(e){ showNote('Could not get the ayat ready: '+e.message+'.'); setHint('Something needs fixing, see the note on the left.'); }
+  finally{ S.busy=false; }
+}
+$('loadBtn').onclick=loadAyat;
+
+/* ---------- your recording at 16 kHz (what the listeners need) ---------- */
+async function audio16(){
+  if(S.a16) return S.a16;
+  const R=16000, off=new OfflineAudioContext(1,Math.max(1,Math.ceil(S.raw.duration*R)),R), src=off.createBufferSource();
+  src.buffer=S.raw; src.connect(off.destination); src.start();
+  S.a16=(await off.startRendering()).getChannelData(0);
+  return S.a16;
+}
+
+/* ---------- 🎧 listener 1: the EXACT ALIGNER (follows every letter of the mushaf, 20 ms steps) ---------- */
+const CTC_URL='https://huggingface.co/Synthesium/quran-recitation-v2-onnx/resolve/main/wav2vec2-ar-ctc-aligner/model.int8.onnx';
+const CTC_VOCAB=['<pad>','<s>','</s>','<unk>','|','-','ء','آ','أ','ؤ','إ','ئ','ا','ب','ة','ت','ث','ج','ح','خ','د','ذ','ر','ز','س','ش','ص','ض','ط','ظ','ع','غ','ـ','ف','ق','ك','ل','م','ن','ه','و','ى','ي','ً','ٌ','ٍ','َ','ُ','ِ','ّ','ْ'];
+const CTC_IDX=Object.fromEntries(CTC_VOCAB.map((c,i)=>[c,i])), CTC_SEP=4, CTC_FR=0.02;
+let ORTP=null, CTC=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); }); }
+async function loadOrt(){
+  if(window.ort) return window.ort;
+  if(!ORTP) ORTP=(async()=>{
+    const base='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+    await loadScript(base+'ort.min.js');
+    const o=window.ort; if(!o) throw new Error('the aligner engine could not load');
+    o.env.wasm.wasmPaths=base;
+    o.env.wasm.numThreads=self.crossOriginIsolated ? Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1)) : 1;
+    return o;
+  })().catch(e=>{ ORTP=null; throw e; });
+  return ORTP;
+}
+async function fetchModel(url,say,label){
+  let cache=null;
+  try{ cache=await caches.open('forge-models-v1'); const hit=await cache.match(url); if(hit){ say('Loading the '+label+'…'); return await hit.arrayBuffer(); } }catch{}
+  const r=await fetch(url); if(!r.ok) throw new Error('the '+label+' could not be downloaded ('+r.status+')');
+  const total=+r.headers.get('content-length')||0, reader=r.body.getReader(), parts=[]; let got=0, lastSay=0;
+  for(;;){
+    const { done, value }=await reader.read(); if(done) break;
+    parts.push(value); got+=value.length;
+    if(got-lastSay>2*1048576){ lastSay=got; say('Downloading the '+label+' (first time only, then it is saved)… '+Math.round(got/1048576)+(total ? ' of '+Math.round(total/1048576) : '')+' MB'); }
+  }
+  const blob=new Blob(parts);
+  if(cache){ try{ await cache.put(url,new Response(blob)); }catch(e){ console.warn('The model could not be saved for next time',e); } }
+  return await blob.arrayBuffer();
+}
+function charsOf(word){
+  const t=String(word).replace(/ٱ/g,'ا').replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g,'');
+  const out=[]; for(const ch of t){ const k=CTC_IDX[ch]; if(k!=null && k>5) out.push(k); }
+  return out;
+}
+async function ctcLogits(ort,say){
+  const a=await audio16(), n=a.length, R=16000, CH=R*20, CTX=R, STRIDE=320;
+  const T=Math.floor(n/STRIDE)+1;
+  let V=CTC_VOCAB.length, logp=null;
+  for(let c0=0;c0<n;c0+=CH){
+    if(S.cancel) throw new Error('cancelled');
+    const c1=Math.min(n,c0+CH), i0=Math.max(0,c0-CTX), i1=Math.min(n,c1+CTX);
+    const seg=a.slice(i0,i1);
+    let mean=0; for(let i=0;i<seg.length;i++) mean+=seg[i]; mean/=seg.length;
+    let v=0; for(let i=0;i<seg.length;i++){ const d=seg[i]-mean; v+=d*d; } const sd=Math.sqrt(v/seg.length+1e-7);
+    for(let i=0;i<seg.length;i++) seg[i]=(seg[i]-mean)/sd;
+    say('The exact aligner is listening… '+Math.round(c0/n*100)+'% (takes about as long as your recitation)');
+    await tick();
+    const feeds={};
+    for(const nm of CTC.inputNames){
+      if(/mask/i.test(nm)){ const m=new BigInt64Array(seg.length); m.fill(1n); feeds[nm]=new ort.Tensor('int64',m,[1,seg.length]); }
+      else feeds[nm]=new ort.Tensor('float32',seg,[1,seg.length]);
+    }
+    const res=await CTC.run(feeds), o=res[CTC.outputNames[0]], dims=o.dims, F=dims[dims.length-2], VV=dims[dims.length-1], d=o.data;
+    if(!logp){ V=VV; logp=new Float32Array(T*V).fill(-30); }
+    const g0=Math.round(i0/STRIDE), core0=Math.round(c0/STRIDE), core1=Math.round(c1/STRIDE);
+    for(let f=0;f<F;f++){
+      const g=g0+f; if(g<core0 || g>=core1 || g>=T) continue;
+      let mx=-Infinity; for(let k=0;k<V;k++) if(d[f*V+k]>mx) mx=d[f*V+k];
+      let s=0; for(let k=0;k<V;k++) s+=Math.exp(d[f*V+k]-mx);
+      const lse=mx+Math.log(s);
+      for(let k=0;k<V;k++) logp[g*V+k]=d[f*V+k]-lse;
+    }
+    if(o.dispose) try{ o.dispose(); }catch{}
+  }
+  return { logp, T, V };
+}
+/* CTC Viterbi forced alignment with free start and end (frames outside the text cost OUT each) */
+function viterbi(logp,V,F0,F1,toks){
+  const L=toks.length, S2=2*L+1, T=F1-F0, OUT=-3, NEG=-1e30;
+  if(T<L+2) return null;
+  const bp=new Uint8Array(T*S2), pbp=new Uint8Array(T);
+  let prev=new Float64Array(S2).fill(NEG), cur=new Float64Array(S2), pre=0, post=NEG;
+  for(let t=0;t<T;t++){
+    const o=(F0+t)*V;
+    const e1=prev[S2-1], e2=S2>1 ? prev[S2-2] : NEG, endPrev=e1>e2 ? e1 : e2;
+    if(post>=endPrev){ post+=OUT; pbp[t]=0; } else { post=endPrev+OUT; pbp[t]=e1>=e2 ? 1 : 2; }
+    for(let s=0;s<S2;s++){
+      let best=prev[s], b=0;
+      if(s>0 && prev[s-1]>best){ best=prev[s-1]; b=1; }
+      if((s&1) && s>2 && toks[(s-1)>>1]!==toks[(s-3)>>1] && prev[s-2]>best){ best=prev[s-2]; b=2; }
+      if(s<2 && pre>best){ best=pre; b=3; }
+      cur[s]=best+((s&1) ? logp[o+toks[(s-1)>>1]] : logp[o]);
+      bp[t*S2+s]=b;
+    }
+    pre+=OUT;
+    const tmp=prev; prev=cur; cur=tmp;
+  }
+  const endS=prev[S2-1]>=prev[S2-2] ? S2-1 : S2-2;
+  let t=T-1, s;
+  if(post>prev[endS]){ while(t>=0 && pbp[t]===0) t--; if(t<=0) return null; s=pbp[t]===1 ? S2-1 : S2-2; t--; }
+  else s=endS;
+  const first=new Int32Array(L).fill(-1), last=new Int32Array(L).fill(-1), conf=new Float32Array(L).fill(-30);
+  while(t>=0){
+    if(s&1){ const k=(s-1)>>1; first[k]=t; if(last[k]<0) last[k]=t; const lp=logp[(F0+t)*V+toks[k]]; if(lp>conf[k]) conf[k]=lp; }
+    const b=bp[t*S2+s];
+    if(b===3) break;
+    if(b===1) s-=1; else if(b===2) s-=2;
+    t--;
+  }
+  return { first, last, conf };
+}
+function ctcAlignAll(logp,T,V){
+  const N=S.units.length, B=S.Bn, W=[];
+  S.units.forEach((u,i)=>u.tokens.forEach(k=>{ if(!k.num) W.push({ i, ch:charsOf(k.text), st:NaN, en:NaN, ok:false, w:wordWeight(k.text,false) }); }));
+  if(!W.length) return null;
+  const byUnit=[]; W.forEach((w,j)=>{ (byUnit[w.i]=byUnit[w.i]||[]).push(j); });
+  const unitChars=i=>(byUnit[i]||[]).reduce((a,j)=>a+W[j].ch.length+1,0);
+  const alignGroup=(a,b,F0,F1)=>{
+    const toks=[], fi=[], li=[], js=[];
+    for(let i=a;i<=b;i++) for(const j of byUnit[i]||[]){ const ch=W[j].ch; if(!ch.length) continue; if(toks.length) toks.push(CTC_SEP); fi.push(toks.length); for(const c of ch) toks.push(c); li.push(toks.length-1); js.push(j); }
+    if(!toks.length) return;
+    const r=viterbi(logp,V,F0,F1,toks); if(!r) return;
+    js.forEach((j,q)=>{
+      const f=r.first[fi[q]], l=r.last[li[q]]; if(f<0) return;
+      W[j].st=(F0+f)*CTC_FR; W[j].en=(F0+(l>=0 ? l : f)+1)*CTC_FR;
+      let c=0; for(let k=fi[q];k<=li[q];k++) c+=r.conf[k]; W[j].ok=c/(li[q]-fi[q]+1)>-1.6;
+    });
+  };
+  let total=0; for(let i=0;i<N;i++) total+=unitChars(i);
+  if(T*(2*total+1)<=60e6) alignGroup(0,N-1,0,T);
+  else{
+    const span=(a,b)=>Math.max(1,Math.min(T,Math.ceil((B[b+1]+1.5)/CTC_FR))-Math.max(0,Math.floor((B[a]-1.5)/CTC_FR)));
+    let g0=0;
+    while(g0<N){
+      let g1=g0, chars=unitChars(g0);
+      while(g1+1<N){ const c2=chars+unitChars(g1+1); if(span(g0,g1+1)*(2*c2+1)>40e6) break; g1++; chars=c2; }
+      alignGroup(g0,g1,Math.max(0,Math.floor((B[g0]-1.5)/CTC_FR)),Math.min(T,Math.ceil((B[g1+1]+1.5)/CTC_FR)));
+      g0=g1+1;
+    }
+  }
+  let lastT=-1;
+  for(const w of W){ if(!isNaN(w.st)){ if(w.st<=lastT+0.04){ w.st=NaN; w.ok=false; } else lastT=w.st; } }
+  const known=W.map((w,j)=>isNaN(w.st) ? -1 : j).filter(j=>j>=0);
+  if(known.length<2) return null;
+  const k0=known[0], kL=known[known.length-1], dur=S.raw.duration;
+  for(let j=0;j<k0;j++) W[j].st=Math.max(0,W[k0].st-(k0-j)*0.35);
+  for(let q=0;q<known.length-1;q++){
+    const a=known[q], b=known[q+1]; if(b-a<2) continue;
+    let tot=0; for(let j=a;j<b;j++) tot+=W[j].w;
+    let acc=W[a].w; for(let j=a+1;j<b;j++){ W[j].st=W[a].st+(W[b].st-W[a].st)*acc/tot; acc+=W[j].w; }
+  }
+  for(let j=kL+1;j<W.length;j++) W[j].st=Math.min(dur-0.2,W[j-1].st+0.4);
+  const w={}, b=[];
+  W.forEach(x=>{ (w[x.i]=w[x.i]||[]).push(x.st); });
+  for(let i=0;i<N;i++){ const arr=w[i]||[]; for(let k=1;k<arr.length;k++) if(arr[k]<arr[k-1]+0.06) arr[k]=arr[k-1]+0.06; b.push(arr.length ? Math.max(0,arr[0]-0.12) : (i ? b[i-1]+0.3 : 0)); }
+  const lastW=W[W.length-1], endT=Math.min(dur,(isNaN(lastW.en) ? lastW.st+0.8 : lastW.en+0.5));
+  b.push(Math.max(endT,b[N-1]+0.5));
+  for(let i=1;i<b.length;i++) if(b[i]<b[i-1]+0.3) b[i]=b[i-1]+0.3;
+  const ok=W.filter(x=>x.ok).length;
+  return { b, w, rate:ok/W.length, eng:'ctc' };
+}
+async function exactAlign(say){
+  const ort=await loadOrt();
+  if(!CTC){
+    const buf=await fetchModel(CTC_URL,say,'exact aligner');
+    say('Starting the exact aligner…'); await tick();
+    CTC=await ort.InferenceSession.create(buf,{ executionProviders:['wasm'], graphOptimizationLevel:'all' });
+  }
+  const { logp, T, V }=await ctcLogits(ort,say);
+  say('Following every letter of the mushaf text…'); await tick();
+  return ctcAlignAll(logp,T,V);
+}
+
+/* ---------- 🎧 listener 2: Whisper Quran AI (guesses words, needs a graphics card) ---------- */
+let ASR=null, ASRKEY='';
+async function tryPipe(T,model,opts){ return await T.pipeline('automatic-speech-recognition',model,opts); }
+async function loadListener(best,say){
+  let gpu=false;
+  if(navigator.gpu){ try{ gpu=!!(await navigator.gpu.requestAdapter()); }catch{} }
+  const key=(gpu ? 'gpu' : 'cpu')+(best ? '-best' : '-fast');
+  if(ASR && ASRKEY===key) return ASR;
+  say('Loading the Quran listener…');
+  const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+  T.env.allowLocalModels=false;
+  const files={};
+  const progress_callback=p=>{
+    if(!p || p.status!=='progress' || !p.total) return;
+    files[p.file]=[p.loaded,p.total];
+    let a=0,b=0; for(const k in files){ a+=files[k][0]; b+=files[k][1]; }
+    say('Downloading the Quran listener (first time only, then it is saved)… '+Math.round(a/1048576)+' of '+Math.round(b/1048576)+' MB');
+  };
+  if(gpu){
+    try{
+      const pipe=await tryPipe(T,'Aymencca/whisper-turbo-coran-onnx',{ device:'webgpu', dtype:{ encoder_model:best ? 'fp16' : 'q4', decoder_model_merged:'q4' }, progress_callback });
+      ASR={ pipe, quran:true }; ASRKEY=key; return ASR;
+    }catch(e){ console.warn('The Quran listener could not start on the graphics card',e); }
+  }
+  say('Your computer cannot run the big Quran listener, so a smaller general listener is used (less exact)…');
+  let pipe=null;
+  for(const dtype of ['q8','fp32']){
+    try{ pipe=await tryPipe(T,'onnx-community/whisper-base_timestamped',{ device:'wasm', dtype, progress_callback }); break; }catch(e){ console.warn('Small listener '+dtype,e); }
+  }
+  if(!pipe) throw new Error('the listener could not be loaded. Check your internet and use Google Chrome');
+  ASR={ pipe, quran:false }; ASRKEY=key; return ASR;
+}
+async function listenAll(say){
+  const R=16000, a=await audio16(), dur=a.length/R, words=[], WIN=28, STEP=25;
+  const A=S.A, voicedFrac=(t0,t1)=>{ const f0=Math.floor(t0/A.fr), f1=Math.min(A.n,Math.ceil(t1/A.fr)); let v=0; for(let f=f0;f<f1;f++) if(A.env[f]>A.thr) v++; return f1>f0 ? v/(f1-f0) : 0; };
+  for(let ws=0;ws<dur;ws+=STEP){
+    const we=Math.min(dur,ws+WIN), last=we>=dur-0.01;
+    say('Listening to your recitation… '+Math.round(ws/dur*100)+'%');
+    await tick();
+    if(we-ws>=0.6 && voicedFrac(ws,we)>0.04){
+      const seg=a.slice(Math.floor(ws*R),Math.floor(we*R));
+      const out=await ASR.pipe(seg,{ language:'arabic', task:'transcribe', return_timestamps:'word' });
+      const lo=ws+(ws>0 ? 1.5 : 0), hi=last ? 1e9 : we-1.5;
+      for(const c of (out && out.chunks) || []){
+        const ts=c.timestamp||[], s=ws+(+ts[0]||0), e=ws+(ts[1]!=null ? +ts[1] : (+ts[0]||0));
+        if(s<lo || s>=hi) continue;
+        for(const part of String(c.text||'').trim().split(/\s+/)){ const n=normAr(part); if(n) words.push({ n, s, e }); }
+      }
+    }
+    if(last) break;
+  }
+  return words;
+}
+function alignToMushaf(rec){
+  const toks=[];
+  S.units.forEach((u,i)=>u.tokens.forEach(k=>{ if(!k.num) toks.push({ i, wi:k.wi, n:normAr(k.text), w:wordWeight(k.text,false) }); }));
+  const M=toks.length, N=rec.length; if(!M || !N) return null;
+  const W=N+1, dp=new Float32Array((M+1)*W), bt=new Uint8Array((M+1)*W), sim=new Float32Array(M*N);
+  for(let i=0;i<M;i++) for(let j=0;j<N;j++){ const a=toks[i].n, b=rec[j].n; sim[i*N+j]=a && b ? 1-lev(a,b)/Math.max(a.length,b.length) : 0; }
+  for(let i=1;i<=M;i++){ dp[i*W]=dp[(i-1)*W]-0.35; bt[i*W]=1; }
+  for(let j=1;j<=N;j++){ dp[j]=dp[j-1]-0.1; bt[j]=2; }
+  for(let i=1;i<=M;i++){
+    for(let j=1;j<=N;j++){
+      const s=sim[(i-1)*N+j-1];
+      const d=dp[(i-1)*W+j-1]+(s>=0.5 ? 1+s : -0.8), u=dp[(i-1)*W+j]-0.35, l=dp[i*W+j-1]-0.15;
+      if(d>=u && d>=l){ dp[i*W+j]=d; bt[i*W+j]=0; } else if(u>=l){ dp[i*W+j]=u; bt[i*W+j]=1; } else { dp[i*W+j]=l; bt[i*W+j]=2; }
+    }
+  }
+  const T=new Float64Array(M).fill(NaN);
+  let i=M, j=N, hits=0;
+  while(i>0 && j>0){
+    const b=bt[i*W+j];
+    if(b===0){ if(sim[(i-1)*N+j-1]>=0.5){ T[i-1]=rec[j-1].s; hits++; } i--; j--; }
+    else if(b===1) i--; else j--;
+  }
+  let lastT=-1; for(let k=0;k<M;k++){ if(!isNaN(T[k])){ if(T[k]<=lastT+0.05){ T[k]=NaN; hits--; } else lastT=T[k]; } }
+  if(hits<2) return null;
+  const anchors=[]; for(let k=0;k<M;k++) if(!isNaN(T[k])) anchors.push(k);
+  const N0=S.units.length, B0=S.autoB, start=B0[0]+0.05, end=Math.max(B0[N0]-0.3,T[anchors[anchors.length-1]]+0.4);
+  const fill=(k0,t0,k1,t1)=>{ let tot=0; for(let k=k0;k<k1;k++) tot+=toks[k].w; let acc=0; for(let k=k0;k<k1;k++){ if(k>k0 || isNaN(T[k])) T[k]=t0+(t1-t0)*acc/(tot||1); acc+=toks[k].w; } };
+  const a0=anchors[0]; if(a0>0){ const t0=Math.min(start,T[a0]-0.3*a0); fill(0,Math.max(0,t0),a0,T[a0]); }
+  for(let q=0;q<anchors.length-1;q++){ const k0=anchors[q], k1=anchors[q+1]; if(k1-k0>1){ const keep=T[k0]; fill(k0,keep,k1,T[k1]); T[k0]=keep; } }
+  const aL=anchors[anchors.length-1]; if(aL<M-1){ const keep=T[aL]; fill(aL,keep,M,end); T[aL]=keep; }
+  const w={}, b=[];
+  for(let k=0;k<M;k++){ const t=toks[k]; (w[t.i]=w[t.i]||[]).push(T[k]); }
+  for(let u=0;u<N0;u++){ const first=w[u] && w[u].length ? w[u][0] : null; b.push(first!=null ? Math.max(0,first-0.15) : null); }
+  for(let u=0;u<N0;u++){ if(b[u]==null) b[u]=u ? b[u-1]+0.3 : B0[0]; }
+  b[0]=Math.min(b[0],B0[0]+0.2);
+  b.push(Math.max(B0[N0],(w[N0-1]||[0]).slice(-1)[0]+0.8));
+  for(let u=1;u<b.length;u++) if(b[u]<b[u-1]+0.3) b[u]=b[u-1]+0.3;
+  for(let u=0;u<N0;u++){ const arr=w[u]||[]; for(let k=1;k<arr.length;k++) if(arr[k]<arr[k-1]+0.08) arr[k]=arr[k-1]+0.08; }
+  return { b, w, rate:hits/M, eng:'whisper' };
+}
+async function aiSync(){
+  if(S.busy) return;
+  if(!S.units.length || !S.raw) return toast('Press "Get the ayat" first (step 2)');
+  S.busy=true; S.cancel=false; stopPreview(); $('aiSync').disabled=true;
+  const say=m=>{ $('aiInfo').textContent=m; setHint(m); };
+  try{
+    let res;
+    if($('aiQ').value==='align') res=await exactAlign(say);
+    else{
+      await loadListener($('aiQ').value==='best',say);
+      const rec=await listenAll(say);
+      say('Matching what was heard with the exact mushaf text…'); await tick();
+      res=alignToMushaf(rec);
+    }
+    if(!res) throw new Error('the listener could not follow the recitation. Check that the selected ayat are exactly what you recited');
+    S.man.ai=res; S.man.b=null; S.man.w={}; saveMan(); rebuild(); renderUnits(); staleCovers();
+    const pct=Math.round(res.rate*100);
+    say(res.eng==='ctc'
+      ? '✓ Done: the exact aligner followed every letter ('+pct+'% of the words were very clear). Press ▶ Preview.'
+      : '✓ Done: '+pct+'% of the words were heard clearly'+(ASR && ASR.quran ? '' : ' (smaller general listener)')+'. The rest are placed smoothly between them. Press ▶ Preview.');
+    if(pct<40) showNote('Only '+pct+'% of the words were very clear. Check that the selected ayat are exactly what you recited (and A\'udhu / Bismillah). You can fix any ayah with ✋ at half speed.');
+    else toast('✓ AI timing saved for this recording');
+    S.lastT=Math.max(0,S.Bn[0]+0.3); seekStatic(S.lastT);
+  }catch(e){ console.error(e); say('The AI could not finish: '+e.message+'.'); showNote('The AI could not finish: '+e.message+'. Your current timing is unchanged.'); }
+  finally{ S.busy=false; $('aiSync').disabled=false; }
+}
+$('aiSync').onclick=aiSync;
+
+/* ---------- the melody of your voice (pitch, 8 kHz, YIN method) ---------- */
+async function computePitch(){
+  const R=8000, off=new OfflineAudioContext(1,Math.ceil(S.raw.duration*R),R), src=off.createBufferSource();
+  src.buffer=S.raw; src.connect(off.destination); src.start();
+  const d=(await off.startRendering()).getChannelData(0);
+  const hop=160, win=320, minL=8, maxL=114, n=Math.max(0,Math.floor((d.length-win-maxL)/hop)), f0=new Float32Array(n), df=new Float32Array(maxL+1);
+  const eThr=Math.max(1e-7,S.A.thr*S.A.thr*0.8);
+  for(let k=0;k<n;k++){
+    const o=k*hop; let e=0;
+    for(let i=0;i<win;i++) e+=d[o+i]*d[o+i];
+    if(e/win<eThr){ f0[k]=0; continue; }
+    for(let L=1;L<=maxL;L++){ let s=0; for(let i=0;i<win;i++){ const x=d[o+i]-d[o+i+L]; s+=x*x; } df[L]=s; }
+    let run=0;
+    for(let L=1;L<=maxL;L++){ const v=df[L]; run+=v; df[L]=run>0 ? v*L/run : 1; }
+    let bl=-1;
+    for(let L=minL;L<=maxL;L++){ if(df[L]<0.15){ while(L+1<=maxL && df[L+1]<df[L]) L++; bl=L; break; } }
+    if(bl<0){ f0[k]=0; continue; }
+    const a=df[bl-1]??df[bl], b=df[bl], c=df[bl+1]??df[bl], den=a-2*b+c, sh=den ? 0.5*(a-c)/den : 0;
+    f0[k]=R/(bl+clamp(sh,-1,1));
+    if(k%400===0) await tick();
+  }
+  const sm=new Float32Array(n);
+  for(let k=0;k<n;k++){ if(!(f0[k]>0)){ sm[k]=0; continue; } const w=[]; for(let j=k-2;j<=k+2;j++) if(j>=0 && j<n && f0[j]>0) w.push(f0[j]); w.sort((x,y)=>x-y); sm[k]=w[w.length>>1]; }
+  const v=[...sm].filter(x=>x>0).sort((x,y)=>x-y);
+  if(v.length<20) return null;
+  const lo=v[Math.floor(v.length*0.05)], hi=v[Math.floor(v.length*0.95)];
+  return { f0:sm, hop:hop/R, lo, span:Math.max(6,12*Math.log2(hi/lo)) };
+}
+
+/* ---------- mosque echo (made in the browser, optional) ---------- */
+async function ensureProc(){
+  const e=+$('echo').value/100, key=String(e);
+  if(S.proc && S.procKey===key) return;
+  if(!(e>0)){ S.proc=S.raw; S.procKey=key; return; }
+  setHint('Adding the mosque echo…');
+  const R=S.raw.sampleRate, len=S.raw.length+Math.round(R*3), off=new OfflineAudioContext(2,len,R), src=off.createBufferSource();
+  src.buffer=S.raw;
+  const conv=off.createConvolver(), irLen=Math.round(R*(1.2+e*2.5)), ir=off.createBuffer(2,irLen,R), pre=Math.round(R*0.025);
+  for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=pre;i<irLen;i++) d[i]=(Math.random()*2-1)*Math.pow(1-(i-pre)/(irLen-pre),3); }
+  conv.buffer=ir;
+  const wet=off.createGain(); wet.gain.value=e*0.9;
+  src.connect(off.destination); src.connect(conv); conv.connect(wet); wet.connect(off.destination); src.start();
+  const out=await off.startRendering();
+  let pk=0; for(let c=0;c<out.numberOfChannels;c++){ const d=out.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } }
+  if(pk>0.97){ const g=0.97/pk; for(let c=0;c<out.numberOfChannels;c++){ const d=out.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=g; } }
+  S.proc=out; S.procKey=key;
+  setHint('✓ Echo added.');
+}
+
+/* ---------- backgrounds: my room, my own pictures/videos, my library, designed ---------- */
+function freeItem(it){ if(!it) return; try{ if(it.el){ it.el.pause(); it.el.removeAttribute('src'); } if(it.url) URL.revokeObjectURL(it.url); if(it.img && it.img.close) it.img.close(); }catch{} }
+async function makeItem(r){
+  if(r.type==='img'){ let bmp=await createImageBitmap(r.blob); if(bmp.width>1920){ const b2=await createImageBitmap(bmp,{ resizeWidth:1920, resizeQuality:'medium' }); bmp.close(); bmp=b2; } return { type:'img', img:bmp }; }
+  const url=URL.createObjectURL(r.blob), el=document.createElement('video'); el.src=url; el.muted=true; el.loop=true; el.playsInline=true; el.preload='auto';
+  return { type:'vid', el, url, blob:r.blob };
+}
+async function fillBgSel(){
+  try{ S.lib=await idbAll('bgs'); }catch{ S.lib=[]; }
+  const cur=localStorage.getItem('forge:qs:set:bgSel') || 'stars';
+  $('bgSel').innerHTML='<option value="roomblur">My own room, softly blurred</option><option value="random">My background library (changes with each ayah)</option><option value="stars">Night sky with stars</option><option value="light">Soft golden light</option><option value="waves">Calm teal waves</option>'
+    +(S.lib.length ? '<optgroup label="One picture or video to start with">'+S.lib.map(b=>'<option value="lib:'+esc(b.id)+'">'+(b.type==='vid' ? '🎬 ' : '🖼️ ')+esc(String(b.name).slice(0,42))+'</option>').join('')+'</optgroup>' : '');
+  $('bgSel').value=[...$('bgSel').options].some(o=>o.value===cur) ? cur : 'stars';
+}
+async function prepareBackground(){
+  const v=$('bgSel').value;
+  if(v.startsWith('lib:')){
+    if(!S.bgItem || S.bgItem.key!==v){
+      freeItem(S.bgItem); S.bgItem=null;
+      const r=S.lib.find(b=>'lib:'+b.id===v);
+      if(r){ try{ S.bgItem=await makeItem(r); S.bgItem.key=v; }catch(e){ console.warn(e); } }
+    }
+  }
+  if((v==='random' || $('bgChange').value!=='never') && !S.items.length && S.lib.length){
+    const first=v.startsWith('lib:') ? S.lib.find(b=>'lib:'+b.id===v) : null;
+    const imgs=shuffle(S.lib.filter(b=>b && b.type==='img' && b!==first)).slice(0,10), vids=shuffle(S.lib.filter(b=>b && b.type==='vid' && b!==first)).slice(0,3);
+    const order=shuffle([...imgs,...vids]); if(first) order.unshift(first);
+    for(const r of order){ try{ S.items.push(await makeItem(r)); }catch{} }
+  }
+  if(v==='random' && !S.lib.length) toast('Your background library is empty. Add pictures or videos with "Add my own pictures or videos".');
+  if(S.isVideo && readCfg().me==='cut'){ try{ await ensureSeg(); }catch(e){ toast('The background cutter could not load. Check your internet.'); } }
+}
+async function resetItems(){ for(const it of S.items) freeItem(it); S.items=[]; await prepareBackground(); }
+$('bgSel').addEventListener('change',async()=>{ localStorage.setItem('forge:qs:set:bgSel',$('bgSel').value); await resetItems(); staleCovers(); if(S.pv){ playBgMedia(); } else seekStatic(S.lastT); });
+$('bgChange').addEventListener('change',async()=>{ await prepareBackground(); staleCovers(); redraw(); });
+$('meMode').addEventListener('change',async()=>{ meUI(); await prepareBackground(); LAYOUT.clear(); staleCovers(); redraw(); });
+$('pName').addEventListener('input',redraw);
+$('bgUp').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; let first=null;
+  for(const f of files){
+    const type=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name) ? 'vid' : f.type.startsWith('image/') ? 'img' : '';
+    if(!type){ toast('Skipped '+f.name+' (not a picture or video)'); continue; }
+    const id=newId();
+    try{ await idbPut('bgs',{ id, name:f.name, type, blob:f }); if(!first) first=id; }catch{ toast('Could not save '+f.name+'. The browser storage may be full.'); }
+  }
+  if(!first) return;
+  await fillBgSel();
+  $('bgSel').value='lib:'+first; localStorage.setItem('forge:qs:set:bgSel',$('bgSel').value);
+  if(S.isVideo && $('meMode').value==='asis'){ $('meMode').value='cut'; $('meMode').dispatchEvent(new Event('change')); localStorage.setItem('forge:qs:set:meMode','cut'); }
+  await resetItems(); seekStatic(S.lastT);
+  toast('✓ Added to your background library.');
+};
+
+/* background changes: every ayah, or every time a meaning scene ends */
+function rotMode(cfg){ if(cfg.bg==='random') return cfg.bgChange==='never' ? 'ayah' : cfg.bgChange; if(cfg.bgChange!=='never' && cfg.bg!=='roomblur') return cfg.bgChange; return null; }
+function bgChangeTimes(cfg){
+  const rm=rotMode(cfg); if(!rm || !S.Bn || !S.units.length) return [];
+  if(rm==='scene' && cfg.mvOn){
+    const out=[]; for(let i=0;i<S.units.length;i++) for(const g of visSegs(i,cfg)) out.push(Math.max(g.st+0.3,g.en-0.6));
+    if(out.length) return out.sort((a,b)=>a-b);
+  }
+  return S.Bn.slice(1,S.units.length);
+}
+function bgAt(t,cfg){
+  const ch=bgChangeTimes(cfg); let idx=0; while(idx<ch.length && ch[idx]<=t) idx++;
+  const start=idx ? ch[idx-1] : 0, next=idx<ch.length ? ch[idx] : (S.raw ? S.raw.duration : start+8);
+  return { idx, since:Math.max(0,t-start), span:Math.max(1,next-start), prevSpan:idx>1 ? start-ch[idx-2] : start };
+}
+
+/* ---------- Google MediaPipe (free, in the browser): background cutter and face finder ---------- */
+let VIS=null, SEG=null, SEGP=null, FD=null, FDP=null;
+async function loadVision(){
+  if(VIS) return VIS;
+  for(const ver of ['@0.10.14','@0.10.3']){
+    const base='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision'+ver;
+    let lib=null;
+    for(const u of [base+'/vision_bundle.mjs',base,base+'/+esm']){
+      try{ const V=await import(u); lib=V.FilesetResolver ? V : (V.default && V.default.FilesetResolver ? V.default : null); if(lib) break; }catch{}
+    }
+    if(!lib) continue;
+    try{ const files=await lib.FilesetResolver.forVisionTasks(base+'/wasm'); VIS={ lib, files }; return VIS; }catch(e){ console.warn(e); }
+  }
+  throw new Error('the vision tools could not load');
+}
+async function ensureSeg(){
+  if(SEG) return SEG;
+  if(!SEGP) SEGP=(async()=>{
+    setHint('Loading the background cutter (first time only)…');
+    const { lib, files }=await loadVision();
+    const model='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+    for(const delegate of ['GPU','CPU']){
+      try{ const seg=await lib.ImageSegmenter.createFromOptions(files,{ baseOptions:{ modelAssetPath:model, delegate }, runningMode:'IMAGE', outputCategoryMask:false, outputConfidenceMasks:true }); SEG={ seg }; setHint('✓ Background cutter ready.'); redraw(); return SEG; }
+      catch(e){ console.warn('Segmenter '+delegate,e); }
+    }
+    throw new Error('the background cutter could not load');
+  })().catch(e=>{ SEGP=null; throw e; });
+  return SEGP;
+}
+async function faceDetector(){
+  if(FD) return FD;
+  if(!FDP) FDP=(async()=>{
+    const { lib, files }=await loadVision();
+    const model='https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite';
+    for(const delegate of ['GPU','CPU']){
+      try{ FD=await lib.FaceDetector.createFromOptions(files,{ baseOptions:{ modelAssetPath:model, delegate }, runningMode:'IMAGE', minDetectionConfidence:0.5 }); return FD; }
+      catch(e){ console.warn('Face finder '+delegate,e); }
+    }
+    throw new Error('the face finder could not load');
+  })().catch(e=>{ FDP=null; throw e; });
+  return FDP;
+}
+async function hasFace(src){
+  try{
+    const fd=await faceDetector(), w=src.width||src.naturalWidth, h=src.height||src.naturalHeight; if(!w || !h) return false;
+    const s=Math.min(1,640/Math.max(w,h)), c=document.createElement('canvas'); c.width=Math.max(2,Math.round(w*s)); c.height=Math.max(2,Math.round(h*s));
+    c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+    const r=fd.detect(c); return !!(r && r.detections && r.detections.length);
+  }catch(e){ console.warn('Face check skipped',e); return false; }
+}
+function computeMask(frame){
+  const G=SEG; if(!G) return false;
+  const fw=frame.videoWidth||frame.width, fh=frame.videoHeight||frame.height; if(!fw || !fh) return false;
+  if(!G.inCanvas || G.fw!==fw || G.fh!==fh){
+    G.fw=fw; G.fh=fh; G.mw=448; G.mh=Math.max(2,Math.round(448*fh/fw));
+    G.inCanvas=document.createElement('canvas'); G.inCanvas.width=G.mw; G.inCanvas.height=G.mh; G.ictx=G.inCanvas.getContext('2d',{ willReadFrequently:true });
+    G.maskCanvas=document.createElement('canvas'); G.maskCanvas.width=G.mw; G.maskCanvas.height=G.mh; G.mctx=G.maskCanvas.getContext('2d');
+    G.img=G.mctx.createImageData(G.mw,G.mh); G.prev=null; G.invert=null;
+  }
+  G.ictx.drawImage(frame,0,0,G.mw,G.mh);
+  let data=null;
+  try{ G.seg.segment(G.inCanvas,res=>{ const ms=res && res.confidenceMasks; if(ms && ms.length) data=ms[ms.length-1].getAsFloat32Array().slice(); }); }catch(e){ console.warn(e); return false; }
+  if(!data || data.length!==G.mw*G.mh) return false;
+  if(G.invert==null){
+    const avg=(x0,x1,y0,y1)=>{ let s=0,c=0; for(let y=Math.floor(G.mh*y0);y<Math.floor(G.mh*y1);y++) for(let x=Math.floor(G.mw*x0);x<Math.floor(G.mw*x1);x++){ s+=data[y*G.mw+x]; c++; } return c ? s/c : 0; };
+    G.invert=avg(0.4,0.6,0.4,0.8) < (avg(0,0.1,0,0.15)+avg(0.9,1,0,0.15))/2;
+  }
+  if(G.prev && G.prev.length===data.length) for(let i=0;i<data.length;i++) data[i]=data[i]*0.6+G.prev[i]*0.4;
+  G.prev=data;
+  const px=G.img.data;
+  for(let i=0;i<data.length;i++){ let v=G.invert ? 1-data[i] : data[i]; v=clamp((v-0.38)/0.36,0,1); v=v*v*(3-2*v); const o=i*4; px[o]=255; px[o+1]=255; px[o+2]=255; px[o+3]=Math.round(v*255); }
+  G.mctx.putImageData(G.img,0,0);
+  return true;
+}
+const PL={ c:null, x:null };
+function drawPerson(ctx,W,H,face){
+  const iw=face.videoWidth||face.width, ih=face.videoHeight||face.height; if(!iw || !ih || !SEG || !SEG.maskCanvas) return false;
+  const m=Math.min(W,H), s=Math.max(W/iw,H/ih), dw=iw*s, dh=ih*s, x=(W-dw)/2, y=(H-dh)/2;
+  if(!PL.c || PL.c.width!==W || PL.c.height!==H){ PL.c=new OffscreenCanvas(W,H); PL.x=PL.c.getContext('2d'); }
+  const px=PL.x; px.setTransform(1,0,0,1,0,0); px.globalCompositeOperation='source-over'; px.globalAlpha=1; px.filter='none'; px.clearRect(0,0,W,H);
+  px.drawImage(face,x,y,dw,dh);
+  px.globalCompositeOperation='destination-in'; px.filter='blur('+Math.max(1,Math.round(m*0.0025))+'px)'; px.drawImage(SEG.maskCanvas,x,y,dw,dh);
+  px.filter='none'; px.globalCompositeOperation='source-over';
+  ctx.drawImage(PL.c,0,0);
+  return true;
+}
+
+/* ---------- meaning visuals: the AI reads the tafsir and chooses from the fixed list ---------- */
+function parseJSON(txt){
+  let s=String(txt||'').trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+  const a=s.indexOf('{'), b=s.lastIndexOf('}'); if(a>=0 && b>a) s=s.slice(a,b+1);
+  return JSON.parse(s);
+}
+async function askAI(prompt){
+  const K=getKeys(); let last='no AI key was found (open 🔑 Keys and paste a Gemini key)';
+  for(const key of K.gem){
+    for(const model of ['gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash']){
+      try{
+        const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+encodeURIComponent(key),{ method:'POST', headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({ contents:[{ role:'user', parts:[{ text:prompt }] }], generationConfig:{ responseMimeType:'application/json', temperature:0.3 } }) });
+        if(r.status===404) continue;
+        if(!r.ok){ last='Gemini answered '+r.status; break; }
+        const j=await r.json(), txt=(((j.candidates||[])[0]||{}).content||{}).parts;
+        return parseJSON((txt||[]).map(p=>p.text||'').join(''));
+      }catch(e){ last=e.message; }
+    }
+  }
+  for(const key of K.groq){
+    for(const model of ['llama-3.3-70b-versatile','openai/gpt-oss-120b']){
+      try{
+        const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key },
+          body:JSON.stringify({ model, messages:[{ role:'user', content:prompt }], temperature:0.3, response_format:{ type:'json_object' } }) });
+        if(!r.ok){ last='Groq answered '+r.status; continue; }
+        const j=await r.json(); return parseJSON(j.choices[0].message.content);
+      }catch(e){ last=e.message; }
+    }
+  }
+  throw new Error(last);
+}
+function visPrompt(chunk){
+  const s=S.surah, most=$('mvFreq').value==='most';
+  return 'You help a Quran reciter choose respectful background visuals for a recitation video. You never write Quran text; you only choose ids from fixed lists.\n'
+  +'Surah '+s.en+' ('+s.n+').\n'
+  +'For each ayah you get: how long it is recited, the Arabic words (numbered), a translation, and the explanation from Tafsir al-Muyassar (Arabic).\n'
+  +'Rules:\n'
+  +'1. Choose by the MEANING explained in the tafsir, never by the literal word alone. Example: in Surah al-An\'am 6:82 the word "ẓulm" means shirk (associating partners with Allah), so choose visuals about misguidance or shirk, not about social oppression.\n'
+  +'2. "scenes": a list of scene ids from SCENES that fit the meaning, all different from each other, in the order the meaning unfolds in the ayah. How many: 3 for an ayah recited 25 seconds or longer, 2 for 12 to 25 seconds, 1 for shorter. '+(most ? 'Give scenes to most ayat.' : 'Give scenes to about half of the ayat, only where visuals truly help; give [] to the others.')+'\n'
+  +'3. "icon": one id from ICONS, or "". Use an icon only when the ayah clearly speaks about that thing or meaning (journey → road, the Hour → clock, prayer → mosque or kaaba). About one ayah in three.\n'
+  +'4. "iconWord": the number of the Arabic word where that thing is mentioned (from the numbered list), or 0.\n'
+  +'5. "meaning": one short plain-English line (at most 14 words) saying what the ayah is about according to the tafsir. It is only shown to the reciter for checking. Never quote the ayah.\n'
+  +'6. Never use Paradise scenes for ayat about punishment, or punishment scenes for ayat about Paradise. Never choose anything showing faces.\n'
+  +'SCENES:\n'+Object.entries(SCENES).map(([k,v])=>k+' = '+v.l).join('\n')+'\n'
+  +'ICONS:\n'+Object.entries(ICONS).map(([k,v])=>k+' = '+v.l).join('\n')+'\n'
+  +'AYAT:\n'+chunk.map((x,n)=>'['+(n+1)+'] ayah '+x.u.num+' | recited for about '+Math.max(1,Math.round(S.Bn[x.i+1]-S.Bn[x.i]))+' seconds | words: '+x.u.tokens.filter(k=>!k.num).map((k,j)=>(j+1)+':'+k.text).join(' ')+' | translation: '+String(x.u.tr||'').slice(0,500)+' | tafsir: '+String(x.u.tf||'(not available)').slice(0,650)).join('\n')+'\n'
+  +'Reply with JSON only: {"items":[{"n":1,"scenes":[],"icon":"","iconWord":0,"meaning":""}]} with one item for every ayah above.';
+}
+function newVis(ids,icon,iw,meaning){
+  const list=[...new Set((Array.isArray(ids) ? ids : [ids]).filter(x=>SCENES[x]))].slice(0,3);
+  while(list.length<3) list.push('');
+  return { scenes:list.map(id=>({ scene:id, item:null, state:'' })), icon:ICONS[icon] ? icon : '', iw:Number.isFinite(iw) ? iw : -1, meaning:String(meaning||'').slice(0,140) };
+}
+function eachItem(fn){ for(const v of S.vis) if(v) for(const sl of v.scenes) if(sl.item) fn(sl.item,sl); }
+function visKey(){ return 'forge:qs:vis:'+S.sig; }
+function saveVis(){ try{ localStorage.setItem(visKey(),JSON.stringify(S.vis.map(v=>v ? { scenes:v.scenes.map(sl=>sl.scene), icon:v.icon, iw:v.iw, meaning:v.meaning } : null))); }catch{} }
+function pauseVisEls(){ for(const el of S.visEls){ try{ el.pause(); }catch{} } S.visEls=new Set(); }
+function clearVis(){ S.visTok++; eachItem(it=>freeItem(it)); S.vis=[]; pauseVisEls(); renderVis(); }
+function restoreVis(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem(visKey())||'null'); }catch{}
+  if(!Array.isArray(saved) || saved.length!==S.units.length){ S.vis=[]; renderVis(); $('mvInfo').textContent='Press "Plan the visuals" to let the AI choose visuals from the tafsir. You check every choice.'; return; }
+  S.vis=saved.map(v=>v ? newVis(Array.isArray(v.scenes) ? v.scenes : (v.scene ? [v.scene] : []),v.icon,+v.iw>=0 ? +v.iw : -1,v.meaning) : newVis([],'',-1,''));
+  renderVis();
+  if($('mvOn').checked) fetchAllMedia(); else $('mvInfo').textContent='Your saved visual plan is loaded. Tick "Show visuals" to use it.';
+}
+async function planVisuals(){
+  if(S.busy) return;
+  if(!S.units.length || !S.Bn) return toast('Press "Get the ayat" first (step 2)');
+  const K=getKeys();
+  if(!K.gem.length && !K.groq.length){ $('mvKeys').open=true; showNote('No AI key was found. Open 🔑 Keys in step 5 and paste your Gemini key, then press Save.'); return; }
+  const ay=S.units.map((u,i)=>({ u, i })).filter(x=>x.u.kind==='ayah');
+  if(!ay.length) return;
+  S.busy=true; $('mvPlan').disabled=true;
+  try{
+    if(ay.some(x=>!x.u.tf)) toast('The tafsir could not be loaded for some ayat, so the translation is used there.');
+    const got=new Map();
+    for(let c=0;c<ay.length;c+=25){
+      const chunk=ay.slice(c,c+25);
+      $('mvInfo').textContent='Reading the tafsir and choosing visuals… ('+Math.min(ay.length,c+25)+' of '+ay.length+' ayat)';
+      const out=await askAI(visPrompt(chunk));
+      for(const it of (out && Array.isArray(out.items) ? out.items : [])){ const x=chunk[(+it.n||0)-1]; if(x) got.set(x.i,it); }
+    }
+    clearVis(); staleCovers();
+    S.vis=S.units.map((u,i)=>{
+      const r=got.get(i)||{};
+      if(u.kind!=='ayah') return newVis([],'',-1,'');
+      const ids=Array.isArray(r.scenes) ? r.scenes : (r.scene ? [r.scene] : []);
+      const nw=u.nw||0, iw=clamp((+r.iconWord||0)-1,-1,Math.max(-1,nw-1));
+      return newVis(ids,r.icon,iw,r.meaning);
+    });
+    saveVis(); renderVis();
+    await fetchAllMedia();
+  }catch(e){ console.error(e); showNote('Could not plan the visuals: '+e.message+'.'); $('mvInfo').textContent='Planning stopped. Check your keys and internet, then try again.'; }
+  finally{ S.busy=false; $('mvPlan').disabled=false; }
+}
+$('mvPlan').onclick=planVisuals;
+
+/* finding a picture or video for a scene (always checked for faces) */
+async function fetchBlob(url,ms){
+  const ac=new AbortController(), tm=setTimeout(()=>ac.abort(),ms||60000);
+  try{ const r=await fetch(url,{ signal:ac.signal }); if(!r.ok) throw new Error('download failed ('+r.status+')'); return await r.blob(); }
+  finally{ clearTimeout(tm); }
+}
+async function fitBitmap(blob){ let bmp=await createImageBitmap(blob); if(Math.max(bmp.width,bmp.height)>1920){ const s=1920/Math.max(bmp.width,bmp.height), b2=await createImageBitmap(bmp,{ resizeWidth:Math.round(bmp.width*s), resizeHeight:Math.round(bmp.height*s), resizeQuality:'medium' }); bmp.close(); bmp=b2; } return bmp; }
+async function pixSearch(kind,q,orient){
+  const K=getKeys(); if(!K.pix) throw new Error('no Pixabay key');
+  const ck='forge:qs:pix:'+kind+':'+q+':'+(orient||'');
+  try{ const c=JSON.parse(localStorage.getItem(ck)||'null'); if(c && Date.now()-c.t<864e5 && Array.isArray(c.hits)) return c.hits; }catch{}
+  const u=kind==='vid'
+    ? 'https://pixabay.com/api/videos/?key='+encodeURIComponent(K.pix)+'&q='+encodeURIComponent(q)+'&safesearch=true&video_type=film&per_page=30'
+    : 'https://pixabay.com/api/?key='+encodeURIComponent(K.pix)+'&q='+encodeURIComponent(q)+'&image_type=photo&safesearch=true&per_page=30'+(orient ? '&orientation='+orient : '');
+  const r=await fetch(u); if(!r.ok) throw new Error('Pixabay answered '+r.status);
+  const j=await r.json();
+  const hits=(j.hits||[]).map(h=>kind==='vid' ? { id:h.id, tags:h.tags||'', v:h.videos||{} } : { id:h.id, tags:h.tags||'', url:h.largeImageURL||h.webformatURL, th:h.previewURL||h.webformatURL });
+  try{ localStorage.setItem(ck,JSON.stringify({ t:Date.now(), hits })); }catch{}
+  return hits;
+}
+const vertical=()=>$('format').value==='9:16';
+async function fromPixVideo(sc){
+  const hits=await pixSearch('vid',sc.q,'');
+  const list=hits.filter(h=>!S.used.has('pv'+h.id) && (sc.crowd || !PEOPLE.test(h.tags)) && h.v && h.v.medium && h.v.medium.url);
+  if(vertical()) list.sort((a,b)=>(b.v.medium.height>b.v.medium.width ? 1 : 0)-(a.v.medium.height>a.v.medium.width ? 1 : 0));
+  for(const h of list.slice(0,6)){
+    try{
+      const rend=h.v.medium.size && h.v.medium.size>30e6 && h.v.small && h.v.small.url ? h.v.small : h.v.medium;
+      S.used.add('pv'+h.id);
+      if(rend.thumbnail){ const tb=await createImageBitmap(await fetchBlob(rend.thumbnail,20000)); const face=await hasFace(tb); tb.close(); if(face) continue; }
+      const blob=await fetchBlob(rend.url,180000);
+      return { type:'vid', blob, thumb:rend.thumbnail||'', key:'pv'+h.id };
+    }catch(e){ console.warn('Pixabay video skipped',e); }
+  }
+  return null;
+}
+async function fromPixPhoto(sc){
+  const orient=$('format').value==='9:16' ? 'vertical' : $('format').value==='16:9' ? 'horizontal' : '';
+  const hits=await pixSearch('img',sc.q,orient);
+  const list=hits.filter(h=>!S.used.has('pp'+h.id) && (sc.crowd || !PEOPLE.test(h.tags)) && h.url);
+  for(const h of list.slice(0,6)){
+    try{
+      S.used.add('pp'+h.id);
+      const bmp=await fitBitmap(await fetchBlob(h.url,60000));
+      if(await hasFace(bmp)){ bmp.close(); continue; }
+      return { type:'img', img:bmp, thumb:h.th||'', key:'pp'+h.id };
+    }catch(e){ console.warn('Pixabay photo skipped',e); }
+  }
+  return null;
+}
+let GENQ=Promise.resolve();
+function fromGen(sc){ const p=GENQ.then(()=>genNow(sc)); GENQ=p.catch(()=>{}); return p; }
+async function genNow(sc){
+  if(!sc.g) return null;
+  const f=$('format').value, [w,h]=f==='9:16' ? [720,1280] : f==='16:9' ? [1280,720] : [1024,1024];
+  for(let tryN=0;tryN<2;tryN++){
+    const seed=Math.floor(Math.random()*1e9), prompt=sc.g+', no faces, no text, no letters, highly detailed, cinematic lighting';
+    try{
+      const blob=await fetchBlob('https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width='+w+'&height='+h+'&nologo=true&seed='+seed,120000);
+      if(!/^image\//.test(blob.type) && blob.size<2000) throw new Error('not a picture');
+      const bmp=await fitBitmap(blob);
+      if(await hasFace(bmp)){ bmp.close(); continue; }
+      const url=URL.createObjectURL(blob);
+      return { type:'img', img:bmp, thumb:url, url, key:'g'+seed };
+    }catch(e){ console.warn('Generated picture failed',e); }
+  }
+  return null;
+}
+async function fromLib(){
+  const recs=shuffle(S.lib.filter(r=>r && !S.used.has('lb'+r.id)));
+  for(const r of recs){
+    try{ S.used.add('lb'+r.id); const it=await makeItem(r); it.key='lb'+r.id; if(it.type==='img'){ it.url=URL.createObjectURL(r.blob); it.thumb=it.url; } return it; }catch{}
+  }
+  return null;
+}
+function prepItem(it){
+  if(it.type==='vid' && !it.el){ it.url=URL.createObjectURL(it.blob); const el=document.createElement('video'); el.src=it.url; el.muted=true; el.loop=true; el.playsInline=true; el.preload='auto'; it.el=el; }
+  return it;
+}
+async function getMedia(id){
+  const sc=SCENES[id]; if(!sc) return null;
+  const K=getKeys(), src=$('mvSrc').value;
+  const order=src==='lib' ? ['lib'] : src==='gen' ? ['gen'] : src==='pixabay' ? ['pv','pp'] : (K.pix ? ['pv','pp','gen'] : ['gen']);
+  for(const o of order){
+    try{
+      let it=null;
+      if(o==='pv' && K.pix && sc.q) it=await fromPixVideo(sc);
+      else if(o==='pp' && K.pix && sc.q) it=await fromPixPhoto(sc);
+      else if(o==='gen' && sc.g) it=await fromGen(sc);
+      else if(o==='lib') it=await fromLib();
+      if(it) return prepItem(it);
+    }catch(e){ console.warn('Visual source '+o+' failed',e); }
+  }
+  return null;
+}
+async function loadOne(i,k,tok){
+  const v=S.vis[i]; if(!v) return; const sl=v.scenes[k]; if(!sl || !sl.scene) return;
+  sl.state='loading'; updateThumb(i,k);
+  let it=null; try{ it=await getMedia(sl.scene); }catch(e){ console.warn(e); }
+  if(tok!==S.visTok || S.vis[i]!==v || v.scenes[k]!==sl){ freeItem(it); return; }
+  if(sl.item) freeItem(sl.item);
+  sl.item=it; sl.state=it ? 'ok' : 'none'; updateThumb(i,k); staleCovers(); redraw();
+}
+async function fetchAllMedia(){
+  const tok=++S.visTok, todo=[];
+  S.vis.forEach((v,i)=>{ if(v) v.scenes.forEach((sl,k)=>{ if(sl.scene && !sl.item) todo.push([i,k]); }); });
+  const total=todo.length;
+  if(!total){ visSummary(); return; }
+  let done=0;
+  const info=()=>{ $('mvInfo').textContent='Finding the visuals and checking them for faces… '+done+' of '+total; };
+  info();
+  const worker=async()=>{ while(todo.length){ if(tok!==S.visTok) return; const [i,k]=todo.shift(); await loadOne(i,k,tok); done++; if(tok===S.visTok) info(); } };
+  await Promise.all([worker(),worker(),worker()]);
+  if(tok===S.visTok) visSummary();
+}
+function visSummary(){
+  let sc=0, ok=0, ic=0;
+  for(const v of S.vis){ if(!v) continue; if(v.icon) ic++; for(const sl of v.scenes){ if(sl.scene) sc++; if(sl.item) ok++; } }
+  $('mvInfo').innerHTML='✓ <b>'+ok+'</b> of '+sc+' scenes ready · <b>'+ic+'</b> icon moments. Check each ayah: change a scene or the icon, 🔁 for another picture, ▶ to watch that ayah.'+(ok<sc ? ' (✕ = nothing suitable was found: press 🔁 or choose another scene.)' : '');
+}
+
+/* the review list (up to 3 scenes per ayah) */
+const SOPT='<option value="">No scene</option>'+Object.entries(SCENES).map(([k,s])=>'<option value="'+k+'">'+esc(s.l)+'</option>').join('');
+const IOPT='<option value="">No icon</option>'+Object.entries(ICONS).map(([k,s])=>'<option value="'+k+'">'+esc(s.l)+'</option>').join('');
+function thumbHTML(i,k){
+  const sl=(S.vis[i]||{ scenes:[] }).scenes[k]||{};
+  if(sl.item && sl.item.thumb) return '<img class="mvth" src="'+esc(sl.item.thumb)+'" alt="">';
+  const st=!sl.scene ? '' : sl.state==='loading' ? '⏳' : sl.item ? '✓' : sl.state==='none' ? '✕' : '';
+  return '<span class="mvth">'+st+'</span>';
+}
+function visRow(i){
+  const u=S.units[i], v=S.vis[i];
+  let h='<div class="mvrow" data-i="'+i+'"><div><b>'+esc(u.label)+'</b> <span class="muted">'+esc(v.meaning||'')+'</span></div>';
+  v.scenes.forEach((sl,k)=>{ h+='<div class="row slot" data-k="'+k+'" style="align-items:center"><span class="num">'+(k+1)+'</span><select data-f="scene" title="Scene '+(k+1)+'">'+SOPT+'</select>'+thumbHTML(i,k)+'<button class="mini" data-a="again" title="Another picture">🔁</button></div>'; });
+  h+='<div class="row" style="align-items:center"><span class="num">✨</span><select data-f="icon" title="Icon">'+IOPT+'</select><button class="mini" data-a="see" title="Watch this ayah">▶ Watch</button></div></div>';
+  return h;
+}
+function renderVis(){
+  const list=$('mvList');
+  if(!S.units.length || !S.vis.length){ list.innerHTML=''; return; }
+  list.innerHTML=S.units.map((u,i)=>u.kind==='ayah' && S.vis[i] ? visRow(i) : '').join('');
+  list.querySelectorAll('.mvrow').forEach(el=>{
+    const v=S.vis[+el.dataset.i]; if(!v) return;
+    el.querySelectorAll('.slot').forEach(s=>{ s.querySelector('[data-f=scene]').value=v.scenes[+s.dataset.k].scene||''; });
+    el.querySelector('[data-f=icon]').value=v.icon||'';
+  });
+}
+function updateThumb(i,k){ const el=$('mvList').querySelector('.mvrow[data-i="'+i+'"] .slot[data-k="'+k+'"] .mvth'); if(el) el.outerHTML=thumbHTML(i,k); }
+$('mvList').addEventListener('change',e=>{
+  const row=e.target.closest('.mvrow'); if(!row) return;
+  const i=+row.dataset.i, v=S.vis[i]; if(!v) return;
+  if(e.target.dataset.f==='scene'){
+    const k=+e.target.closest('.slot').dataset.k, sl=v.scenes[k];
+    sl.scene=e.target.value; if(sl.item){ freeItem(sl.item); sl.item=null; } sl.state='';
+    saveVis(); updateThumb(i,k); if(sl.scene) loadOne(i,k,S.visTok); staleCovers(); redraw();
+  }
+  if(e.target.dataset.f==='icon'){ v.icon=e.target.value; saveVis(); staleCovers(); redraw(); }
+});
+$('mvList').addEventListener('click',e=>{
+  const b=e.target.closest('button'), row=e.target.closest('.mvrow'); if(!b || !row) return;
+  const i=+row.dataset.i, v=S.vis[i]; if(!v) return;
+  if(b.dataset.a==='again'){
+    const k=+b.closest('.slot').dataset.k, sl=v.scenes[k];
+    if(!sl.scene) return toast('Choose a scene first');
+    if(sl.item){ freeItem(sl.item); sl.item=null; } loadOne(i,k,S.visTok);
+  }
+  if(b.dataset.a==='see' && S.Bn) startPreview(Math.max(0,S.Bn[i]-0.3));
+});
+['mvOn','icOn','mvLen','mvMe'].forEach(id=>$(id).addEventListener('change',()=>{ if(id==='mvOn' && $('mvOn').checked && S.vis.some(v=>v && v.scenes.some(sl=>sl.scene && !sl.item))) fetchAllMedia(); staleCovers(); redraw(); }));
+
+/* when each scene shows inside an ayah: scene → me → scene → me → scene, or one after another */
+function visSegs(i,cfg){
+  const v=S.vis[i]; if(!v || !S.Bn) return [];
+  const list=v.scenes.filter(sl=>sl.scene && sl.item); if(!list.length) return [];
+  const B=S.Bn, A=B[i]+0.25, Z=B[i+1]-0.15, D=Z-A; if(D<1.5) return [];
+  if(cfg.mvLen==='one') return [{ sl:list[0], st:A, en:Math.min(Z,A+6), k:0 }];
+  if(cfg.mvLen==='cont'){ const n=Math.min(list.length,Math.max(1,Math.floor(D/3.5))), L=D/n; return list.slice(0,n).map((sl,k)=>({ sl, st:A+k*L, en:A+(k+1)*L, k })); }
+  const n=Math.min(list.length,Math.max(1,Math.floor((D+3)/9))), cyc=D/n;
+  return list.slice(0,n).map((sl,k)=>{ const st=A+k*cyc; return { sl, st, en:Math.min(Z,st+(n===1 ? Math.min(8,D) : Math.min(8,cyc*0.62))), k }; });
+}
+function visLayers(t,cfg){
+  if(!cfg.mvOn || !S.vis.length || !S.Bn || !S.units.length) return null;
+  const i=unitAt(t), segs=visSegs(i,cfg); if(!segs.length) return null;
+  const k=segs.findIndex(g=>t>=g.st && t<=g.en); if(k<0) return null;
+  const g=segs[k], cont=cfg.mvLen==='cont', out=[];
+  const mk=(x,a)=>({ item:x.sl.item, st:x.st, a, p:clamp((t-x.st)/Math.max(0.1,x.en-x.st),0,1), seed:i*3+x.k });
+  let a;
+  if(cont){
+    if(k>0 && t-g.st<0.6) out.push(mk(segs[k-1],1));
+    const fin=k===0 || t-g.st<0.6 ? clamp((t-g.st)/0.6,0,1) : 1, fout=k===segs.length-1 ? clamp((g.en-t)/0.6,0,1) : 1;
+    a=Math.min(fin,fout);
+  }else a=clamp(Math.min((t-g.st)/0.6,(g.en-t)/0.6),0,1);
+  out.push(mk(g,a));
+  return out;
+}
+function iconTime(i){
+  const v=S.vis[i]; if(!v || !ICONS[v.icon] || !S.Bn) return null;
+  const B=S.Bn, wt=S.WT && S.WT[i], k=wt && wt.length ? Math.min(v.iw,wt.length-1) : -1;
+  const t0=k>=0 ? wt[k] : B[i]+(B[i+1]-B[i])*0.35;
+  return clamp(t0,B[i]+0.2,Math.max(B[i]+0.2,B[i+1]-2.2));
+}
+function iconAt(t,cfg){
+  if(!cfg.icOn || !S.vis.length || !S.Bn || !S.units.length) return null;
+  const i=unitAt(t), t0=iconTime(i); if(t0==null) return null;
+  const e=t-t0; if(e<0 || e>2.8) return null;
+  return { id:S.vis[i].icon, e };
+}
+function drawVisuals(ctx,W,H,layers,frames){
+  let top=0;
+  layers.forEach((L,k)=>{
+    const im=frames[k]; if(!im) return;
+    const still=L.item.type==='img', z=still ? 1.06+0.1*L.p : 1.02, ox=still ? (L.seed%2 ? -1 : 1)*0.02*(L.p-0.5) : 0;
+    ctx.save(); ctx.globalAlpha=L.a; cover(ctx,im,W,H,z,ox); ctx.restore();
+    top=Math.max(top,L.a);
+  });
+  if(top>0){ ctx.save(); ctx.globalAlpha=top; ctx.fillStyle='rgba(0,0,0,0.36)'; ctx.fillRect(0,0,W,H); ctx.restore(); }
+}
+const ICON_PATHS={};
+function iconPath(id,k){ const c=ICON_PATHS[id+k]; if(c) return c; const ic=ICONS[id]; const p=new Path2D(k==='f' ? ic.fd : ic.d); ICON_PATHS[id+k]=p; return p; }
+function drawIcon(ctx,id,cx,cy,size,p,a){
+  const ic=ICONS[id]; if(!ic) return;
+  const s=size/24;
+  ctx.save(); ctx.globalAlpha=a;
+  const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,size*0.78); rg.addColorStop(0,'rgba(233,196,106,0.22)'); rg.addColorStop(1,'rgba(233,196,106,0)');
+  ctx.fillStyle=rg; ctx.fillRect(cx-size,cy-size,size*2,size*2);
+  ctx.translate(cx-12*s,cy-12*s); ctx.scale(s,s);
+  if(ic.fd && p>0.5){ ctx.globalAlpha=a*clamp((p-0.5)/0.5,0,1); ctx.fillStyle=ic.fill||'#111'; ctx.fill(iconPath(id,'f')); ctx.globalAlpha=a; }
+  ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=1.3; ctx.strokeStyle=GOLD; ctx.shadowColor='rgba(233,196,106,0.9)'; ctx.shadowBlur=Math.max(4,size*0.06);
+  if(p<1) ctx.setLineDash([90*p,400]);
+  ctx.stroke(iconPath(id,'d'));
+  ctx.restore();
+}
+function drawIconMoment(ctx,W,H,m,t,cfg,G,TG){
+  const I=iconAt(t,cfg); if(!I) return;
+  const e=I.e, prog=easeOut(clamp(e/1.0,0,1)), scale=0.85+0.15*easeOut(clamp(e/0.5,0,1)), a=clamp(e/0.3,0,1)*clamp((2.8-e)/0.5,0,1);
+  const topB=TG.top2+m*0.01, botB=G.b-(cfg.mel ? m*0.14 : m*0.03);
+  const bands=LASTCARD ? [[topB,LASTCARD.top],[LASTCARD.bot,botB]] : [[topB,botB]];
+  let best=bands[0]; for(const b of bands) if(b[1]-b[0]>best[1]-best[0]) best=b;
+  let size=Math.min((best[1]-best[0])*0.85,m*0.3), cy=(best[0]+best[1])/2, mul=1;
+  if(size<m*0.12){ size=m*0.3; cy=LASTCARD ? (LASTCARD.top+LASTCARD.bot)/2 : (topB+botB)/2; mul=0.2; }
+  const cx=(TG.l+TG.r)/2;
+  drawIcon(ctx,I.id,cx,cy,size*scale,prog,a*mul);
+}
+
+/* ---------- reading video frames exactly (for the finished video and the covers) ---------- */
+async function dim(track,name){
+  try{ const g='get'+name[0].toUpperCase()+name.slice(1); if(typeof track[g]==='function') return +(await track[g]())||0; const v=track[name]; return +(typeof v==='function' ? await v.call(track) : await v)||0; }catch{ return 0; }
+}
+async function openReader(MB,blob,maxSide,loop){
+  const input=new MB.Input({ source:new MB.BlobSource(blob), formats:MB.ALL_FORMATS });
+  const track=await input.getPrimaryVideoTrack();
+  if(!track || !(await track.canDecode())) throw new Error('cannot decode');
+  const first=await track.getFirstTimestamp();
+  const dur=loop ? Math.max(0.5,(await track.computeDuration())-first) : 0;
+  let vw=await dim(track,'displayWidth'), vh=await dim(track,'displayHeight');
+  if(!(vw>0 && vh>0)){ vw=maxSide; vh=Math.round(maxSide*9/16); }
+  const s=Math.min(1,maxSide/Math.max(vw,vh)); vw=Math.max(2,Math.round(vw*s/2)*2); vh=Math.max(2,Math.round(vh*s/2)*2);
+  const hold=new OffscreenCanvas(vw,vh);
+  return { input, sink:new MB.CanvasSink(track,{ width:vw, height:vh, fit:'fill', poolSize:2 }), first, dur, loop, hold, hx:hold.getContext('2d'), iter:null, next:null, has:false, pos:-1 };
+}
+async function readFrame(c,t){
+  const target=c.first+(c.loop ? (Math.max(0,t)%c.dur) : Math.max(0,t));
+  if(!c.iter || target<c.pos-0.001){
+    if(c.iter){ try{ await c.iter.return(); }catch{} }
+    c.iter=c.sink.canvases(target); c.has=false;
+    const r=await c.iter.next(); c.next=r.done ? null : r.value;
+  }
+  while(c.next && (!c.has || c.next.timestamp<=target+0.001)){ c.hx.drawImage(c.next.canvas,0,0); c.has=true; const r=await c.iter.next(); c.next=r.done ? null : r.value; }
+  c.pos=target; return c.has ? c.hold : null;
+}
+async function closeReader(c){ try{ if(c && c.iter) await c.iter.return(); }catch{} try{ c && c.input.dispose?.(); }catch{} }
+async function itemFrame(it,tt){ if(!it) return null; if(it.img) return it.img; if(it.reader){ try{ return await readFrame(it.reader,Math.max(0,tt)); }catch{ return null; } } return null; }
+async function openSources(MB,cfg,W,H){
+  const rd={ face:null, list:[] };
+  if(S.isVideo && (VIDEO_ME.includes(cfg.me) || cfg.bg==='roomblur')){ try{ rd.face=await openReader(MB,S.file,Math.max(W,H),false); rd.list.push(rd.face); }catch(e){ console.warn('Your video picture could not be read',e); } }
+  const bgItems=rotMode(cfg) ? S.items : cfg.bg.startsWith('lib:') && S.bgItem ? [S.bgItem] : [];
+  for(const it of bgItems){ if(it.blob && !it.reader){ try{ it.reader=await openReader(MB,it.blob,1280,true); rd.list.push(it.reader); }catch(e){ console.warn(e); } } }
+  if(cfg.mvOn){
+    const vids=[]; eachItem(it=>{ if(it.type==='vid' && it.blob && !it.reader) vids.push(it); });
+    for(const it of vids){ try{ it.reader=await openReader(MB,it.blob,1280,true); rd.list.push(it.reader); }catch(e){ console.warn('A visual video could not be read',e); } }
+  }
+  rd.close=async()=>{ for(const r of rd.list) await closeReader(r); for(const it of [...S.items,S.bgItem]) if(it) it.reader=null; eachItem(it=>{ it.reader=null; }); };
+  return rd;
+}
+async function buildFrame(t,cfg,rd){
+  const F={ face:null, cur:null, prev:null, maskOk:false, V:null, vis:null, bgi:null };
+  if(rd.face){ try{ F.face=await readFrame(rd.face,t); }catch{} }
+  const rm=rotMode(cfg);
+  if(rm && S.units.length && S.Bn){
+    const b=bgAt(t,cfg); F.bgi=b;
+    if(S.items.length){
+      const it=S.items[b.idx%S.items.length]; F.cur=await itemFrame(it,b.since);
+      if(b.idx>0 && b.since<0.8){ const ip=S.items[(b.idx-1)%S.items.length]; if(ip!==it) F.prev=await itemFrame(ip,b.since+b.prevSpan); }
+    }
+  }else if(cfg.bg.startsWith('lib:')) F.cur=await itemFrame(S.bgItem,t);
+  const layers=visLayers(t,cfg);
+  if(layers){ F.V=layers; F.vis=[]; for(const L of layers) F.vis.push(await itemFrame(L.item,t-L.st)); }
+  if(cfg.me==='cut' && F.face && SEG) F.maskOk=computeMask(F.face);
+  return F;
+}
+
+/* ---------- drawing ---------- */
+function rr(ctx,x,y,w,h,r){ r=Math.max(0,Math.min(r,w/2,h/2)); ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x,y,w,h,r); else{ ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); } }
+function cover(ctx,im,W,H,z,ox){ const iw=im.videoWidth||im.width, ih=im.videoHeight||im.height; if(!iw || !ih) return false; const s=Math.max(W/iw,H/ih)*(z||1), w=iw*s, h=ih*s; ctx.drawImage(im,(W-w)/2+(ox||0)*W,(H-h)/2,w,h); return true; }
+const STARS=(()=>{ let s=7; const r=()=>{ s=(s*16807)%2147483647; return s/2147483647; }; return Array.from({ length:170 },()=>({ x:r(), y:r(), z:r(), p:r()*6.283 })); })();
+function readCfg(){
+  const tr=$('qTr').value; let me=$('meMode').value;
+  if(!S.isVideo && VIDEO_ME.includes(me)) me=S.photo ? 'bubble' : 'none';
+  if(me==='bubble' && !S.photo) me='none';
+  return { me, bg:$('bgSel').value||'stars', bgChange:$('bgChange').value, text:$('textMode').value, style:$('txtStyle').value, split:$('txtSplit').value, hl:$('hlMode').value, lead:+$('hlLead').value/100, pos:$('txtPos').value, size:+$('txtSize').value/100,
+    safe:$('safeOn').checked, mel:$('melOn').checked, hdr:$('hdrOn').checked, bar:$('barOn').checked, trRtl:/^(ur|fa|ar)\./.test(tr), pname:$('pName').value.trim(),
+    mvOn:$('mvOn').checked, icOn:$('icOn').checked, mvLen:$('mvLen').value, mvMe:$('mvMe').value };
+}
+/* The area phone apps never cover. 9:16: top 15%, bottom 28%, right 18.5%, left 6% (TikTok, Meta and YouTube guides, 2026). */
+const ZONE_V={ t:0.15, b:0.72, l:0.06, r:0.815 };
+function safeBox(W,H,cfg){
+  const m=Math.min(W,H), vert=W<H, sq=Math.abs(W-H)<4;
+  if(cfg.safe && vert) return { t:H*ZONE_V.t, b:H*ZONE_V.b, l:W*ZONE_V.l, r:W*ZONE_V.r };
+  if(cfg.safe && sq) return { t:H*0.09, b:H*0.82, l:W*0.06, r:W*0.86 };
+  return { t:m*0.04, b:H-m*0.05, l:m*0.04, r:W-m*0.04 };
+}
+function drawDesigned(ctx,W,H,t,kind){
+  const m=Math.min(W,H), base=ctx.globalAlpha;
+  if(kind==='light'){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#21170c'); g.addColorStop(1,'#0b0805'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(let k=0;k<4;k++){ const cx=W*(0.5+0.32*Math.sin(t*0.07+k*1.7)), cy=H*(0.45+0.3*Math.cos(t*0.05+k*2.3)), rad=m*(0.45+0.12*k); const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,rad); rg.addColorStop(0,'rgba(233,196,106,0.16)'); rg.addColorStop(1,'rgba(233,196,106,0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H); }
+    return;
+  }
+  if(kind==='waves'){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#073039'); g.addColorStop(1,'#02121a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(let k=0;k<3;k++){ const cx=W*(0.5+0.38*Math.sin(t*0.12+k*2.1)), cy=H*(0.5+0.32*Math.cos(t*0.09+k*1.7)), rad=m*(0.6+0.1*k), col=k===1 ? '233,196,106' : '42,157,143'; const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,rad); rg.addColorStop(0,'rgba('+col+',0.2)'); rg.addColorStop(1,'rgba('+col+',0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H); }
+    return;
+  }
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0b1430'); g.addColorStop(1,'#03060f'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const rg=ctx.createRadialGradient(W*0.5,H*0.16,0,W*0.5,H*0.16,m*0.65); rg.addColorStop(0,'rgba(233,196,106,0.16)'); rg.addColorStop(1,'rgba(233,196,106,0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.fillStyle='#FFFFFF';
+  for(const st of STARS){ const a=0.35+0.65*(0.5+0.5*Math.sin(t*(0.6+st.z)+st.p)); ctx.globalAlpha=base*a*(0.35+0.65*st.z); ctx.beginPath(); ctx.arc(st.x*W,st.y*H,m*(0.0012+st.z*0.0026),0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+function drawBackdrop(ctx,W,H,t,F,cfg,range){
+  const m=Math.min(W,H), bg=cfg.bg, rm=rotMode(cfg);
+  if(rm && F.bgi){
+    if(F.cur || F.prev){
+      const b=F.bgi, p=clamp(b.since/b.span,0,1), dir=b.idx%2 ? -1 : 1;
+      if(F.prev) cover(ctx,F.prev,W,H,1.12,0);
+      if(F.cur){ ctx.save(); ctx.globalAlpha=F.prev ? clamp(b.since/0.8,0,1) : 1; cover(ctx,F.cur,W,H,(F.cur instanceof ImageBitmap ? 1.04+0.08*p : 1.02),F.cur instanceof ImageBitmap ? dir*0.02*(p-0.5) : 0); ctx.restore(); }
+      ctx.fillStyle='rgba(0,0,0,'+(cfg.me==='cut' ? 0.22 : 0.45)+')'; ctx.fillRect(0,0,W,H);
+      return;
+    }
+    if(!S.items.length){
+      const start=DESIGNED.includes(bg) ? DESIGNED.indexOf(bg) : 0, b=F.bgi;
+      if(b.idx>0 && b.since<0.8) drawDesigned(ctx,W,H,t,DESIGNED[(start+b.idx-1)%3]);
+      ctx.save(); ctx.globalAlpha=b.idx>0 ? clamp(b.since/0.8,0,1) : 1; drawDesigned(ctx,W,H,t,DESIGNED[(start+b.idx)%3]); ctx.restore();
+      return;
+    }
+  }
+  if(bg==='roomblur' && F.face){ ctx.save(); ctx.filter='blur('+Math.max(3,Math.round(m*0.025))+'px) brightness(0.55) saturate(1.1)'; cover(ctx,F.face,W,H,1.1); ctx.restore(); return; }
+  if(bg.startsWith('lib:') && F.cur){
+    const span=range && range.r1>range.r0 ? range.r1-range.r0 : 60, p=clamp((t-(range ? range.r0 : 0))/span,0,1);
+    cover(ctx,F.cur,W,H,F.cur instanceof ImageBitmap ? 1.03+0.07*p : 1,0);
+    ctx.fillStyle='rgba(0,0,0,'+(cfg.me==='cut' ? 0.22 : 0.45)+')'; ctx.fillRect(0,0,W,H);
+    return;
+  }
+  drawDesigned(ctx,W,H,t,DESIGNED.includes(bg) ? bg : 'stars');
+}
+function drawBg(ctx,W,H,t,F,cfg,range){
+  ctx.fillStyle='#05080d'; ctx.fillRect(0,0,W,H);
+  if(cfg.me==='asis' && F.face){
+    cover(ctx,F.face,W,H,1);
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'rgba(0,0,0,0.2)'); g.addColorStop(0.5,'rgba(0,0,0,0.25)'); g.addColorStop(1,'rgba(0,0,0,0.5)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    return;
+  }
+  drawBackdrop(ctx,W,H,t,F,cfg,range);
+  if(cfg.me==='cut' && F.face){
+    if(!(F.maskOk && drawPerson(ctx,W,H,F.face))) cover(ctx,F.face,W,H,1);
+    const g=ctx.createLinearGradient(0,H*0.4,0,H); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.35)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+}
+function drawFramed(ctx,face,fr,m){
+  const iw=face.videoWidth||face.width, ih=face.videoHeight||face.height; if(!iw || !ih) return;
+  const s=Math.max(fr.w/iw,fr.h/ih), dw=iw*s, dh=ih*s, x=fr.x+(fr.w-dw)/2, y=fr.y+(fr.h-dh)*0.3, r=m*0.035;
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.55)'; ctx.shadowBlur=m*0.04; ctx.shadowOffsetY=m*0.01; rr(ctx,fr.x,fr.y,fr.w,fr.h,r); ctx.fillStyle='#000'; ctx.fill(); ctx.restore();
+  ctx.save(); rr(ctx,fr.x,fr.y,fr.w,fr.h,r); ctx.clip(); ctx.drawImage(face,x,y,dw,dh); ctx.restore();
+  ctx.save(); rr(ctx,fr.x,fr.y,fr.w,fr.h,r); ctx.lineWidth=Math.max(2,m*0.003); ctx.strokeStyle='rgba(233,196,106,0.75)'; ctx.stroke(); ctx.restore();
+}
+function drawBubble(ctx,cx,cy,size,t,cfg,m){
+  const im=S.photo; if(!im) return;
+  const lv=voiceLevel(t), r=size/2*(1+0.045*lv), iw=im.width, ih=im.height;
+  ctx.save();
+  for(let k=0;k<2;k++){ const p=(t*0.7+k*0.5)%1; ctx.globalAlpha=(1-p)*0.45*lv; ctx.strokeStyle=GOLD; ctx.lineWidth=Math.max(2,m*0.004); ctx.beginPath(); ctx.arc(cx,cy,r*(1.08+0.35*p),0,Math.PI*2); ctx.stroke(); }
+  ctx.globalAlpha=1;
+  ctx.shadowColor='rgba(233,196,106,'+(0.35+0.5*lv).toFixed(2)+')'; ctx.shadowBlur=m*(0.02+0.04*lv);
+  ctx.strokeStyle='rgba(233,196,106,'+(0.45+0.45*lv).toFixed(2)+')'; ctx.lineWidth=Math.max(2,m*0.005); ctx.beginPath(); ctx.arc(cx,cy,r*1.1,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  const s=Math.max(2*r/iw,2*r/ih); ctx.drawImage(im,cx-iw*s/2,cy-ih*s/2.4,iw*s,ih*s);
+  ctx.restore();
+  ctx.save(); ctx.strokeStyle=GOLD; ctx.lineWidth=Math.max(3,m*0.007); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  if(cfg.pname){
+    const fs=m*0.022; ctx.save(); ctx.font='700 '+Math.round(fs)+'px '+LAT; const tw=ctx.measureText(cfg.pname).width, h=fs*1.8, w=tw+fs*1.4, y=cy+r*1.1+m*0.012;
+    rr(ctx,cx-w/2,y,w,h,h/2); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fill(); ctx.fillStyle='#FFFFFF'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(cfg.pname,cx,y+h/2); ctx.restore();
+  }
+}
+const headerLine=s=>'Surah '+s.en+' · '+(s.a===s.b ? 'Ayah '+s.a : 'Ayat '+s.a+'–'+s.b);
+/* a soft dark plate behind the surah name and the maqam badge, so they are always easy to read over any picture */
+function drawTopPlate(ctx,W,H,m,G,cfg,i){
+  const s=S.surah, hasMq=!!maqamAt(i), showHdr=cfg.hdr && !!s;
+  if(!showHdr && !hasMq) return;
+  const cx=(G.l+G.r)/2; let w=0;
+  ctx.save();
+  if(showHdr){
+    ctx.direction='rtl'; ctx.font=Math.round(m*0.05)+'px '+AR_FONT; w=Math.max(w,ctx.measureText(s.ar).width);
+    ctx.direction='ltr'; ctx.font='500 '+Math.round(m*0.022)+'px '+LAT; w=Math.max(w,ctx.measureText(headerLine(s)).width);
+  }
+  if(hasMq) w=Math.max(w,m*0.24);
+  w=Math.min(G.r-G.l,w+m*0.09);
+  const top=showHdr ? G.t-m*0.012 : G.mqY-m*0.012, bot=hasMq ? G.mqY+m*0.074 : G.t+m*0.105;
+  ctx.shadowColor='rgba(0,0,0,0.35)'; ctx.shadowBlur=m*0.02;
+  rr(ctx,cx-w/2,top,w,bot-top,m*0.028); ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fill();
+  ctx.restore();
+}
+function drawHeader(ctx,W,H,m,G){
+  const s=S.surah; if(!s) return;
+  const cx=(G.l+G.r)/2;
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.direction='rtl'; ctx.font=Math.round(m*0.05)+'px '+AR_FONT; ctx.fillStyle=GOLD; ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=m*0.012; ctx.fillText(s.ar,cx,G.t+m*0.047);
+  ctx.direction='ltr'; ctx.font='500 '+Math.round(m*0.022)+'px '+LAT; ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.fillText(headerLine(s),cx,G.t+m*0.087);
+  ctx.restore();
+}
+/* the big surah name on the cover */
+function drawCoverTitle(ctx,W,H,cfg){
+  const s=S.surah; if(!s) return;
+  const m=Math.min(W,H), G=safeBox(W,H,cfg), cx=(G.l+G.r)/2;
+  const g=ctx.createLinearGradient(0,Math.max(0,G.t-m*0.08),0,G.t+m*0.3); g.addColorStop(0,'rgba(0,0,0,0.7)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.save(); ctx.fillStyle=g; ctx.fillRect(0,0,W,G.t+m*0.3);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction='rtl';
+  let fs=m*0.12; ctx.font=Math.round(fs)+'px '+AR_FONT;
+  while(ctx.measureText(s.ar).width>(G.r-G.l)*0.95 && fs>m*0.05){ fs*=0.92; ctx.font=Math.round(fs)+'px '+AR_FONT; }
+  ctx.fillStyle=GOLD; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=m*0.025; ctx.fillText(s.ar,cx,G.t+fs*0.95);
+  ctx.direction='ltr'; ctx.font='700 '+Math.round(m*0.04)+'px '+LAT; ctx.fillStyle='#FFFFFF'; ctx.shadowBlur=m*0.015;
+  ctx.fillText(headerLine(s),cx,G.t+fs*0.95+m*0.06);
+  ctx.restore();
+}
+function layoutFor(ctx,i,fs,maxW){
+  const key=i+'|'+Math.round(fs)+'|'+Math.round(maxW);
+  if(LAYOUT.has(key)) return LAYOUT.get(key);
+  const u=S.units[i];
+  ctx.save(); ctx.font=Math.round(fs)+'px '+AR_FONT; ctx.direction='rtl';
+  const gap=fs*0.3, items=u.tokens.map(tk=>({ tk, w:ctx.measureText(tk.text).width }));
+  ctx.restore();
+  const lines=breakLines(items,gap,maxW);
+  const L={ lines, gap, widest:Math.max(...items.map(x=>x.w)) };
+  LAYOUT.set(key,L); return L;
+}
+function breakLines(items,gap,maxW){
+  const lines=[]; let line=[], lw=0;
+  for(const it of items){ if(line.length && lw+gap+it.w>maxW){ lines.push({ items:line, w:lw }); line=[]; lw=0; } lw+=(line.length ? gap : 0)+it.w; line.push(it); }
+  if(line.length) lines.push({ items:line, w:lw });
+  return lines;
+}
+function linePages(L,maxLines){ const pages=[]; for(let k=0;k<L.lines.length;k+=maxLines) pages.push(L.lines.slice(k,k+maxLines)); return pages; }
+/* phrase by phrase: split at the waqf signs of the mushaf and at the places where you paused */
+function phrasePages(i,fs,maxW,maxLines,L){
+  const key='ph|'+i+'|'+Math.round(fs)+'|'+Math.round(maxW)+'|'+maxLines;
+  if(LAYOUT.has(key)) return LAYOUT.get(key);
+  const items=L.lines.flatMap(l=>l.items), ends=new Set(), wt=S.WT && S.WT[i];
+  items.forEach((it,k)=>{ if(!it.tk.num && WAQF.test(it.tk.text)) ends.add(k); });
+  if(wt){
+    for(let k=0;k<items.length-1;k++){
+      const a=items[k].tk, b=items[k+1].tk; if(a.num || b.num) continue;
+      const t0=wt[a.wi], t1=wt[b.wi]; if(t0==null || t1==null) continue;
+      if(silentRun(t0+0.15,t1)>=0.35) ends.add(k);
+    }
+  }
+  let phrases=[], cur=[];
+  items.forEach((it,k)=>{ cur.push(it); if(ends.has(k) && k<items.length-1){ phrases.push(cur); cur=[]; } });
+  if(cur.length) phrases.push(cur);
+  const words=ph=>ph.filter(it=>!it.tk.num).length;
+  for(let k=0;k<phrases.length;k++){
+    if(phrases.length>1 && words(phrases[k])<2){
+      if(k<phrases.length-1){ phrases[k+1]=phrases[k].concat(phrases[k+1]); phrases.splice(k,1); k--; }
+      else{ phrases[k-1]=phrases[k-1].concat(phrases[k]); phrases.splice(k,1); }
+    }
+  }
+  const pages=[];
+  for(const ph of phrases){ const lines=breakLines(ph,L.gap,maxW); for(let k=0;k<lines.length;k+=maxLines) pages.push(lines.slice(k,k+maxLines)); }
+  LAYOUT.set(key,pages); return pages;
+}
+function wrap(ctx,text,maxW){ const ws=String(text).split(/\s+/).filter(Boolean), lines=[]; let line=''; for(const w of ws){ const t=line ? line+' '+w : w; if(ctx.measureText(t).width>maxW && line){ lines.push(line); line=w; } else line=t; } if(line) lines.push(line); return lines; }
+const trFont=(cfg,fs,weight)=>cfg.trRtl ? Math.round(fs)+'px '+AR_FONT : cfg.style==='classic' ? 'italic 600 '+Math.round(fs)+'px '+SERIF : (weight||'400')+' '+Math.round(fs)+'px '+LAT;
+function fitLines(ctx,text,fs0,maxW,maxLines,cfg,weight){
+  let fs=fs0, lines;
+  for(;;){ ctx.font=trFont(cfg,fs,weight); lines=wrap(ctx,text,maxW); if(lines.length<=maxLines || fs<fs0*0.6) break; fs*=0.93; }
+  if(lines.length>maxLines){ lines=lines.slice(0,maxLines); lines[maxLines-1]=lines[maxLines-1].replace(/\s*\S*$/,'')+'…'; }
+  return { fs, lines };
+}
+function placeBlock(H,m,G,cfg,blockH){
+  const topLim=G.top2+m*0.03, botLim=G.b-(cfg.mel ? m*0.14 : m*0.03);
+  let pos=cfg.pos; if(pos==='auto') pos=(cfg.me==='asis' || cfg.me==='cut') ? 'low' : 'mid';
+  let top=pos==='up' ? topLim : pos==='low' ? botLim-blockH : (topLim+botLim)/2-blockH/2;
+  return Math.max(topLim,Math.min(top,botLim-blockH));
+}
+function drawCard(ctx,W,H,m,t,i,cfg,G){
+  const u=S.units[i], B=S.Bn, vert=W<H, classic=cfg.style==='classic';
+  const a=clamp(Math.min((t-B[i]+0.05)/0.35,(B[i+1]-t)/0.3),0,1); if(a<=0) return;
+  const cx=(G.l+G.r)/2, maxW=Math.min(W*0.86,(G.r-G.l)*0.94), boxA=a*(cfg.me==='asis' || cfg.me==='cut' ? 0.5 : 0.32);
+  const shadow=classic ? ['rgba(0,0,0,0.85)',m*0.02] : ['rgba(0,0,0,0.45)',m*0.008];
+  const trColor=classic ? CREAM : '#FFFFFF';
+  if(cfg.text==='tr'){
+    const txt=(u.tr||'')+(u.num ? '  ('+u.num+')' : ''), T=fitLines(ctx,txt,m*0.05*cfg.size,maxW,7,cfg,'500'), lh=T.fs*1.4, blockH=T.lines.length*lh;
+    const top=placeBlock(H,m,G,cfg,blockH);
+    LASTCARD={ top:top-m*0.035, bot:top+blockH+m*0.03 };
+    if(!classic){ ctx.save(); ctx.globalAlpha=boxA; rr(ctx,cx-maxW/2-m*0.045,top-m*0.035,maxW+m*0.09,blockH+m*0.06,m*0.03); ctx.fillStyle='#000'; ctx.fill(); ctx.restore(); }
+    ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
+    ctx.font=trFont(cfg,T.fs,'500'); ctx.shadowColor=shadow[0]; ctx.shadowBlur=shadow[1];
+    T.lines.forEach((l,k)=>ctx.fillText(l,cx,top+T.fs*(1+k*1.4)));
+    ctx.restore();
+    return;
+  }
+  const maxLines=vert ? (cfg.safe ? 3 : 4) : 3;
+  let fs=m*(vert ? 0.07 : 0.066)*cfg.size*(G.small ? 0.85 : 1), L=layoutFor(ctx,i,fs,maxW);
+  if(L.widest>maxW){ fs*=maxW/L.widest*0.98; L=layoutFor(ctx,i,fs,maxW); }
+  const usePhrases=cfg.split==='phrase' || (cfg.split==='auto' && L.lines.length>maxLines);
+  const pages=usePhrases ? phrasePages(i,fs,maxW,maxLines,L) : linePages(L,maxLines);
+  const wt=S.WT[i], tt=t+cfg.lead; let cw=-1;
+  if(wt) for(let j=0;j<wt.length;j++){ if(tt>=wt[j]) cw=j; else break; }
+  let prog=1;
+  if(cw>=0 && wt){
+    const st=wt[cw], en=cw+1<wt.length ? wt[cw+1] : Math.max(st+0.3,B[i+1]-0.25);
+    const span=cfg.hl==='quick' ? Math.min(0.45,Math.max(0.12,en-st)) : Math.max(0.12,en-st);
+    prog=clamp((tt-st)/span,0,1);
+  }
+  let pg=0; if(cw>=0) pages.forEach((p,k)=>{ if(p.some(l=>l.items.some(it=>it.tk.wi===cw))) pg=k; });
+  const lines=pages[pg]||[];
+  let pa=1;
+  if(pg>0 && wt){ const firstIt=lines.flatMap(l=>l.items).find(it=>!it.tk.num); if(firstIt && wt[firstIt.tk.wi]!=null) pa=clamp((tt-wt[firstIt.tk.wi]+0.08)/0.25,0,1); }
+  const aa=a*(0.2+0.8*pa);
+  const T=cfg.text==='both' && u.tr ? fitLines(ctx,u.tr,m*(classic ? 0.034 : 0.032)*cfg.size*(G.small ? 0.9 : 1),maxW,4,cfg) : null;
+  const gapTr=classic ? m*0.06 : m*0.035;
+  const lh=fs*1.9, trH=T ? gapTr+T.lines.length*T.fs*1.45 : 0, blockH=lines.length*lh+trH;
+  const top=placeBlock(H,m,G,cfg,blockH);
+  LASTCARD={ top:top-m*0.03, bot:top+blockH+m*0.03 };
+  if(!classic){ ctx.save(); ctx.globalAlpha=boxA; rr(ctx,cx-maxW/2-m*0.045,top-m*0.03,maxW+m*0.09,blockH+m*0.06,m*0.03); ctx.fillStyle='#000'; ctx.fill(); ctx.restore(); }
+  ctx.save(); ctx.font=Math.round(fs)+'px '+AR_FONT; ctx.direction='rtl'; ctx.textAlign='right'; ctx.textBaseline='alphabetic';
+  lines.forEach((ln,k)=>{
+    let x=cx+ln.w/2; const y=top+k*lh+fs*1.3;
+    for(const it of ln.items){
+      const tk=it.tk;
+      ctx.shadowColor=shadow[0]; ctx.shadowBlur=shadow[1];
+      if(tk.num){ ctx.globalAlpha=aa*0.9; ctx.fillStyle=GOLD; ctx.fillText(tk.text,x,y); }
+      else if(cfg.hl==='ayah' || tk.wi<cw){ ctx.globalAlpha=aa; ctx.fillStyle='#FFFFFF'; ctx.fillText(tk.text,x,y); }
+      else if(tk.wi>cw){ ctx.globalAlpha=aa*0.55; ctx.fillStyle='#FFFFFF'; ctx.fillText(tk.text,x,y); }
+      else if(cfg.hl==='word'){ ctx.globalAlpha=aa; ctx.fillStyle=GOLD; ctx.shadowColor='rgba(233,196,106,0.85)'; ctx.shadowBlur=m*0.025; ctx.fillText(tk.text,x,y); }
+      else{
+        ctx.globalAlpha=aa; ctx.fillStyle='#FFFFFF'; ctx.fillText(tk.text,x,y);
+        ctx.save(); ctx.beginPath(); ctx.rect(x-it.w*prog-2,y-fs*1.6,it.w*prog+4,fs*2.4); ctx.clip();
+        ctx.fillStyle=GOLD; ctx.shadowColor='rgba(233,196,106,0.85)'; ctx.shadowBlur=m*0.025; ctx.fillText(tk.text,x,y);
+        ctx.restore();
+      }
+      x-=it.w+L.gap;
+    }
+  });
+  ctx.restore();
+  if(T){
+    const yl=top+lines.length*lh;
+    if(classic){ ctx.save(); ctx.globalAlpha=a*0.85; ctx.strokeStyle=GOLD; ctx.lineWidth=Math.max(1.5,m*0.0025); ctx.beginPath(); ctx.moveTo(cx-maxW*0.17,yl+gapTr*0.35); ctx.lineTo(cx+maxW*0.17,yl+gapTr*0.35); ctx.stroke(); ctx.restore(); }
+    ctx.save(); ctx.globalAlpha=a*0.95; ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
+    ctx.font=trFont(cfg,T.fs); ctx.shadowColor=shadow[0]; ctx.shadowBlur=classic ? m*0.015 : m*0.006;
+    const y0=yl+gapTr;
+    T.lines.forEach((l,k)=>ctx.fillText(l,cx,y0+T.fs*(0.85+k*1.45)));
+    ctx.restore();
+  }
+}
+function drawMelody(ctx,W,H,m,t,cfg,G){
+  const P=S.pitch; if(!P) return;
+  const band=m*0.08, yb=G.b-m*0.025, x0=G.l+(G.r-G.l)*0.04, x1=G.r-(G.r-G.l)*0.04, w0=t-5, w1=t+0.5, span=w1-w0;
+  const k0=Math.max(0,Math.floor(w0/P.hop)), k1=Math.min(P.f0.length-1,Math.ceil(w1/P.hop));
+  const Y=f=>yb-clamp(12*Math.log2(f/P.lo)/P.span,0,1)*band, X=tt=>x0+(tt-w0)/span*(x1-x0);
+  ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.lineWidth=Math.max(2,m*0.004);
+  ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.beginPath(); ctx.moveTo(x0,yb); ctx.lineTo(x1,yb); ctx.stroke();
+  for(const past of [false,true]){
+    ctx.beginPath(); let on=false;
+    for(let k=k0;k<=k1;k++){
+      const tk=k*P.hop, f=P.f0[k];
+      if((past && tk>t) || (!past && tk<t) || !(f>0)){ on=false; continue; }
+      const x=X(tk), y=Y(f); if(on) ctx.lineTo(x,y); else { ctx.moveTo(x,y); on=true; }
+    }
+    ctx.strokeStyle=past ? GOLD : 'rgba(233,196,106,0.25)';
+    if(past){ ctx.shadowColor='rgba(233,196,106,0.8)'; ctx.shadowBlur=m*0.012; } else ctx.shadowBlur=0;
+    ctx.stroke();
+  }
+  const kc=Math.round(t/P.hop), fc=P.f0[kc];
+  if(fc>0){ ctx.shadowColor=GOLD; ctx.shadowBlur=m*0.02; ctx.fillStyle='#FFFFFF'; ctx.beginPath(); ctx.arc(X(t),Y(fc),m*0.007,0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+function maqamAt(i){ let r=null; for(const x of [...S.mq].sort((p,q)=>p.from-q.from)) if(x.from<=i) r=x; return r && r.mq ? r : null; }
+const anyMaqam=()=>S.mq.some(x=>MAQ[x.mq]);
+function drawMaqam(ctx,W,H,m,t,i,G){
+  const r=maqamAt(i); if(!r || !MAQ[r.mq]) return;
+  const [en,ar]=MAQ[r.mq], st=S.Bn[clamp(r.from,0,S.units.length-1)], a=r.from===0 ? 1 : clamp((t-st)/0.6,0,1); if(a<=0) return;
+  const fa=m*0.028, fl=m*0.014, cx=(G.l+G.r)/2;
+  ctx.save(); ctx.globalAlpha=a;
+  ctx.font=Math.round(fa)+'px '+AR_FONT; ctx.direction='rtl'; const wa=ctx.measureText('مقام '+ar).width;
+  ctx.font='700 '+Math.round(fl)+'px '+LAT; ctx.direction='ltr'; const wl=ctx.measureText('MAQAM '+en.toUpperCase()).width;
+  const w=Math.max(wa,wl)+m*0.05, h=fa*1.5+fl*1.6, x=cx-w/2, y=G.mqY;
+  rr(ctx,x,y,w,h,m*0.018); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill(); ctx.lineWidth=Math.max(1.5,m*0.002); ctx.strokeStyle='rgba(233,196,106,0.8)'; ctx.stroke();
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.direction='rtl'; ctx.font=Math.round(fa)+'px '+AR_FONT; ctx.fillStyle=GOLD; ctx.fillText('مقام '+ar,cx,y+fa*1.15);
+  ctx.direction='ltr'; ctx.font='700 '+Math.round(fl)+'px '+LAT; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillText('MAQAM '+en.toUpperCase(),cx,y+fa*1.15+fl*1.5);
+  ctx.restore();
+}
+function drawMark(ctx,W,H,m,G){
+  const mk=S.mark;
+  ctx.save(); ctx.globalAlpha=0.9;
+  if(mk.img){ let h=m*0.055, w=mk.img.width/mk.img.height*h; if(w>W*0.15){ w=W*0.15; h=w*mk.img.height/mk.img.width; } ctx.drawImage(mk.img,G.l,G.t,w,h); }
+  else if(mk.name){ const fs=m*0.02; ctx.font='700 '+Math.round(fs)+'px '+LAT; const tw=ctx.measureText(mk.name).width, h=fs*1.9, w=tw+fs*1.4; rr(ctx,G.l,G.t,w,h,h/2); ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fill(); ctx.fillStyle='#FFFFFF'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(mk.name,G.l+fs*0.7,G.t+h/2); }
+  ctx.restore();
+}
+function drawScene(ctx,W,H,t,F,cfg,range){
+  const m=Math.min(W,H), vert=W<H, G=safeBox(W,H,cfg);
+  G.mqY=G.t+(cfg.hdr ? m*0.11 : 0);
+  G.top2=G.mqY+(anyMaqam() ? m*0.085 : 0);
+  if(!cfg.hdr && !anyMaqam()) G.top2=G.t+m*0.08;
+  if(cfg.coverTop){ G.mqY=G.t+m*0.17; G.top2=G.mqY+(anyMaqam() ? m*0.085 : 0)+m*0.01; }
+  LASTCARD=null;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowColor='transparent'; ctx.direction='ltr';
+  drawBg(ctx,W,H,t,F,cfg,range);
+  const VL=F.V && F.vis && F.vis.some(Boolean) ? F.V : null, keepMe=cfg.mvMe==='keep' && (cfg.me==='frame' || cfg.me==='bubble');
+  if(VL && keepMe) drawVisuals(ctx,W,H,VL,F.vis);
+  const TG={ ...G };
+  if(cfg.me==='frame' && F.face){
+    const fr=vert ? { x:G.l, y:G.top2+m*0.01, w:G.r-G.l, h:(G.b-G.top2)*0.46 } : { x:G.l, y:G.top2+m*0.01, w:(G.r-G.l)*0.44, h:G.b-G.top2-m*0.03 };
+    drawFramed(ctx,F.face,fr,m);
+    if(vert){ TG.top2=fr.y+fr.h; TG.small=true; } else { TG.l=fr.x+fr.w+m*0.04; }
+  }else if(cfg.me==='bubble' && S.photo){
+    const size=m*(vert ? 0.3 : 0.32);
+    if(vert){ const cy=G.top2+m*0.03+size*0.55; drawBubble(ctx,(G.l+G.r)/2,cy,size,t,cfg,m); TG.top2=cy+size*0.55+(cfg.pname ? m*0.05 : 0); TG.small=true; }
+    else{ const cx=G.l+size*0.6, cy=(G.top2+G.b)/2-m*0.03; drawBubble(ctx,cx,cy,size,t,cfg,m); TG.l=cx+size*0.65+m*0.03; }
+  }
+  if(VL && !keepMe) drawVisuals(ctx,W,H,VL,F.vis);
+  if(S.units.length && S.Bn){
+    const i=unitAt(t);
+    if(!cfg.coverTop){ drawTopPlate(ctx,W,H,m,G,cfg,i); if(cfg.hdr) drawHeader(ctx,W,H,m,G); }
+    drawMaqam(ctx,W,H,m,t,i,G);
+    drawCard(ctx,W,H,m,t,i,cfg,TG);
+    drawIconMoment(ctx,W,H,m,t,cfg,G,TG);
+    if(cfg.mel) drawMelody(ctx,W,H,m,t,cfg,G);
+  }
+  if(!cfg.coverTop) drawMark(ctx,W,H,m,G);
+  if(cfg.bar && range && range.r1>range.r0){ const h=Math.max(3,m*0.007), p=clamp((t-range.r0)/(range.r1-range.r0),0,1); ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(0,H-h,W,h); ctx.fillStyle=GOLD; ctx.fillRect(0,H-h,W*p,h); }
+  ctx.restore();
+}
+function drawZones(ctx,W,H){
+  if(!(W<H)) return;
+  const fs=Math.round(W*0.028);
+  ctx.save();
+  ctx.fillStyle='rgba(255,50,50,0.28)';
+  ctx.fillRect(0,0,W,H*ZONE_V.t);
+  ctx.fillRect(0,H*ZONE_V.b,W,H*(1-ZONE_V.b));
+  ctx.fillRect(W*ZONE_V.r,H*0.42,W*(1-ZONE_V.r),H*(ZONE_V.b-0.42));
+  ctx.fillRect(0,H*ZONE_V.t,W*ZONE_V.l,H*(ZONE_V.b-ZONE_V.t));
+  ctx.fillStyle='#FFFFFF'; ctx.font='600 '+fs+'px '+LAT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=4;
+  ctx.fillText('Search · tabs · menu',W/2,H*ZONE_V.t/2);
+  ctx.fillText('Channel name · caption · music · subscribe',W/2,H*(1+ZONE_V.b)/2);
+  ctx.save(); ctx.translate(W*(1+ZONE_V.r)/2,H*(0.42+ZONE_V.b)/2); ctx.rotate(-Math.PI/2); ctx.fillText('Like · comment · share',0,0); ctx.restore();
+  ctx.restore();
+}
+
+/* ---------- preview ---------- */
+function sizeView(){ const [W,H]=FORMATS[$('format').value]||FORMATS['9:16'], cv=$('view'); cv.width=Math.round(W/2); cv.height=Math.round(H/2); LAYOUT.clear(); }
+function previewF(t,cfg){
+  const v=$('vid'), ok=it=>it ? (it.img || (it.el && it.el.readyState>=2 ? it.el : null)) : null;
+  const F={ face:S.isVideo && v.readyState>=2 ? v : null, cur:null, prev:null, maskOk:false, V:null, vis:null, bgi:null };
+  const rm=rotMode(cfg);
+  if(rm && S.units.length && S.Bn){
+    const b=bgAt(t,cfg); F.bgi=b;
+    if(S.items.length){
+      const it=S.items[b.idx%S.items.length]; F.cur=ok(it);
+      if(b.idx>0 && b.since<0.8){ const ip=S.items[(b.idx-1)%S.items.length]; if(ip!==it) F.prev=ok(ip); }
+    }
+  }else if(cfg.bg.startsWith('lib:')) F.cur=ok(S.bgItem);
+  const layers=visLayers(t,cfg), want=new Set();
+  if(layers){
+    F.V=layers;
+    F.vis=layers.map(L=>{
+      const it=L.item;
+      if(it.img) return it.img;
+      if(it.el){
+        want.add(it.el);
+        if(!S.visEls.has(it.el)){ try{ it.el.currentTime=Math.max(0,t-L.st)%(it.el.duration||10); }catch{} }
+        if(S.pv){ it.el.playbackRate=S.pv.rate||1; if(it.el.paused) it.el.play().catch(()=>{}); }
+        return it.el.readyState>=2 ? it.el : null;
+      }
+      return null;
+    });
+  }
+  for(const el of S.visEls) if(!want.has(el)){ try{ el.pause(); }catch{} }
+  S.visEls=want;
+  if(cfg.me==='cut' && F.face && SEG) F.maskOk=computeMask(F.face);
+  return F;
+}
+function drawPreview(t){
+  const cv=$('view'), ctx=cv.getContext('2d'), cfg=readCfg();
+  drawScene(ctx,cv.width,cv.height,t,previewF(t,cfg),cfg,{ r0:0, r1:S.raw ? S.raw.duration : 1 });
+  if($('zonesOn').checked) drawZones(ctx,cv.width,cv.height);
+}
+function seekStatic(t){ S.lastT=t; const v=$('vid'); if(S.isVideo && v.readyState>=1){ try{ v.currentTime=t; }catch{} } drawPreview(t); }
+$('vid').addEventListener('seeked',()=>{ if(!S.pv) drawPreview(S.lastT); });
+$('vid').addEventListener('loadeddata',()=>{ if(!S.pv) seekStatic(S.lastT); });
+function pvTime(){ const pv=S.pv; return pv ? pv.from+Math.max(0,pv.ac.currentTime-pv.t0)*pv.rate : S.lastT; }
+function playBgMedia(){ for(const it of [...S.items,S.bgItem]) if(it && it.el){ try{ it.el.play().catch(()=>{}); }catch{} } }
+async function startPreview(from,rate){
+  stopPreview();
+  if(!S.raw) return toast('Choose your recitation first');
+  await ensureProc();
+  rate=clamp(+rate||1,0.25,1);
+  from=clamp(from||0,0,S.proc.duration-0.1);
+  const ac=new AudioContext(), src=ac.createBufferSource(); src.buffer=S.proc; src.playbackRate.value=rate; src.connect(ac.destination);
+  const t0=ac.currentTime+0.08; src.start(t0,from);
+  const pv={ ac, src, t0, from, raf:0, rate }; S.pv=pv;
+  src.onended=()=>{ if(S.pv===pv) stopPreview(); };
+  const v=$('vid'); if(S.isVideo){ try{ v.playbackRate=rate; v.currentTime=from; v.play().catch(()=>{}); }catch{} }
+  playBgMedia();
+  $('playBtn').textContent='⏹ Stop';
+  const loop=()=>{ if(S.pv!==pv) return; const t=pvTime(); S.lastT=t; if(S.isVideo && !v.paused && Math.abs(v.currentTime-t)>0.3){ try{ v.currentTime=t; }catch{} } drawPreview(t); highlightUnit(t); pv.raf=requestAnimationFrame(loop); };
+  loop();
+}
+function stopPreview(){
+  const pv=S.pv; if(!pv) return; S.pv=null;
+  cancelAnimationFrame(pv.raf); try{ pv.src.onended=null; pv.src.stop(); }catch{} try{ pv.ac.close(); }catch{}
+  const v=$('vid'); try{ v.pause(); v.playbackRate=1; }catch{}
+  for(const it of [...S.items,S.bgItem]) if(it && it.el){ try{ it.el.pause(); }catch{} }
+  for(const el of S.visEls){ try{ el.pause(); el.playbackRate=1; }catch{} }
+  $('playBtn').textContent='▶ Preview';
+  if(S.tap){ S.tap=null; $('tapBtn').classList.add('hidden'); $('tapHelp').classList.add('hidden'); }
+}
+$('playBtn').onclick=()=>{ if(S.pv) stopPreview(); else startPreview(S.units.length && S.Bn ? Math.max(0,S.Bn[0]-0.5) : 0); };
+let lastHl=-1;
+function highlightUnit(t){ if(!S.units.length || !S.Bn) return; const i=unitAt(t); if(i===lastHl) return; lastHl=i; document.querySelectorAll('#unitList .unit').forEach(el=>el.classList.toggle('on',+el.dataset.i===i)); }
+
+/* ---------- the ayat list: play, nudge, tap words ---------- */
+function renderUnits(){
+  const B=S.Bn; lastHl=-1;
+  $('unitList').innerHTML=S.units.map((u,i)=>'<div class="unit" data-i="'+i+'"><b>'+esc(u.label)+'</b><span class="tm">'+fmt(B[i])+'</span><span class="ar">'+esc(u.ar)+'</span>'
+    +'<button class="mini" data-a="play" title="Play from this ayah">▶</button>'
+    +(i>0 ? '<button class="mini" data-a="early" title="Starts too late: move earlier">⏪</button><button class="mini" data-a="late" title="Starts too early: move later">⏩</button>' : '')
+    +'<button class="mini" data-a="words" title="Tap the words of this ayah">✋</button></div>').join('');
+}
+$('unitList').addEventListener('click',e=>{
+  const b=e.target.closest('button'), row=e.target.closest('.unit'); if(!b || !row) return;
+  const i=+row.dataset.i, act=b.dataset.a, B=S.Bn;
+  if(act==='play') return startPreview(Math.max(0,B[i]-0.3));
+  if(act==='words') return startTap('words',i);
+  if(act==='early' || act==='late'){
+    const nb=B.slice(); nb[i]=clamp(nb[i]+(act==='early' ? -0.15 : 0.15),nb[i-1]+0.3,nb[i+1]-0.3);
+    S.man.b=nb; delete S.man.w[i]; delete S.man.w[i-1]; saveMan(); rebuild(); renderUnits(); staleCovers(); seekStatic(nb[i]+0.2);
+  }
+});
+$('resetSync').onclick=()=>{ if(!S.units.length) return; if(!confirm('Go back to the automatic timing from the sound only? Your AI timing and tapped timing for this recording will be removed.')) return; S.man={ b:null, w:{}, ai:null }; saveMan(); rebuild(); renderUnits(); staleCovers(); $('aiInfo').textContent='The AI only listens for when each word starts. The words on screen always come from the exact mushaf text.'; toast('Back to automatic timing'); };
+$('tapAyat').onclick=()=>startTap('ayat');
+function startTap(kind,u){
+  if(!S.units.length || !S.Bn) return toast('Press "Get the ayat" first');
+  const N=S.units.length, rate=+$('tapRate').value||1, slow=rate<1 ? ' (playing at '+(rate===0.5 ? 'half' : '¾')+' speed)' : '';
+  S.tap=null;
+  const from=kind==='ayat' ? Math.max(0,S.Bn[0]-1.5) : Math.max(0,S.Bn[u]-0.8);
+  startPreview(from,rate).then(()=>{
+    S.tap={ kind, u, taps:[] };
+    $('tapBtn').classList.remove('hidden'); $('tapHelp').classList.remove('hidden');
+    if(kind==='ayat'){ $('tapBtn').textContent='TAP (0 / '+N+')'; $('tapHelp').textContent='Press SPACE (or the TAP button) at the moment each part BEGINS, including the first'+slow+'. Press Esc to stop.'; }
+    else{ const n=S.units[u].nw; $('tapBtn').textContent='TAP (0 / '+n+')'; $('tapHelp').textContent='Press SPACE (or TAP) as each WORD of '+S.units[u].label+' begins: '+n+' words'+slow+'. Press Esc to stop.'; }
+  });
+}
+function tap(){
+  const T=S.tap; if(!T || !S.pv) return;
+  const rate=S.pv.rate||1, t=pvTime(); T.taps.push(t);
+  const react=0.06*rate;
+  if(T.kind==='ayat'){
+    const N=S.units.length; $('tapBtn').textContent='TAP ('+T.taps.length+' / '+N+')';
+    if(T.taps.length>=N){
+      const end=Math.max(S.autoB[N],T.taps[N-1]+0.6), nb=[Math.max(0,T.taps[0]-react-0.06)];
+      for(let k=1;k<N;k++) nb.push(Math.max(nb[k-1]+0.3,T.taps[k]-react));
+      nb.push(Math.max(nb[N-1]+0.3,end));
+      S.man.b=nb; S.man.w={}; finishTap('✓ Ayah timing saved');
+    }
+  }else{
+    const u=S.units[T.u], n=u.nw; $('tapBtn').textContent='TAP ('+T.taps.length+' / '+n+')';
+    if(T.taps.length>=n){ S.man.w[T.u]=T.taps.map(x=>Math.max(0,x-react*0.7)); finishTap('✓ Word timing saved for '+u.label); }
+  }
+}
+function finishTap(msg){ S.tap=null; $('tapBtn').classList.add('hidden'); $('tapHelp').classList.add('hidden'); stopPreview(); saveMan(); rebuild(); renderUnits(); staleCovers(); toast(msg); }
+$('tapBtn').onclick=tap;
+document.addEventListener('keydown',e=>{
+  if(!S.tap) return;
+  if(e.code==='Space'){ e.preventDefault(); tap(); }
+  else if(e.code==='Escape'){ stopPreview(); toast('Tapping stopped. Nothing was changed.'); }
+});
+
+/* ---------- maqam badge rows ---------- */
+function loadMq(){ try{ const m=JSON.parse(localStorage.getItem('forge:qs:mq')||'null'); S.mq=Array.isArray(m) && m.length ? m : [{ from:0, mq:'' }]; }catch{ S.mq=[{ from:0, mq:'' }]; } S.mq[0].from=0; }
+function saveMq(){ try{ localStorage.setItem('forge:qs:mq',JSON.stringify(S.mq)); }catch{} }
+function renderMq(){
+  const opts=S.units.length ? S.units.map((u,i)=>'<option value="'+i+'">'+esc(u.label)+'</option>').join('') : '<option value="0">Start</option>';
+  const mqOpts='<option value="">No badge</option>'+Object.entries(MAQ).map(([k,[en,ar]])=>'<option value="'+k+'">'+en+' · '+ar+'</option>').join('');
+  $('mqRows').innerHTML=S.mq.map((r,k)=>'<div class="mq" data-k="'+k+'"><select data-f="from"'+(k===0 ? ' disabled' : '')+'>'+opts+'</select><select data-f="mq">'+mqOpts+'</select>'+(k>0 ? '<button class="mini" data-x="1" title="Remove">✕</button>' : '')+'</div>').join('');
+  $('mqRows').querySelectorAll('.mq').forEach(el=>{ const r=S.mq[+el.dataset.k]; el.querySelector('[data-f=from]').value=String(Math.min(r.from,Math.max(0,S.units.length-1))); el.querySelector('[data-f=mq]').value=r.mq||''; });
+}
+$('mqRows').addEventListener('change',e=>{ const row=e.target.closest('.mq'); if(!row) return; const r=S.mq[+row.dataset.k], f=e.target.dataset.f; if(f==='from') r.from=+e.target.value; if(f==='mq') r.mq=e.target.value; saveMq(); updatePost(); staleCovers(); redraw(); });
+$('mqRows').addEventListener('click',e=>{ const b=e.target.closest('[data-x]'); if(!b) return; S.mq.splice(+b.closest('.mq').dataset.k,1); saveMq(); renderMq(); updatePost(); staleCovers(); redraw(); });
+$('mqAdd').onclick=()=>{ const last=S.mq[S.mq.length-1]; S.mq.push({ from:Math.min((last ? last.from : 0)+1,Math.max(0,S.units.length-1)), mq:last ? last.mq : '' }); saveMq(); renderMq(); };
+
+/* ---------- ready-to-post text (no AI needed) ---------- */
+function updatePost(){
+  const s=S.surah; if(!s) return;
+  const r=s.a===s.b ? String(s.a) : s.a+'-'+s.b, used=[...new Set(S.mq.map(x=>x.mq).filter(k=>MAQ[k]))].map(k=>MAQ[k][0]);
+  const mqTxt=used.length ? ' (Maqam '+used.join(' & ')+')' : '', trName=(($('qTr').selectedOptions[0]||{}).textContent||'').split('·').pop().trim();
+  const nm=s.en.replace(/[^A-Za-z]/g,''), ch=S.mark.name ? S.mark.name.replace(/[^A-Za-z0-9]/g,'') : '';
+  $('postTitle').value=('Surah '+s.en+' '+r+' | Beautiful Quran Recitation'+mqTxt).slice(0,100);
+  const firstTr=(S.units.find(u=>u.kind==='ayah')||{}).tr||'';
+  $('postDesc').value='A heart-touching recitation of Surah '+s.en+' ('+s.ar+'), '+(s.a===s.b ? 'ayah '+s.a : 'ayat '+s.a+' to '+s.b)+', with the Arabic text and translation ('+trName+').'+(used.length ? ' Recited in Maqam '+used.join(' and ')+'.' : '')
+    +(firstTr ? '\n\n"'+firstTr.slice(0,260)+(firstTr.length>260 ? '…' : '')+'" ('+s.en+' '+s.a+')' : '')
+    +'\n\nMay Allah accept from us and from you. Share it so others can benefit.\n\n#Quran #QuranRecitation #Surah'+nm+' #Tilawah #Islam #Muslim'+(used.length ? ' #Maqam'+used[0] : '')+(ch ? ' #'+ch : '');
+  $('postTags').value=['quran','quran recitation','surah '+s.en.toLowerCase(),'beautiful quran recitation','quran with translation','tilawah','islam',...used.map(x=>'maqam '+x.toLowerCase())].join(', ');
+  $('postEmpty').classList.add('hidden');
+}
+document.querySelectorAll('.cp').forEach(b=>b.onclick=async()=>{ const el=$(b.dataset.t); try{ await navigator.clipboard.writeText(el.value); toast('Copied'); }catch{ el.select(); toast('Press Ctrl + C'); } });
+
+/* ---------- 🖼️ covers: the 4 best moments, chosen automatically ---------- */
+function selRange(){ const N=S.units.length; let a=0, b=N-1; if($('range').value==='part'){ a=+$('pFrom').value||0; b=Math.max(a,+$('pTo').value||a); } return [a,b]; }
+function coverCandidates(cfg,a,b){
+  const B=S.Bn, c=[];
+  for(let i=a;i<=b;i++){
+    const u=S.units[i]; if(!u || u.kind!=='ayah') continue;
+    const D=B[i+1]-B[i];
+    for(const g of visSegs(i,cfg)) c.push({ t:g.st+(g.en-g.st)*0.55, i, sc:3 });
+    c.push({ t:B[i]+Math.min(D*0.45,6), i, sc:1.5 });
+    if(cfg.icOn){ const t0=iconTime(i); if(t0!=null) c.push({ t:t0+1.3, i, sc:2.2 }); }
+  }
+  if(!c.length) for(let i=a;i<=b;i++) c.push({ t:B[i]+(B[i+1]-B[i])*0.45, i, sc:1 });
+  c.forEach(x=>{ x.sc+=voiceLevel(x.t)*2+(x.i===a ? 0.3 : 0); });
+  c.sort((p,q)=>q.sc-p.sc);
+  const out=[], usedI=new Map();
+  for(const x of c){ if(out.length>=4) break; if(out.some(o=>Math.abs(o.t-x.t)<2.5)) continue; if((usedI.get(x.i)||0)>=2) continue; out.push(x); usedI.set(x.i,(usedI.get(x.i)||0)+1); }
+  for(const x of c){ if(out.length>=4) break; if(!out.includes(x) && !out.some(o=>Math.abs(o.t-x.t)<1.2)) out.push(x); }
+  return out.map(x=>x.t);
+}
+function clearCovers(){ for(const c of S.covers) try{ URL.revokeObjectURL(c.url); }catch{} S.covers=[]; S.coverSel=-1; S.coverStale=false; renderCovers(); }
+/* something changed after the covers were drawn: keep them and keep the choice, only tell the owner he can refresh them */
+function staleCovers(){ if(!S.covers.length || S.coverStale) return; S.coverStale=true; renderCovers(); }
+function holdText(){ const v=$('cvHold').value; return v==='none' ? 'It does not show while the video plays.' : v==='long' ? 'When the video plays it shows for 0.7 s, then fades into the recitation.' : 'When the video plays it only blinks (0.1 s), then the recitation starts.'; }
+function renderCovers(){
+  const g=$('cvGrid'); if(!g) return;
+  if(!S.covers.length){ g.innerHTML=''; $('cvInfo').textContent=S.units.length ? 'Tap "Show the 4 best covers". If you don\'t choose, the best cover is chosen for you when the video is made.' : 'After "Get the ayat", tap the button. If you don\'t choose, the best cover is chosen for you when the video is made.'; return; }
+  g.innerHTML=S.covers.map((c,k)=>'<div class="cv'+(k===S.coverSel ? ' on' : '')+'" data-k="'+k+'"><img src="'+c.url+'" alt="Cover '+(k+1)+'"><div class="row"><button class="mini" data-a="use">'+(k===S.coverSel ? '✓ Chosen' : 'Use this')+'</button><button class="mini" data-a="dl" title="Download this cover" style="flex:none">⬇</button></div></div>').join('');
+  const chosen=S.coverSel>=0 ? '<b>✓ Cover '+(S.coverSel+1)+' is chosen.</b> '+($('cvFirst').checked ? 'It becomes the video\'s picture in your folder, gallery and WhatsApp. '+holdText()+' ' : 'Tick the box above to use it. ') : '';
+  $('cvInfo').innerHTML=chosen+'Tap <b>Use this</b> on another cover to change it. Tap <b>⬇</b> to save a cover for TikTok, Instagram or YouTube.'
+    +(S.coverStale ? '<br>⚠ You changed something after these covers were drawn. Your choice still works; press "Show the 4 best covers" again only if you want fresh covers.' : '');
+}
+async function suggestCovers(){
+  if(!S.units.length || !S.Bn) throw new Error('press "Get the ayat" first');
+  const cfg=readCfg(), [W,H]=FORMATS[$('format').value]||FORMATS['9:16'], [a,b]=selRange();
+  const times=coverCandidates(cfg,a,b), cc={ ...cfg, coverTop:$('cvTitle').checked };
+  $('cvInfo').textContent='Choosing the best moments and drawing the covers…';
+  await fontsReady; await ensureProc(); await prepareBackground();
+  const MB=await loadMB(), rd=await openSources(MB,cc,W,H), out=[];
+  try{
+    for(const t of times){
+      if(SEG) SEG.prev=null;
+      const c=new OffscreenCanvas(W,H), ctx=c.getContext('2d');
+      const F=await buildFrame(t,cc,rd);
+      drawScene(ctx,W,H,t,F,cc,{ r0:0, r1:S.raw.duration });
+      if(cc.coverTop) drawCoverTitle(ctx,W,H,cc);
+      const blob=await c.convertToBlob({ type:'image/jpeg', quality:0.9 });
+      out.push({ t, canvas:c, url:URL.createObjectURL(blob) });
+      await tick();
+    }
+  }finally{ await rd.close(); }
+  for(const c of S.covers) try{ URL.revokeObjectURL(c.url); }catch{}
+  S.covers=out; S.coverSel=out.length ? 0 : -1; S.coverStale=false; renderCovers();
+}
+$('cvSuggest').onclick=async()=>{
+  if(S.busy) return;
+  if(!S.units.length || !S.Bn) return toast('Press "Get the ayat" first (step 2)');
+  stopPreview(); S.busy=true; $('cvSuggest').disabled=true;
+  try{ await suggestCovers(); toast('Tap "Use this" on the cover you like'); }catch(e){ console.error(e); $('cvInfo').textContent='The covers could not be made: '+e.message+'.'; }
+  finally{ S.busy=false; $('cvSuggest').disabled=false; }
+};
+$('cvGrid').addEventListener('click',async e=>{
+  const b=e.target.closest('button'), card=e.target.closest('.cv'); if(!b || !card) return;
+  const k=+card.dataset.k, c=S.covers[k]; if(!c) return;
+  if(b.dataset.a==='use'){
+    S.coverSel=k;
+    if(!$('cvFirst').checked){ $('cvFirst').checked=true; localStorage.setItem('forge:qs:set:cvFirst','1'); }
+    renderCovers();
+    toast(S.resultUrl ? '✓ Cover '+(k+1)+' chosen. Press "Make my Quran video" again to put it in the video.' : '✓ Cover '+(k+1)+' chosen. It will be your video\'s picture.');
+  }
+  if(b.dataset.a==='dl'){
+    try{
+      const blob=await c.canvas.convertToBlob({ type:'image/png' }), url=URL.createObjectURL(blob), a=document.createElement('a');
+      a.href=url; a.download='Cover-Surah-'+(S.surah ? S.surah.en.replace(/[^A-Za-z]/g,'') : 'Quran')+'-'+(k+1)+'.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }catch(err){ toast('The cover could not be saved'); }
+  }
+});
+['cvTitle','format','range','pFrom','pTo'].forEach(id=>$(id).addEventListener('change',()=>staleCovers()));
+$('cvFirst').addEventListener('change',renderCovers);
+$('cvHold').addEventListener('change',renderCovers);
+
+/* ---------- making the video ---------- */
+function fillPart(){ const o=S.units.map((u,i)=>'<option value="'+i+'">'+esc(u.label)+'</option>').join(''); $('pFrom').innerHTML=o; $('pTo').innerHTML=o; $('pFrom').value='0'; $('pTo').value=String(Math.max(0,S.units.length-1)); }
+function partUI(){ $('partRow').classList.toggle('hidden',$('range').value!=='part'); }
+$('range').addEventListener('change',partUI);
+function sliceBuf(buf,r0,r1,lead){
+  const R=buf.sampleRate, s=Math.floor(r0*R), e=Math.min(buf.length,Math.ceil(r1*R)), len=Math.max(1,e-s), nc=buf.numberOfChannels, pad=Math.round((lead||0)*R);
+  const out=new AudioBuffer({ length:pad+len, numberOfChannels:nc, sampleRate:R }), fi=Math.round(R*0.04), fo=Math.min(len,Math.round(R*0.6));
+  for(let c=0;c<nc;c++){
+    const d=out.getChannelData(c);
+    d.set(buf.getChannelData(c).subarray(s,e),pad);
+    for(let i=0;i<Math.min(fi,len);i++) d[pad+i]*=i/fi;
+    for(let i=0;i<fo;i++) d[pad+len-1-i]*=i/fo;
+  }
+  return out;
+}
+async function makeVideo(){
+  if(S.busy) return;
+  if(!S.units.length || !S.Bn) return toast('Press "Get the ayat" first (step 2)');
+  stopPreview(); S.busy=true; S.cancel=false;
+  $('makeBtn').classList.add('hidden'); $('cancelBtn').classList.remove('hidden'); $('prog').classList.remove('hidden'); $('note').classList.add('hidden'); $('doneBox').classList.add('hidden');
+  let rd=null, output=null;
+  try{
+    await fontsReady;
+    setP(0.01,'Preparing…');
+    await ensureProc();
+    await prepareBackground();
+    const cfg=readCfg(), N=S.units.length, B=S.Bn, [a,b]=selRange();
+    if($('cvFirst').checked && (!S.covers.length || S.coverSel<0)){
+      setP(0.02,'Choosing the best cover…');
+      try{ await suggestCovers(); }catch(e){ console.warn('Cover skipped',e); }
+    }
+    const coverIdx=$('cvFirst').checked && S.coverSel>=0 && S.covers[S.coverSel] ? S.coverSel : -1;
+    const coverC=coverIdx>=0 ? S.covers[coverIdx].canvas : null;
+    const [lead,fade]=coverC ? (COVER_HOLD[$('cvHold').value]||COVER_HOLD.blink) : [0,0];
+    const r0=Math.max(0,B[a]-(a===0 ? 0.6 : 0.25)), r1=Math.min(S.proc.duration,B[b+1]+(b===N-1 ? 1.5 : 0.4));
+    let [W,H]=FORMATS[$('format').value]||FORMATS['9:16'];
+    if($('quality').value==='720'){ W=Math.round(W*2/3/2)*2; H=Math.round(H*2/3/2)*2; }
+    const MB=await loadMB();
+    setP(0.03,'Opening the pictures…');
+    rd=await openSources(MB,cfg,W,H);
+    if(cfg.me==='cut' && SEG) SEG.prev=null;
+    const vcodec=await MB.getFirstEncodableVideoCodec(['avc','vp9','av1'],{ width:W, height:H });
+    if(!vcodec) throw new Error('this browser cannot make MP4 videos. Please use Google Chrome or Microsoft Edge');
+    const acodec=await MB.getFirstEncodableAudioCodec(['aac','opus']);
+    const canvas=new OffscreenCanvas(W,H), ctx=canvas.getContext('2d');
+    output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:'in-memory' }), target:new MB.BufferTarget() });
+    const vs=new MB.CanvasSource(canvas,{ codec:vcodec, bitrate:MB.QUALITY_HIGH });
+    output.addVideoTrack(vs,{ frameRate:30 });
+    let as=null; if(acodec){ as=new MB.AudioBufferSource({ codec:acodec, bitrate:MB.QUALITY_HIGH }); output.addAudioTrack(as); }
+    const s=S.surah, title='Surah '+s.en+' '+(s.a===s.b ? s.a : s.a+'-'+s.b);
+    let coverSaved=false;
+    if(typeof output.setMetadataTags==='function'){
+      try{
+        const tags={ title, comment:'Made with StoryForge Quran Studio' };
+        if(coverC){ const jb=await coverC.convertToBlob({ type:'image/jpeg', quality:0.9 }); tags.images=[{ data:new Uint8Array(await jb.arrayBuffer()), mimeType:'image/jpeg', kind:'coverFront' }]; }
+        output.setMetadataTags(tags); coverSaved=!!coverC;
+      }catch(e){ console.warn('The cover picture could not be saved inside the file',e); }
+    }
+    await output.start();
+    if(as) await as.add(sliceBuf(S.proc,r0,r1,lead));
+    const fps=30, total=Math.max(1,Math.ceil((lead+r1-r0)*fps)), tStart=performance.now(), range={ r0, r1 };
+    for(let k=0;k<total;k++){
+      if(S.cancel) throw new Error('cancelled');
+      const tv=k/fps;
+      if(coverC && tv<lead){
+        if(fade<=0 || tv<lead-fade){ ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=1; ctx.drawImage(coverC,0,0,W,H); }
+        else{
+          const F=await buildFrame(r0,cfg,rd); drawScene(ctx,W,H,r0,F,cfg,range);
+          ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=clamp((lead-tv)/fade,0,1); ctx.drawImage(coverC,0,0,W,H); ctx.restore();
+        }
+      }else{
+        const t=r0+tv-lead;
+        const F=await buildFrame(t,cfg,rd); drawScene(ctx,W,H,t,F,cfg,range);
+      }
+      await vs.add(tv,1/fps);
+      if(k%15===0){ const done=(k+1)/total, secs=(performance.now()-tStart)/1000; setP(0.05+0.93*done,'Making your video… '+Math.round(done*100)+'%'+(done>0.03 ? ' · about '+Math.max(1,Math.round(secs/done*(1-done)))+' s left' : '')); await tick(); }
+    }
+    setP(0.99,'Finishing the file…');
+    await output.finalize();
+    const blob=new Blob([output.target.buffer],{ type:'video/mp4' });
+    if(S.resultUrl) URL.revokeObjectURL(S.resultUrl);
+    S.resultUrl=URL.createObjectURL(blob);
+    const ua=S.units[a], ub=S.units[b];
+    S.resultName=('Surah-'+s.en.replace(/[^A-Za-z]/g,'')+'-'+(ua.num||s.a)+'-'+(ub.num||s.b)+'-'+$('format').value.replace(':','x')+'.mp4');
+    setP(1,'✓ Done: '+(blob.size/1048576).toFixed(1)+' MB');
+    $('doneBox').classList.remove('hidden');
+    const cvMsg=coverC ? ' Cover '+(coverIdx+1)+(coverSaved ? ' is the video\'s picture' : ' is used')+(lead>0 ? ' and '+(lead<0.3 ? 'blinks at the very start' : 'opens the video') : '')+'.' : '';
+    showNote('✓ Your Quran video is ready. Press "Download video".'+cvMsg+' Your covers are above (⬇ to save one), and your title, description and hashtags are in step 7.',true);
+  }catch(e){
+    if(output){ try{ await output.cancel(); }catch{} }
+    if(e.message==='cancelled'){ setP(0,'Cancelled'); toast('Cancelled'); }
+    else{ console.error(e); showNote('The video could not be made: '+e.message+'.'); }
+  }finally{
+    if(rd) await rd.close();
+    S.busy=false; $('makeBtn').classList.remove('hidden'); $('cancelBtn').classList.add('hidden');
+  }
+}
+$('makeBtn').onclick=makeVideo;
+$('cancelBtn').onclick=()=>{ S.cancel=true; };
+$('dlBtn').onclick=()=>{ if(!S.resultUrl) return; const a=document.createElement('a'); a.href=S.resultUrl; a.download=S.resultName||'quran-video.mp4'; document.body.appendChild(a); a.click(); a.remove(); };
+
+/* ---------- start ---------- */
+fillSelects(); persist(); partUI(); sizeView(); loadMq(); renderMq(); loadSurahs(); initKeys(); renderCovers();
+loadPhoto().then(()=>{ meUI(); redraw(); });
+fillBgSel().then(()=>prepareBackground()).then(redraw).catch(()=>{});
+loadMark().then(redraw);
+const showLead=()=>{ const v=+$('hlLead').value/100; $('leadVal').textContent=(v>0 ? '+' : '')+v.toFixed(2)+' s'; };
+const showSize=()=>{ $('sizeVal').textContent=$('txtSize').value+'%'; };
+showLead(); showSize();
+$('hlLead').addEventListener('input',()=>{ showLead(); redraw(); });
+$('txtSize').addEventListener('input',()=>{ showSize(); LAYOUT.clear(); staleCovers(); redraw(); });
+$('format').addEventListener('change',()=>{ sizeView(); redraw(); });
+$('chan').addEventListener('change',()=>loadMark().then(()=>{ updatePost(); staleCovers(); redraw(); }));
+['textMode','txtStyle','txtSplit','hlMode','melOn','hdrOn','barOn','safeOn','zonesOn','txtPos'].forEach(id=>$(id).addEventListener('change',()=>{ LAYOUT.clear(); staleCovers(); redraw(); }));
+$('qTr').addEventListener('change',()=>{ if(S.units.length) toast('Press "Get the ayat" again to use the new translation'); });
+fontsReady.then(()=>{ LAYOUT.clear(); redraw(); });
+if(location.protocol==='file:') showNote('This page was opened by double-clicking the file. Open it with Live Server in VS Code, or on your Netlify site.');
+</script>
+</body>
+</html>

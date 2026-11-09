@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<!-- clip-assembler.html — v3.5 — StoryForge Pack 2 · 🎬 Auto Video Assembler.
+v3.5: Four fixes from review.
+(1) LIP-SYNC DRIFT / VIDEO ENDING BEFORE AUDIO: most likely root cause identified — v3.4's cut-transition
+compositing ran on EVERY cut, including every pause-removal sub-window join (now far more frequent than
+clip-to-clip cuts), adding real per-frame draw cost that can make the canvas-captured video track fall
+behind the continuously-playing audio track over a long build, producing growing lip-sync drift and,
+eventually, the video track ending before the audio track (video freezes, audio keeps going). Two concrete
+load-reduction fixes: (a) the full transition blend (TRANSITION_PRESETS) now only plays at true segment-to-
+segment boundaries (wi===0 of each segment's subWindows) — pause-removal's internal joins are now a fast,
+near-zero-cost join (audio still click-faded via the existing floor, but no canvas compositing overhead);
+(b) caption text wrapping, previously recomputed via wrapText() on every single rAF frame, is now cached
+per unique (font+maxW+text) via a build-scoped capCache Map passed into drawCaption(), so it's computed once
+per distinct caption rather than ~30×/sec. This is an empirical browser-timing issue, not something provably
+fixed from code alone — stated plainly in chat, with a request to retest.
+(2) B-ROLL: root-caused — b-roll only ever populated via a separate manual "Auto-find b-roll for all" click,
+and its completion toast always said "done" even when zero photos were actually found (pexelsFindPhoto
+failures were silent). Fixed: Build now automatically fetches b-roll for any included segment that has a
+visualQuery but no image yet, whenever a Pexels key is present in the field — no separate click required —
+and reports an accurate "Found X of Y" or a clear failure toast. autoFindAllBtn's own completion toast was
+also corrected to report real success/failure counts instead of an unconditional "done".
+(3) QUIET BUILD: ensureAudioGraph() no longer unconditionally wires voiceGain to audioCtx.destination (the
+literal reason builds were audible). New #previewDuringBuild checkbox (default OFF) controls both the canvas
+staying visible and voiceGain being (dis)connected from destination at build start, via a small inline
+toggle in the build handler. #processingPanel gets a .quiet class when preview is off — canvas hidden,
+panel shrinks, label reads "Building quietly…" — progress bar/label (text-only) remain either way so
+cancellation and progress are still visible without sound or a live frame feed.
+v3.4: visual cut-transition system (now scoped down per above). v3.3: auto pause-removal, independent
+caption text/box color + 4 fonts, code-level repetition dedupe, audio-only cut fade. v3.2/v3.1/v3/v2.x/v1:
+see prior version history. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Clip Assembler</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@700;800&display=swap');
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 60px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:120px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:13px/1.5 ui-monospace,monospace;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input[type=text],input[type=password],input[type=number],select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=color]{background:var(--panel2);border:1px solid var(--line);border-radius:8px;height:38px;padding:3px;width:100%}
+input[type=file]{width:100%;color:var(--muted);font-size:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn.danger{background:#3a1f22;border-color:#6b2e33;color:#ffb0b5}
+.btn:disabled{opacity:.45;cursor:default}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px}
+.step{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.step .num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .body{flex:1}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center;z-index:5}
+.startbar .btn{max-width:720px}
+.seglist{display:flex;flex-direction:column;gap:8px;margin-top:10px;transition:opacity .2s}
+.seglist.locked{opacity:.5;pointer-events:none}
+.segrow{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.segrow.off{opacity:.45}
+.segtop{display:flex;align-items:center;gap:8px}
+.segtop .idx{font-weight:800;color:var(--accent);width:22px}
+.segtop label{flex:1;font-size:13px}
+.segtimes{display:flex;gap:6px;align-items:center;font-size:12px}
+.segtimes input{width:64px;padding:5px;font-size:12px}
+.segbtns{display:flex;gap:6px}
+.segbtns button{background:#222c3d;border:1px solid var(--line);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+.brollrow{display:flex;align-items:center;gap:8px;font-size:12px}
+.brollrow input[type=file]{flex:1}
+.brollrow input[type=text]{padding:6px;font-size:12px}
+.thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--line)}
+.findbtn{background:#222c3d;border:1px solid var(--line);color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.procPanel{position:fixed;right:14px;bottom:14px;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;z-index:30;box-shadow:0 8px 28px rgba(0,0,0,0.5)}
+.procPanel.quiet{width:190px}
+.procHead{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700}
+.procHead button{background:#1a2333;color:#fff;border:1px solid #333;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:12px}
+.procPanel canvas{width:100%;height:auto;border-radius:8px;display:block;margin:8px 0;background:#000}
+.procPanel.quiet canvas{display:none}
+#progLabel{font-size:11px;color:var(--muted);margin-bottom:6px}
+#progBar{height:5px;border-radius:3px;background:#2a3548;overflow:hidden}
+#progFill{height:100%;width:0%;background:var(--accent);transition:width .15s}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:40}
+#after.show{display:flex}
+#after video{width:100%;max-height:65vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:50;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+#analyzeStatus{display:block;margin-top:8px;font-size:12px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🎬 Clip Assembler <small>v3.5</small></h1>
+  <small>Upload a long video — Gemini finds several separate, postable shorts automatically, pulling moments from anywhere in the video, even non-sequentially</small>
+
+  <div class="card">
+    <h2>1. Your video</h2>
+    <input type="file" id="videoFile" accept="video/*">
+    <small id="videoInfo" style="display:block;margin-top:6px"></small>
+  </div>
+
+  <div class="card">
+    <h2>✨ 2. Analyze automatically (Gemini)</h2>
+    <small>Uses your own Gemini API key. It watches/listens to the video directly — no separate transcript needed.</small>
+    <div class="row" style="margin-top:8px">
+      <input type="password" id="geminiKey" placeholder="Gemini API key">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="geminiModelSelect">
+        <option value="gemini-3.8-flash" selected>gemini-3.8-flash (current default)</option>
+        <option value="gemini-3.8-pro">gemini-3.8-pro</option>
+        <option value="gemini-flash-latest">gemini-flash-latest</option>
+        <option value="gemini-pro-latest">gemini-pro-latest</option>
+        <option value="custom">Custom — type below…</option>
+      </select>
+      <input type="text" id="geminiModelCustom" placeholder="Custom model name" class="hidden">
+    </div>
+    <div class="checkrow"><input type="checkbox" id="rememberKey"><label for="rememberKey">Remember key on this device</label></div>
+    <div class="row" style="margin-top:8px">
+      <select id="numEdits">
+        <option value="1">1 short</option>
+        <option value="2" selected>2 separate shorts</option>
+        <option value="3">3 separate shorts</option>
+        <option value="4">4 separate shorts</option>
+        <option value="5">5 separate shorts</option>
+      </select>
+      <select id="targetLen">
+        <option value="~45 seconds">Very short (~45s)</option>
+        <option value="~90 seconds" selected>Short (~90s)</option>
+        <option value="~3 minutes">Medium (~3 min)</option>
+        <option value="~6 minutes">Long (~6 min)</option>
+        <option value="no strict limit, use your judgement">No limit — AI's judgement</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn gold" id="analyzeBtn" type="button">🎬 Analyze video automatically</button></div>
+    <small id="analyzeStatus"></small>
+    <small style="display:block;margin-top:8px">Your key stays in this page/browser — only sent to Google's API. Each short is independent — drawn from wherever in the video it's strongest.</small>
+  </div>
+
+  <div id="editPicker" class="card hidden"></div>
+
+  <div class="card">
+    <h2>3. Transcript — only needed for the manual flow below</h2>
+    <small>Skip this if you used automatic analysis above. Otherwise: upload a .srt/.vtt, or paste plain lines like <code>[01:23] what was said</code></small>
+    <input type="file" id="transcriptFile" accept=".srt,.vtt,.txt" style="margin-top:8px">
+    <textarea id="transcriptText" style="margin-top:8px" placeholder="[00:05] So today I want to talk about...
+[00:14] and honestly, honestly this changed everything for me..."></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Alternative: paste from any AI chat (no API key needed)</h2>
+    <small>Same no-key flow as your other tools — fallback if you'd rather not use the Gemini key, or if automatic analysis fails.</small>
+    <div class="step">
+      <div class="num">1</div>
+      <div class="body"><div class="row"><button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button></div></div>
+    </div>
+    <div class="step"><div class="num">2</div><div class="body"><small>Paste into any AI chat (ChatGPT, Gemini, Claude...), send it, copy the full reply.</small></div></div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <textarea id="aiPaste" style="min-height:90px" placeholder="Paste the AI's reply here…"></textarea>
+        <div class="row"><button class="btn gold" id="usePasteBtn" type="button">✓ Build clip list</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. Clips — edit, reorder, real b-roll</h2>
+    <small>Order here = final playback order. Untick to drop a clip. Each clip can carry a real stock photo as b-roll.</small>
+    <div class="row" style="margin-top:8px">
+      <input type="password" id="pexelsKey" placeholder="Pexels API key (free — pexels.com/api)">
+      <button class="btn" id="autoFindAllBtn" type="button">🖼️ Auto-find b-roll for all</button>
+    </div>
+    <small style="display:block;margin-top:4px">Real stock photography, not AI-generated. If a key is entered here, Build will also auto-fetch any missing b-roll by itself — this button is only for previewing it before you build.</small>
+
+    <div class="checkrow"><input type="checkbox" id="autoPauseOn" checked><label for="autoPauseOn">Automatically cut out long pauses/dead air within each clip</label></div>
+    <div class="row" style="margin-top:8px">
+      <select id="pauseSensitivity">
+        <option value="light">Light — only cut very long pauses</option>
+        <option value="medium" selected>Medium (recommended)</option>
+        <option value="aggressive">Aggressive — tighter, cuts more</option>
+      </select>
+    </div>
+    <small style="display:block;margin-top:6px">Detects quiet gaps in the audio inside each clip and skips them. The first build after picking a video takes a little longer while it checks the audio.</small>
+
+    <div class="row" style="margin-top:8px"><button class="btn" id="addSegBtn" type="button">+ Add clip manually</button></div>
+    <div class="seglist" id="segList"></div>
+  </div>
+
+  <div class="card">
+    <h2>5. Captions</h2>
+    <div class="checkrow"><input type="checkbox" id="captionsOn" checked><label for="captionsOn">Burn in captions from the transcript</label></div>
+    <small style="display:block;margin-top:8px">Quick looks — tap one, or fine-tune below</small>
+    <div class="pills" id="capPresets" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:10px">
+      <select id="capStyle">
+        <option value="bar">Background Bar</option>
+        <option value="shadow">Shadow (no box)</option>
+        <option value="chip" selected>Highlight Chip</option>
+      </select>
+      <select id="capPosition">
+        <option value="top">Top</option>
+        <option value="middle" selected>Middle</option>
+        <option value="bottom">Bottom</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="capWords">
+        <option value="2">2 words at a time</option>
+        <option value="3">3 words at a time</option>
+        <option value="4" selected>4 words at a time</option>
+        <option value="5">5 words at a time</option>
+        <option value="6">6 words at a time</option>
+      </select>
+      <select id="capFont">
+        <option value="default" selected>Clean Sans</option>
+        <option value="poppins">Poppins Bold</option>
+        <option value="bebas">Bebas Neue (Impact)</option>
+        <option value="georgia">Georgia Serif</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><small style="display:block;margin-bottom:4px">Text color</small><input type="color" id="capTextColor" value="#1a1a1a"></div>
+      <div><small style="display:block;margin-bottom:4px">Background/chip color</small><input type="color" id="capBoxColor" value="#d4af37"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Output</h2>
+    <div class="row">
+      <select id="shape"><option value="tall" selected>Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="musicType">
+        <option value="none">🔇 No background music</option>
+        <option value="upload">⬆ Upload background music</option>
+      </select>
+      <input type="file" id="musicFile" accept="audio/*" class="hidden">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="musicVol"><option value="0.12">Music: quiet</option><option value="0.25" selected>Music: normal</option><option value="0.4">Music: loud</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="transitionMode">
+        <option value="none">Hard cut — no transition</option>
+        <option value="quickCross" selected>Quick crossfade (smooths every cut)</option>
+        <option value="smoothCross">Smooth crossfade (cinematic)</option>
+        <option value="blackFade">Fade through black (dramatic)</option>
+      </select>
+    </div>
+    <small style="display:block;margin-top:4px">Full blend plays at cuts between clips. Pauses removed inside a clip join quickly (audio-smoothed only) to keep playback perfectly in sync.</small>
+    <div class="checkrow"><input type="checkbox" id="previewDuringBuild"><label for="previewDuringBuild">Show a live preview (video + sound) while building — off by default, builds quietly in the background</label></div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="buildBtn" disabled>▶ Build video</button></div>
+
+<div id="processingPanel" class="procPanel hidden">
+  <div class="procHead"><span id="procHeadLabel">Building…</span><button id="cancelBtn" title="Cancel">✕</button></div>
+  <canvas id="cv"></canvas>
+  <div id="progLabel">Starting…</div>
+  <div id="progBar"><div id="progFill"></div></div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Video ready</b>
+  <video id="takeVid" controls playsinline></video>
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back to clips</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3400); }
+
+/* ===== time helpers ===== */
+function clockToSec(tok){
+  const parts=tok.replace(',','.').split(':').map(Number);
+  if(parts.some(isNaN)) return null;
+  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2) return parts[0]*60+parts[1];
+  return parts[0];
+}
+function secToClock(s){
+  s=Math.max(0,Math.round(s));
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  const p=n=>String(n).padStart(2,'0');
+  return h>0 ? h+':'+p(m)+':'+p(sec) : p(m)+':'+p(sec);
+}
+
+/* ===== transcript parsing ===== */
+let cues=[];
+function parseSrtVtt(text){
+  const out=[];
+  const blocks=text.replace(/\r/g,'').split(/\n\n+/);
+  const timeLineRe=/(\d{1,2}(?::\d{2}){1,2}[.,]\d{3}|\d{1,2}:\d{2}(?::\d{2})?)\s*-->\s*(\d{1,2}(?::\d{2}){1,2}[.,]\d{3}|\d{1,2}:\d{2}(?::\d{2})?)/;
+  blocks.forEach(b=>{
+    const lines=b.split('\n').filter(l=>l.trim() && l.trim()!=='WEBVTT');
+    const tIdx=lines.findIndex(l=>timeLineRe.test(l));
+    if(tIdx===-1) return;
+    const m=lines[tIdx].match(timeLineRe);
+    const start=clockToSec(m[1]), end=clockToSec(m[2]);
+    const text=lines.slice(tIdx+1).join(' ').trim();
+    if(start!=null && end!=null && text) out.push({start,end,text});
+  });
+  return out;
+}
+function parsePlainTimestamped(text){
+  const out=[]; const lines=text.replace(/\r/g,'').split('\n');
+  const re=/^\s*\[?(\d{1,2}(?::\d{2}){1,2})\]?\s*[:\-–]?\s*(.*)$/;
+  lines.forEach(line=>{
+    if(!line.trim()) return;
+    const m=line.match(re);
+    if(!m) return;
+    const start=clockToSec(m[1]);
+    if(start==null) return;
+    out.push({start, end:start+4, text:m[2].trim()});
+  });
+  for(let i=0;i<out.length-1;i++) out[i].end=Math.max(out[i].start+1, out[i+1].start);
+  return out;
+}
+function loadTranscript(text, filename){
+  let parsed=[];
+  if(filename && /\.(srt|vtt)$/i.test(filename)) parsed=parseSrtVtt(text);
+  else { parsed=parseSrtVtt(text); if(!parsed.length) parsed=parsePlainTimestamped(text); }
+  if(!parsed.length) parsed=parsePlainTimestamped(text);
+  cues=parsed.sort((a,b)=>a.start-b.start);
+  return cues.length;
+}
+$('transcriptFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ $('transcriptText').value=r.result; const n=loadTranscript(r.result, f.name); toast(n?('✓ '+n+' transcript lines loaded'):'Could not parse that file — paste text instead'); };
+  r.readAsText(f);
+});
+$('transcriptText').addEventListener('change', ()=>{
+  if($('transcriptText').value.trim()) loadTranscript($('transcriptText').value, null);
+});
+
+/* ===== caption chunking ===== */
+function chunkCue(cue, wordsPerChunk){
+  const words=cue.text.split(/\s+/).filter(Boolean);
+  if(!words.length) return [];
+  const parts=[];
+  for(let i=0;i<words.length;i+=wordsPerChunk) parts.push(words.slice(i,i+wordsPerChunk).join(' '));
+  const dur=(cue.end-cue.start)/parts.length;
+  return parts.map((text,i)=>({ start:cue.start+i*dur, end:cue.start+(i+1)*dur, text }));
+}
+function buildDisplayCues(wordsPerChunk){ return cues.flatMap(c=>chunkCue(c, wordsPerChunk)); }
+function findCueIn(list,t){ return list.find(c=>t>=c.start && t<c.end); }
+
+/* ===== caption fonts + presets ===== */
+const FONT_MAP={
+  default:"system-ui, sans-serif",
+  poppins:"'Poppins', system-ui, sans-serif",
+  bebas:"'Bebas Neue', system-ui, sans-serif",
+  georgia:"Georgia, serif"
+};
+function hexToRgba(hex, alpha){
+  const h=(hex||'#000000').replace('#','');
+  const full = h.length===3 ? h.split('').map(c=>c+c).join('') : h;
+  const bigint=parseInt(full,16)||0;
+  const r=(bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255;
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+const CAP_PRESETS=[
+  {name:'Bold Gold Chip', style:'chip', boxColor:'#d4af37', textColor:'#1a1a1a', fontKey:'poppins'},
+  {name:'Punchy White Bar', style:'bar', boxColor:'#000000', textColor:'#ffffff', fontKey:'bebas'},
+  {name:'Clean Shadow', style:'shadow', boxColor:'#000000', textColor:'#ffffff', fontKey:'poppins'},
+  {name:'Red Pop', style:'shadow', boxColor:'#000000', textColor:'#ff5a5f', fontKey:'bebas'},
+  {name:'Sunshine Chip', style:'chip', boxColor:'#ffd93d', textColor:'#1a1a1a', fontKey:'bebas'},
+  {name:'Classic Gold Bar', style:'bar', boxColor:'#000000', textColor:'#d4af37', fontKey:'default'},
+  {name:'Neon Green', style:'shadow', boxColor:'#000000', textColor:'#51ff9f', fontKey:'poppins'},
+  {name:'Sky Chip', style:'chip', boxColor:'#4dabf7', textColor:'#ffffff', fontKey:'poppins'}
+];
+const capBox=$('capPresets');
+CAP_PRESETS.forEach((p,i)=>{
+  const el=document.createElement('div');
+  el.className='p'+(i===0?' on':'');
+  el.textContent=p.name;
+  el.onclick=()=>{
+    [...capBox.children].forEach(c=>c.classList.remove('on'));
+    el.classList.add('on');
+    $('capStyle').value=p.style; $('capBoxColor').value=p.boxColor; $('capTextColor').value=p.textColor; $('capFont').value=p.fontKey;
+  };
+  capBox.appendChild(el);
+});
+$('capStyle').value=CAP_PRESETS[0].style;
+$('capBoxColor').value=CAP_PRESETS[0].boxColor;
+$('capTextColor').value=CAP_PRESETS[0].textColor;
+$('capFont').value=CAP_PRESETS[0].fontKey;
+
+/* ===== video upload ===== */
+let videoFile=null, videoURL=null, videoDuration=0, video=null;
+$('videoFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  videoFile=f; videoURL=URL.createObjectURL(f);
+  analysisBuffer=null; decodingPromise=null; /* new video → old pause-analysis is stale */
+  video=document.createElement('video');
+  video.src=videoURL; video.preload='metadata'; video.muted=false; video.playsInline=true;
+  video.onloadedmetadata=()=>{
+    videoDuration=video.duration;
+    $('videoInfo').textContent='✓ '+f.name+' — '+secToClock(videoDuration)+' long, '+video.videoWidth+'×'+video.videoHeight+' ('+(f.size/1024/1024).toFixed(1)+'MB)';
+    updateBuildEnabled();
+  };
+});
+
+$('musicType').addEventListener('change', ()=>{ $('musicFile').classList.toggle('hidden', $('musicType').value!=='upload'); });
+
+(function(){
+  const k=localStorage.getItem('sf_gemini_key'); if(k){ $('geminiKey').value=k; $('rememberKey').checked=true; }
+  const pk=localStorage.getItem('sf_pexels_key'); if(pk){ $('pexelsKey').value=pk; }
+  const savedModel=localStorage.getItem('sf_gemini_model');
+  if(savedModel){
+    const opt=[...$('geminiModelSelect').options].find(o=>o.value===savedModel);
+    if(opt){ $('geminiModelSelect').value=savedModel; }
+    else { $('geminiModelSelect').value='custom'; $('geminiModelCustom').classList.remove('hidden'); $('geminiModelCustom').value=savedModel; }
+  }
+})();
+$('geminiModelSelect').addEventListener('change', ()=>{ $('geminiModelCustom').classList.toggle('hidden', $('geminiModelSelect').value!=='custom'); });
+$('pexelsKey').addEventListener('change', ()=>{ localStorage.setItem('sf_pexels_key', $('pexelsKey').value.trim()); });
+function getSelectedModel(){
+  const sel=$('geminiModelSelect').value;
+  const resolved = sel==='custom' ? ($('geminiModelCustom').value.trim()||'gemini-3.8-flash') : sel;
+  localStorage.setItem('sf_gemini_model', resolved);
+  return resolved;
+}
+
+/* ===== repeated-statement rule text (shared by both prompts) ===== */
+const REPEAT_RULE = "CRITICAL — repeated statements: speakers often restate the same point 2-4 times, sometimes word-for-word, sometimes reworded, sometimes minutes apart (e.g. \"as I said earlier\", or just repeating the same sentence for emphasis). Actively watch for this. When you detect it, select only the SINGLE clearest, most concise instance of that point — never include more than one instance of the same idea, even across different parts of the video or different shorts.";
+
+/* ===== code-level repetition safety net ===== */
+function normWords(text){
+  return (text||'').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(w=>w && w.length>2);
+}
+function jaccardSim(aWords,bWords){
+  if(!aWords.length || !bWords.length) return 0;
+  const setA=new Set(aWords), setB=new Set(bWords);
+  let inter=0; setA.forEach(w=>{ if(setB.has(w)) inter++; });
+  const unionSize=new Set([...setA,...setB]).size;
+  return unionSize?inter/unionSize:0;
+}
+function spokenTextFor(seg){
+  if(cues && cues.length){
+    const matched=cues.filter(c=>c.end>seg.start && c.start<seg.end).map(c=>c.text).join(' ');
+    if(matched.trim()) return matched;
+  }
+  return seg.label||'';
+}
+const DEDUPE_SIMILARITY_THRESHOLD=0.55;
+function dedupeSegments(segs){
+  const kept=[], fingerprints=[]; let removed=0;
+  segs.forEach(seg=>{
+    const words=normWords(spokenTextFor(seg));
+    const isDup=fingerprints.some(fp=>jaccardSim(fp,words)>=DEDUPE_SIMILARITY_THRESHOLD);
+    if(isDup) removed++;
+    else { kept.push(seg); fingerprints.push(words); }
+  });
+  return { segs:kept, removed };
+}
+function dedupeAcrossEdits(edits){
+  const fingerprints=[]; let removed=0;
+  const newEdits=edits.map(edit=>{
+    const keptSegs=[];
+    edit.segments.forEach(seg=>{
+      const words=normWords(spokenTextFor(seg));
+      const isDup=fingerprints.some(fp=>jaccardSim(fp,words)>=DEDUPE_SIMILARITY_THRESHOLD);
+      if(isDup) removed++;
+      else { keptSegs.push(seg); fingerprints.push(words); }
+    });
+    return { title:edit.title, segments:keptSegs };
+  }).filter(e=>e.segments.length);
+  return { edits:newEdits, removed };
+}
+
+/* ===== manual AI prompt build + paste-back parse ===== */
+function buildPrompt(){
+  const transcript=$('transcriptText').value.trim();
+  if(!transcript) return null;
+  const len=$('targetLen').value;
+  const numShorts=+$('numEdits').value;
+  return `Here is a timestamped transcript of a long video. I want ${numShorts} SEPARATE, INDEPENDENT short${numShorts>1?'s':''} out of it — each one its own standalone video ready to post (YouTube Shorts / Instagram / TikTok), not stylistic variations of the same highlights.
+
+TRANSCRIPT:
+${transcript}
+
+Instructions — follow exactly:
+1. Silently ignore filler words, false starts, and dead air.
+2. ${REPEAT_RULE}
+3. Build ${numShorts} short${numShorts>1?'s':''}. ${numShorts>1?'Each short must be genuinely different content — pull from different parts of the video for each short wherever possible so they don\u2019t repeat the same moments.':''}
+4. Within EACH short, clips do NOT need to be chronological or near each other — a short can combine a moment at 1:50 with another at 24:10 and another at 51:30, as long as they belong together and the short makes sense on its own.
+5. Aim for each short to be about ${len}.
+6. Output ONLY a numbered list per short, in this exact format, one short per block separated by a header line "SHORT n:":
+SHORT 1:
+1. 00:12-00:47 — one short reason this clip is strong | VISUAL: 2-4 word real-world search term for a real stock photo that fits this moment (real photography only, not icons, not text, not AI art)
+2. 24:10-24:35 — one short reason | VISUAL: ...
+
+SHORT 2:
+1. ...
+Use mm:ss or h:mm:ss timestamps matching the transcript. No other text before or after the lists.`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    try{
+      const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
+    }catch(e2){ return false; }
+  }
+}
+$('copyPromptBtn').onclick=async ()=>{
+  const prompt=buildPrompt();
+  if(!prompt){ toast('Add a transcript first (card 3)'); return; }
+  const ok=await copyText(prompt);
+  toast(ok?'✓ Copied — paste it into any AI chat':'Could not copy automatically — select the prompt text and copy it yourself');
+};
+
+let segments=[];
+let segIdCounter=1;
+function parseAiClipList(text){
+  const lines=text.replace(/\r/g,'').split('\n');
+  const re=/(\d{1,2}(?::\d{2}){1,2})\s*[-–—]\s*(\d{1,2}(?::\d{2}){1,2})\s*[—\-–]?\s*(.*)$/;
+  const out=[]; let skipped=0;
+  lines.forEach(line=>{
+    if(!line.trim()) return;
+    const m=line.match(re);
+    if(!m){ if(/\d/.test(line)) skipped++; return; }
+    const start=clockToSec(m[1]), end=clockToSec(m[2]);
+    if(start==null||end==null||end<=start) { skipped++; return; }
+    let rest=(m[3]||'').trim();
+    let visualQuery='';
+    const vMatch=rest.match(/\|\s*VISUAL:\s*(.*)$/i);
+    if(vMatch){ visualQuery=vMatch[1].trim(); rest=rest.slice(0,vMatch.index).trim(); }
+    out.push({ id:segIdCounter++, start, end, label:rest||'Clip', include:true, brollImg:null, brollURL:null, visualQuery, _page:0 });
+  });
+  return { segs:out, skipped };
+}
+$('usePasteBtn').onclick=()=>{
+  const text=$('aiPaste').value.trim();
+  if(!text){ toast("Paste the AI's reply first"); return; }
+  const shortBlocks=[...text.matchAll(/SHORT\s*(\d+)\s*:\s*\n([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/gi)];
+  if(shortBlocks.length>1){
+    const parsedShorts=shortBlocks.map(m=>{
+      const {segs}=parseAiClipList(m[2]||'');
+      return { title:'Short '+m[1], segments:segs };
+    }).filter(e=>e.segments.length);
+    if(parsedShorts.length){
+      const {edits:dedupedShorts, removed}=dedupeAcrossEdits(parsedShorts);
+      geminiEdits=dedupedShorts;
+      renderEditPicker();
+      loadEdit(0);
+      toast('✓ '+dedupedShorts.length+' shorts loaded'+(removed?' ('+removed+' repeated clip(s) removed)':'')+' — pick one below to review');
+      updateBuildEnabled();
+      return;
+    }
+  }
+  const {segs, skipped}=parseAiClipList(text);
+  if(!segs.length){ toast('Could not find any clips in that — check the format matches the example'); return; }
+  if(videoDuration){ segs.forEach(s=>{ s.end=Math.min(s.end, videoDuration); s.start=Math.min(s.start, s.end-0.3); }); }
+  const {segs:dedupedSegs, removed}=dedupeSegments(segs);
+  geminiEdits=[]; $('editPicker').classList.add('hidden'); $('editPicker').innerHTML='';
+  segments=dedupedSegs;
+  renderSegList();
+  const notes=[];
+  if(skipped) notes.push(skipped+' line(s) skipped');
+  if(removed) notes.push(removed+' repeated clip(s) removed');
+  toast('✓ '+dedupedSegs.length+' clips loaded'+(notes.length?' ('+notes.join(', ')+')':'')+' — review below');
+  updateBuildEnabled();
+};
+$('addSegBtn').onclick=()=>{
+  segments.push({ id:segIdCounter++, start:0, end:Math.min(10,videoDuration||10), label:'Clip', include:true, brollImg:null, brollURL:null, visualQuery:'', _page:0 });
+  renderSegList(); updateBuildEnabled();
+};
+
+/* ===== Gemini automatic analysis ===== */
+let geminiEdits=[];
+function buildGeminiPrompt(numShorts, lenText){
+  return `You are analyzing a video file directly (you can see and hear it).
+
+I want ${numShorts} SEPARATE, INDEPENDENT short${numShorts>1?'s':''} out of this video — each one its own standalone video ready to post (YouTube Shorts / Instagram / TikTok). ${numShorts>1?'These are NOT stylistic variations of the same highlight reel — they must be genuinely different content.':''}
+
+Do two things:
+
+1. Write a timestamped transcript of everything said, one line per sentence/phrase, in this exact format:
+[mm:ss] what was said
+
+2. Then build ${numShorts} short${numShorts>1?'s':''}:
+ - Silently skip filler words, false starts, and dead air.
+ - ${REPEAT_RULE}
+ ${numShorts>1?'- Each short must pull from different parts of the video wherever possible, so the shorts don\u2019t repeat the same moments.':'- Pick the strongest moments in the video for this one short.'}
+ - Within EACH short, clips do NOT need to be chronological or near each other — a single short can combine a moment at 1:50 with another at 24:10 and another at 51:30, as long as they belong together and that short makes sense on its own.
+ - Aim for each short to be about ${lenText}.
+ - For every clip also suggest a short real-world b-roll search term — 2-4 words describing a REAL stock photo (real people, real places, real nature — never icons, text, or AI art) that fits what's being said.
+
+Output ONLY in this exact structure, nothing else before or after, no markdown code fences:
+
+TRANSCRIPT:
+[00:05] ...
+[00:11] ...
+
+SHORT 1:
+1. 00:12-00:47 — one short reason | VISUAL: 2-4 word real photo search term
+2. 24:10-24:35 — one short reason | VISUAL: 2-4 word real photo search term
+
+SHORT 2:
+1. ...`;
+}
+function parseGeminiAnalysis(text){
+  const transcriptMatch=text.match(/TRANSCRIPT:([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/i);
+  const transcriptText=transcriptMatch?transcriptMatch[1].trim():'';
+  const parsedCues=parsePlainTimestamped(transcriptText);
+  const shortBlocks=[...text.matchAll(/SHORT\s*(\d+)\s*:\s*\n([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/gi)];
+  const edits=shortBlocks.map(m=>{
+    const {segs}=parseAiClipList(m[2]||'');
+    return { title:'Short '+m[1], segments:segs };
+  }).filter(e=>e.segments.length);
+  return { cues:parsedCues, edits };
+}
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result.split(',')[1]);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+function renderEditPicker(){
+  const box=$('editPicker');
+  if(geminiEdits.length<=1){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML='<h2 style="margin:0 0 8px;font-size:14px">Pick a short to load</h2><small style="display:block;margin-bottom:8px">Build this one, then come back and pick another.</small><div class="pills">'+
+    geminiEdits.map((e,i)=>`<div class="p${i===0?' on':''}" data-i="${i}">${e.title.replace(/</g,'&lt;')}</div>`).join('')+'</div>';
+  box.querySelectorAll('.p').forEach(p=>{
+    p.onclick=()=>{ box.querySelectorAll('.p').forEach(x=>x.classList.remove('on')); p.classList.add('on'); loadEdit(+p.dataset.i); };
+  });
+}
+function loadEdit(i){
+  const edit=geminiEdits[i]; if(!edit) return;
+  segments=edit.segments.map(s=>({ id:segIdCounter++, start:s.start, end:s.end, label:s.label, include:true, brollImg:null, brollURL:null, visualQuery:s.visualQuery||'', _page:0 }));
+  if(videoDuration){ segments.forEach(s=>{ s.end=Math.min(s.end,videoDuration); s.start=Math.min(s.start,s.end-0.3); }); }
+  renderSegList(); updateBuildEnabled();
+}
+$('analyzeBtn').onclick=async ()=>{
+  const apiKey=$('geminiKey').value.trim();
+  const model=getSelectedModel();
+  if(!apiKey){ toast('Paste your Gemini API key first'); return; }
+  if(!videoFile){ toast('Upload a video first'); return; }
+  if($('rememberKey').checked) localStorage.setItem('sf_gemini_key', apiKey); else localStorage.removeItem('sf_gemini_key');
+
+  const numShorts=+$('numEdits').value;
+  const lenText=$('targetLen').value;
+  const prompt=buildGeminiPrompt(numShorts, lenText);
+
+  $('analyzeBtn').disabled=true;
+  $('analyzeStatus').textContent='Preparing…';
+
+  try{
+    let fileDataPart;
+    const INLINE_LIMIT=18*1024*1024;
+    if(videoFile.size<=INLINE_LIMIT){
+      $('analyzeStatus').textContent='Encoding video…';
+      const b64=await fileToBase64(videoFile);
+      fileDataPart={ inline_data: { mime_type: videoFile.type||'video/mp4', data: b64 } };
+    } else {
+      $('analyzeStatus').textContent='Uploading video to Gemini… large files can take a while';
+      const startRes=await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files',{
+        method:'POST',
+        headers:{
+          'x-goog-api-key': apiKey,
+          'X-Goog-Upload-Protocol':'resumable',
+          'X-Goog-Upload-Command':'start',
+          'X-Goog-Upload-Header-Content-Length': String(videoFile.size),
+          'X-Goog-Upload-Header-Content-Type': videoFile.type||'video/mp4',
+          'Content-Type':'application/json'
+        },
+        body: JSON.stringify({file:{display_name:videoFile.name}})
+      });
+      if(!startRes.ok){
+        const errBody=await startRes.json().catch(()=>({}));
+        throw new Error((errBody.error && errBody.error.message) || ('Upload start failed — HTTP '+startRes.status));
+      }
+      const uploadUrl=startRes.headers.get('x-goog-upload-url');
+      if(!uploadUrl) throw new Error('UPLOAD_URL_BLOCKED');
+
+      const putRes=await fetch(uploadUrl,{
+        method:'POST',
+        headers:{ 'X-Goog-Upload-Offset':'0', 'X-Goog-Upload-Command':'upload, finalize' },
+        body: videoFile
+      });
+      if(!putRes.ok){
+        const errBody=await putRes.json().catch(()=>({}));
+        throw new Error((errBody.error && errBody.error.message) || ('Upload failed — HTTP '+putRes.status));
+      }
+      let fileMeta=(await putRes.json()).file;
+      if(!fileMeta || !fileMeta.uri) throw new Error('UPLOAD_FAILED');
+
+      $('analyzeStatus').textContent='Processing on Gemini…';
+      let tries=0;
+      while(fileMeta.state==='PROCESSING' && tries<40){
+        await new Promise(r=>setTimeout(r,3000));
+        const checkRes=await fetch('https://generativelanguage.googleapis.com/v1beta/'+fileMeta.name,{ headers:{'x-goog-api-key':apiKey} });
+        fileMeta=await checkRes.json();
+        tries++;
+        $('analyzeStatus').textContent='Processing on Gemini… ('+(tries*3)+'s)';
+      }
+      if(fileMeta.state!=='ACTIVE') throw new Error('PROCESS_FAILED');
+      fileDataPart={ file_data: { file_uri: fileMeta.uri, mime_type: fileMeta.mimeType||videoFile.type||'video/mp4' } };
+    }
+
+    $('analyzeStatus').textContent='Analyzing…';
+    const genRes=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
+      method:'POST',
+      headers:{ 'x-goog-api-key': apiKey, 'Content-Type':'application/json' },
+      body: JSON.stringify({ contents:[{ parts:[ fileDataPart, {text:prompt} ] }] })
+    });
+    const genJson=await genRes.json().catch(()=>({}));
+    if(!genRes.ok || genJson.error) throw new Error((genJson.error && genJson.error.message) || ('Request failed — HTTP '+genRes.status));
+
+    let text=((genJson.candidates && genJson.candidates[0] && genJson.candidates[0].content && genJson.candidates[0].content.parts) || []).map(p=>p.text||'').join('\n');
+    text=text.replace(/^```[a-z]*\n?/i,'').replace(/```\s*$/,'').trim();
+    if(!text) throw new Error('EMPTY_RESPONSE');
+
+    const {cues:parsedCues, edits}=parseGeminiAnalysis(text);
+    if(!edits.length) throw new Error('NO_EDITS_PARSED');
+
+    cues=parsedCues;
+    const {edits:dedupedEdits, removed}=dedupeAcrossEdits(edits);
+    geminiEdits=dedupedEdits;
+    renderEditPicker();
+    loadEdit(0);
+    $('analyzeStatus').textContent='✓ Done — '+dedupedEdits.length+' short(s) ready'+(removed?' ('+removed+' repeated clip(s) removed)':'')+', loaded the first one below';
+    toast('✓ Analysis complete');
+  }catch(err){
+    console.error(err);
+    let msg='Analysis failed — ';
+    if(err.message==='UPLOAD_URL_BLOCKED') msg+="browser blocked reading Gemini's upload address. Use the manual flow below.";
+    else if(err.message==='PROCESS_FAILED') msg+='Gemini took too long to process the file. Try a shorter clip, or use the manual flow below.';
+    else if(err.message==='EMPTY_RESPONSE') msg+='Gemini returned nothing. Try again, or use the manual flow below.';
+    else if(err.message==='NO_EDITS_PARSED') msg+="Gemini's reply didn't match the expected format. Try again, or use the manual flow below.";
+    else msg+=err.message;
+    $('analyzeStatus').textContent=msg;
+    toast('Analysis failed — see note under the button');
+  }finally{
+    $('analyzeBtn').disabled=false;
+  }
+};
+
+/* ===== Pexels real-photo b-roll ===== */
+function shapeOrientationParam(){ const s=$('shape').value; if(s==='tall') return 'portrait'; if(s==='square') return 'square'; return 'landscape'; }
+async function pexelsFindPhoto(query, page){
+  const key=$('pexelsKey').value.trim();
+  if(!key || !query) return null;
+  try{
+    const res=await fetch('https://api.pexels.com/v1/search?query='+encodeURIComponent(query)+'&per_page=1&page='+(page||1)+'&orientation='+shapeOrientationParam(),{
+      headers:{ 'Authorization': key }
+    });
+    if(!res.ok) return null;
+    const json=await res.json().catch(()=>null);
+    if(!json || !json.photos || !json.photos.length) return null;
+    return json.photos[0];
+  }catch(err){ return null; }
+}
+function loadImageFromUrl(url){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(); img.crossOrigin='anonymous';
+    img.onload=()=>resolve(img); img.onerror=reject;
+    img.src=url;
+  });
+}
+async function findBrollForSegment(seg){
+  if(!$('pexelsKey').value.trim()){ return false; }
+  const q=(seg.visualQuery||'').trim();
+  if(!q){ return false; }
+  seg._page=(seg._page||0)+1;
+  const photo=await pexelsFindPhoto(q, ((seg._page-1)%5)+1);
+  if(!photo){ return false; }
+  try{
+    const img=await loadImageFromUrl(photo.src.large);
+    seg.brollImg=img; seg.brollURL=photo.src.tiny||photo.src.small;
+    return true;
+  }catch(err){ return false; }
+}
+$('autoFindAllBtn').onclick=async ()=>{
+  if(!$('pexelsKey').value.trim()){ toast('Add a Pexels API key first'); return; }
+  const targets=segments.filter(s=>s.include && !s.brollImg && (s.visualQuery||'').trim());
+  if(!targets.length){ toast('No clips need b-roll (all set, or none have a search term)'); return; }
+  $('autoFindAllBtn').disabled=true;
+  toast('Finding b-roll for '+targets.length+' clip(s)…');
+  let got=0;
+  for(const seg of targets){ const ok=await findBrollForSegment(seg); if(ok) got++; renderSegList(); }
+  $('autoFindAllBtn').disabled=false;
+  toast(got ? ('✓ Found '+got+' of '+targets.length+' real photo(s)') : 'Found none — check your Pexels key or try different search terms');
+};
+
+function renderSegList(){
+  const box=$('segList'); box.innerHTML='';
+  segments.forEach((seg,i)=>{
+    const row=document.createElement('div');
+    row.className='segrow'+(seg.include?'':' off');
+    row.innerHTML=`
+      <div class="segtop">
+        <div class="idx">${i+1}</div>
+        <input type="checkbox" ${seg.include?'checked':''} data-act="inc">
+        <label>${seg.label.replace(/</g,'&lt;')}</label>
+        <div class="segbtns">
+          <button data-act="up" ${i===0?'disabled':''}>↑</button>
+          <button data-act="down" ${i===segments.length-1?'disabled':''}>↓</button>
+          <button data-act="del">✕</button>
+        </div>
+      </div>
+      <div class="segtimes">
+        Start <input type="text" data-act="start" value="${secToClock(seg.start)}">
+        End <input type="text" data-act="end" value="${secToClock(seg.end)}">
+        <small>(${Math.max(0,(seg.end-seg.start)).toFixed(1)}s)</small>
+      </div>
+      <div class="brollrow">
+        <input type="text" data-act="vq" placeholder="b-roll search term, e.g. women praying" value="${(seg.visualQuery||'').replace(/"/g,'&quot;')}">
+        <button class="findbtn" data-act="findBroll">${seg.brollImg?'🔁 Try another':'🔍 Find real photo'}</button>
+      </div>
+      <div class="brollrow">
+        ${seg.brollURL?`<img class="thumb" src="${seg.brollURL}">`:''}
+        <input type="file" accept="image/*" data-act="broll">
+        ${seg.brollURL?`<button data-act="noBroll" style="background:#222c3d;border:1px solid var(--line);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px">Remove b-roll</button>`:''}
+      </div>`;
+    row.querySelector('[data-act=inc]').onchange=e=>{ seg.include=e.target.checked; renderSegList(); updateBuildEnabled(); };
+    row.querySelector('[data-act=up]').onclick=()=>{ if(i>0){ [segments[i-1],segments[i]]=[segments[i],segments[i-1]]; renderSegList(); } };
+    row.querySelector('[data-act=down]').onclick=()=>{ if(i<segments.length-1){ [segments[i+1],segments[i]]=[segments[i],segments[i+1]]; renderSegList(); } };
+    row.querySelector('[data-act=del]').onclick=()=>{ segments.splice(i,1); renderSegList(); updateBuildEnabled(); };
+    row.querySelector('[data-act=start]').onchange=e=>{ const s=clockToSec(e.target.value); if(s!=null && s<seg.end) seg.start=s; else toast('Bad start time'); renderSegList(); };
+    row.querySelector('[data-act=end]').onchange=e=>{ const en=clockToSec(e.target.value); if(en!=null && en>seg.start) seg.end=videoDuration?Math.min(en,videoDuration):en; else toast('Bad end time'); renderSegList(); };
+    row.querySelector('[data-act=vq]').onchange=e=>{ seg.visualQuery=e.target.value; };
+    row.querySelector('[data-act=findBroll]').onclick=async (e)=>{
+      const btn=e.target; const prevText=btn.textContent;
+      seg.visualQuery=row.querySelector('[data-act=vq]').value;
+      if(!$('pexelsKey').value.trim()){ toast('Add a Pexels API key first'); return; }
+      if(!(seg.visualQuery||'').trim()){ toast('Add a search term for this clip first'); return; }
+      btn.disabled=true; btn.textContent='Searching…';
+      const ok=await findBrollForSegment(seg);
+      if(!ok){ btn.textContent=prevText; toast('No results — try a different term'); }
+      renderSegList(); updateBuildEnabled();
+    };
+    row.querySelector('[data-act=broll]').onchange=e=>{
+      const f=e.target.files && e.target.files[0]; if(!f) return;
+      const img=new Image(); const url=URL.createObjectURL(f);
+      img.onload=()=>{ seg.brollImg=img; seg.brollURL=url; renderSegList(); };
+      img.src=url;
+    };
+    const noBrollBtn=row.querySelector('[data-act=noBroll]');
+    if(noBrollBtn) noBrollBtn.onclick=()=>{ seg.brollImg=null; seg.brollURL=null; renderSegList(); };
+    box.appendChild(row);
+  });
+}
+function updateBuildEnabled(){
+  $('buildBtn').disabled = !(videoFile && segments.some(s=>s.include));
+}
+
+/* ===== canvas draw helpers ===== */
+function shapeWH(){ const s=$('shape').value; if(s==='tall') return [1080,1920]; if(s==='square') return [1080,1080]; return [1920,1080]; }
+function drawCover(ctx, media, naturalW, naturalH, x,y,w,h){
+  if(!naturalW||!naturalH) return;
+  const scale=Math.max(w/naturalW, h/naturalH);
+  const sw=w/scale, sh=h/scale, sx=(naturalW-sw)/2, sy=(naturalH-sh)/2;
+  ctx.drawImage(media, sx, sy, sw, sh, x, y, w, h);
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font; const words=text.split(' '); const lines=[]; let cur='';
+  for(const w of words){ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t; }
+  if(cur) lines.push(cur); return lines;
+}
+/* v3.5: cached lookup so a cue's wrapping is computed once, not every rAF frame */
+function getWrappedLines(ctx, text, maxW, font, cache){
+  const key=font+'||'+maxW+'||'+text;
+  if(cache && cache.has(key)) return cache.get(key);
+  const lines=wrapText(ctx, text, maxW, font).slice(0,2);
+  if(cache) cache.set(key, lines);
+  return lines;
+}
+function drawCaption(ctx, W, H, text, settings, cache){
+  if(!text) return;
+  const style=settings.style, position=settings.position;
+  const textColor=settings.textColor||'#ffffff';
+  const boxColor=settings.boxColor||'#000000';
+  const fontFamily=FONT_MAP[settings.fontKey]||FONT_MAP.default;
+  const fs=Math.round(W*0.06);
+  const font='800 '+fs+'px '+fontFamily;
+  ctx.font=font;
+  const maxW=W*0.86;
+  const lines=getWrappedLines(ctx, text, maxW, font, cache);
+  const lh=fs*1.22;
+
+  if(style==='bar'){
+    const padY=16, boxH=lines.length*lh+padY*2, boxX=W*0.08, boxW=W*0.84;
+    let boxY = position==='top' ? H*0.1 : position==='bottom' ? H-boxH-H*0.08 : H/2-boxH/2;
+    ctx.fillStyle=hexToRgba(boxColor,0.55);
+    const r=16;
+    ctx.beginPath();
+    ctx.moveTo(boxX+r,boxY); ctx.arcTo(boxX+boxW,boxY,boxX+boxW,boxY+boxH,r);
+    ctx.arcTo(boxX+boxW,boxY+boxH,boxX,boxY+boxH,r); ctx.arcTo(boxX,boxY+boxH,boxX,boxY,r); ctx.arcTo(boxX,boxY,boxX+boxW,boxY,r);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle=textColor; ctx.textAlign='center';
+    let ty=boxY+padY+fs*0.85;
+    lines.forEach(l=>{ ctx.fillText(l, W/2, ty); ty+=lh; });
+  } else if(style==='shadow'){
+    const boxH=lines.length*lh;
+    let boxY = position==='top' ? H*0.1 : position==='bottom' ? H-boxH-H*0.08 : H/2-boxH/2;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=16; ctx.shadowOffsetX=0; ctx.shadowOffsetY=3;
+    ctx.fillStyle=textColor; ctx.textAlign='center';
+    let ty=boxY+fs*0.85;
+    lines.forEach(l=>{ ctx.fillText(l, W/2, ty); ty+=lh; });
+    ctx.restore();
+  } else {
+    const boxH=lines.length*lh;
+    let boxY = position==='top' ? H*0.1 : position==='bottom' ? H-boxH-H*0.08 : H/2-boxH/2;
+    let ty=boxY+fs*0.85;
+    lines.forEach(l=>{
+      ctx.font=font;
+      const tw=ctx.measureText(l).width;
+      const padX=22, padY=12;
+      const chipW=tw+padX*2, chipH=fs+padY*2;
+      const chipX=W/2-chipW/2, chipY=ty-fs*0.85-padY+fs*0.1;
+      ctx.fillStyle=boxColor;
+      const r2=chipH/2;
+      ctx.beginPath();
+      ctx.moveTo(chipX+r2,chipY); ctx.arcTo(chipX+chipW,chipY,chipX+chipW,chipY+chipH,r2);
+      ctx.arcTo(chipX+chipW,chipY+chipH,chipX,chipY+chipH,r2); ctx.arcTo(chipX,chipY+chipH,chipX,chipY,r2); ctx.arcTo(chipX,chipY,chipX+chipW,chipY,r2);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle=textColor; ctx.textAlign='center';
+      ctx.fillText(l, W/2, ty);
+      ty+=lh;
+    });
+  }
+}
+
+/* ===== audio graph ===== */
+let audioCtx=null, mediaStreamDest=null, videoSourceNode=null, voiceGain=null, musicGain=null, musicEl=null, musicSource=null;
+function ensureAudioGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!mediaStreamDest) mediaStreamDest=audioCtx.createMediaStreamDestination();
+  /* v3.5: voiceGain is NOT connected to audioCtx.destination here anymore — that was the literal reason
+     builds were always audible. Monitoring to speakers is now opt-in, wired per-build in the build handler. */
+  if(!voiceGain){ voiceGain=audioCtx.createGain(); voiceGain.gain.value=1; voiceGain.connect(mediaStreamDest); }
+  if(!musicGain){ musicGain=audioCtx.createGain(); musicGain.gain.value=+($('musicVol').value||0.25); musicGain.connect(mediaStreamDest); }
+  if(!videoSourceNode && video){ videoSourceNode=audioCtx.createMediaElementSource(video); videoSourceNode.connect(voiceGain); }
+}
+function fadeVoice(target, seconds){
+  if(!voiceGain||!audioCtx) return;
+  const now=audioCtx.currentTime;
+  try{
+    voiceGain.gain.cancelScheduledValues(now);
+    voiceGain.gain.setValueAtTime(voiceGain.gain.value, now);
+    voiceGain.gain.linearRampToValueAtTime(target, now+Math.max(0.01,seconds));
+  }catch(err){}
+}
+$('musicFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAudioGraph();
+  if(musicEl){ musicEl.pause(); }
+  musicEl=new Audio(); musicEl.src=URL.createObjectURL(f); musicEl.loop=true; musicEl.crossOrigin='anonymous';
+  if(musicSource){ try{musicSource.disconnect();}catch(err){} }
+  musicSource=audioCtx.createMediaElementSource(musicEl);
+  musicSource.connect(musicGain);
+  toast('✓ Background music loaded');
+});
+
+/* ===== auto pause-removal ===== */
+let analysisBuffer=null, decodingPromise=null;
+async function ensureDecodedAudio(){
+  if(analysisBuffer) return analysisBuffer;
+  if(decodingPromise) return decodingPromise;
+  if(!videoFile || typeof OfflineAudioContext==='undefined') return null;
+  decodingPromise=(async ()=>{
+    try{
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const arrBuf=await videoFile.arrayBuffer();
+      const fullBuf=await audioCtx.decodeAudioData(arrBuf);
+      const targetSr=8000;
+      const offlineCtx=new OfflineAudioContext(1, Math.max(1,Math.ceil(fullBuf.duration*targetSr)), targetSr);
+      const src=offlineCtx.createBufferSource();
+      src.buffer=fullBuf;
+      src.connect(offlineCtx.destination);
+      src.start(0);
+      const rendered=await offlineCtx.startRendering();
+      analysisBuffer=rendered;
+      return rendered;
+    }catch(err){
+      console.error(err);
+      return null;
+    } finally {
+      decodingPromise=null;
+    }
+  })();
+  return decodingPromise;
+}
+const PAUSE_PRESETS={
+  light:{ relThreshold:0.05, minGapSec:0.9, paddingSec:0.15 },
+  medium:{ relThreshold:0.08, minGapSec:0.6, paddingSec:0.12 },
+  aggressive:{ relThreshold:0.12, minGapSec:0.35, paddingSec:0.08 }
+};
+function computeSpeakingWindows(buf, start, end, params){
+  const sr=buf.sampleRate; const data=buf.getChannelData(0);
+  const startIdx=Math.max(0,Math.floor(start*sr)), endIdx=Math.min(data.length, Math.ceil(end*sr));
+  if(endIdx<=startIdx) return [[start,end]];
+  const winSamples=Math.max(1, Math.floor(sr*0.02));
+  const rms=[];
+  for(let i=startIdx;i<endIdx;i+=winSamples){
+    let sum=0,count=0;
+    const lim=Math.min(i+winSamples,endIdx);
+    for(let j=i;j<lim;j++){ sum+=data[j]*data[j]; count++; }
+    rms.push(count?Math.sqrt(sum/count):0);
+  }
+  if(!rms.length) return [[start,end]];
+  let maxRms=0; for(const v of rms) if(v>maxRms) maxRms=v;
+  if(maxRms<1e-5) return [[start,end]];
+  const thresh=maxRms*params.relThreshold;
+  const minGapWindows=Math.max(1,Math.round(params.minGapSec/0.02));
+  const paddingWindows=Math.max(0,Math.round(params.paddingSec/0.02));
+  const keep=rms.map(()=>true);
+  let i=0;
+  while(i<rms.length){
+    if(rms[i]<thresh){
+      let j=i; while(j<rms.length && rms[j]<thresh) j++;
+      const runLen=j-i;
+      if(runLen>=minGapWindows){
+        const cutStart=Math.min(i+paddingWindows,j);
+        const cutEnd=Math.max(j-paddingWindows,cutStart);
+        for(let k=cutStart;k<cutEnd;k++) keep[k]=false;
+      }
+      i=j;
+    } else i++;
+  }
+  const windows=[]; let ws=null;
+  for(let k=0;k<keep.length;k++){
+    const t=start+k*0.02;
+    if(keep[k]){ if(ws===null) ws=t; }
+    else { if(ws!==null){ windows.push([ws,t]); ws=null; } }
+  }
+  if(ws!==null) windows.push([ws,end]);
+  const merged=[];
+  windows.forEach(w=>{
+    if(merged.length && w[0]-merged[merged.length-1][1] < 0.15) merged[merged.length-1][1]=w[1];
+    else merged.push(w.slice());
+  });
+  const final=merged.filter(w=>w[1]-w[0]>0.12);
+  return final.length?final:[[start,end]];
+}
+
+/* ===== cut transitions — v3.5: only applied at real segment-to-segment boundaries now (see build loop) ===== */
+const TRANSITION_PRESETS={
+  none:{style:'none', ms:0},
+  quickCross:{style:'cross', ms:140},
+  smoothCross:{style:'cross', ms:300},
+  blackFade:{style:'black', ms:420}
+};
+
+/* ===== build / render pipeline — non-blocking corner panel, no forced watching ===== */
+function seekVideoTo(v, t){
+  return new Promise(resolve=>{
+    function onSeeked(){ v.removeEventListener('seeked', onSeeked); resolve(); }
+    v.addEventListener('seeked', onSeeked);
+    v.currentTime=Math.max(0, Math.min(t, (videoDuration||t)-0.05));
+  });
+}
+let cancelRequested=false, mr=null, chunks=[], resultBlob=null, isBuilding=false;
+
+$('buildBtn').onclick=async ()=>{
+  const included=segments.filter(s=>s.include);
+  if(!included.length){ toast('No clips included'); return; }
+  cancelRequested=false; isBuilding=true;
+  $('buildBtn').disabled=true; $('addSegBtn').disabled=true;
+  $('segList').classList.add('locked');
+
+  try{
+    ensureAudioGraph();
+    if(audioCtx.state==='suspended') await audioCtx.resume();
+
+    /* v3.5: quiet-by-default build. Monitoring to speakers + visible canvas are opt-in. */
+    const previewOn=$('previewDuringBuild').checked;
+    $('processingPanel').classList.toggle('quiet', !previewOn);
+    $('procHeadLabel').textContent = previewOn ? 'Building…' : 'Building (quiet)…';
+    try{
+      if(previewOn) voiceGain.connect(audioCtx.destination);
+      else voiceGain.disconnect(audioCtx.destination);
+    }catch(err){ /* fine if it wasn't connected */ }
+
+    const cv=$('cv'), ctx=cv.getContext('2d');
+    const [W,H]=shapeWH(); cv.width=W; cv.height=H;
+
+    const transCv=document.createElement('canvas'); transCv.width=W; transCv.height=H;
+    const transCtx=transCv.getContext('2d');
+    transCtx.fillStyle='#000'; transCtx.fillRect(0,0,W,H);
+    const transitionParams = TRANSITION_PRESETS[$('transitionMode').value] || TRANSITION_PRESETS.quickCross;
+
+    $('processingPanel').classList.remove('hidden');
+    $('progLabel').textContent='Preparing…'; $('progFill').style.width='0%';
+
+    const canvasStream=cv.captureStream(30);
+    const tracks=[...canvasStream.getVideoTracks(), ...mediaStreamDest.stream.getAudioTracks()];
+    const combined=new MediaStream(tracks);
+    const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+    mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+    chunks=[];
+    mr.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopPromise=new Promise(resolve=>{ mr.onstop=()=>{ resultBlob=new Blob(chunks,{type:mr.mimeType}); resolve(); }; });
+
+    mr.start(300);
+    if(musicEl){ musicEl.currentTime=0; musicEl.play().catch(()=>{}); }
+
+    const captionsOn=$('captionsOn').checked;
+    const capSettings={ style:$('capStyle').value, position:$('capPosition').value, textColor:$('capTextColor').value, boxColor:$('capBoxColor').value, fontKey:$('capFont').value };
+    const displayCues = captionsOn ? buildDisplayCues(+$('capWords').value||4) : [];
+    const capCache=new Map(); /* v3.5: avoids recomputing text wrapping every frame */
+
+    const autoPauseOn=$('autoPauseOn').checked;
+    let analysisBuf=null;
+    if(autoPauseOn){
+      $('progLabel').textContent='Analyzing audio for pauses…';
+      analysisBuf=await ensureDecodedAudio();
+      if(!analysisBuf) toast('Could not analyze audio for pause removal — building without it');
+    }
+    const pauseParams=PAUSE_PRESETS[$('pauseSensitivity').value]||PAUSE_PRESETS.medium;
+
+    /* v3.5: automatic b-roll fetch during build, with accurate reporting — fixes "entered the key but got
+       nothing" by removing the separate manual-click requirement and the previously misleading toast. */
+    const pexKey=$('pexelsKey').value.trim();
+    if(pexKey && !cancelRequested){
+      const needBroll=included.filter(s=>!s.brollImg && (s.visualQuery||'').trim());
+      if(needBroll.length){
+        let gotCount=0;
+        for(let bi=0; bi<needBroll.length; bi++){
+          if(cancelRequested) break;
+          $('progLabel').textContent='Finding real photo '+(bi+1)+' of '+needBroll.length+'…';
+          const ok=await findBrollForSegment(needBroll[bi]);
+          if(ok) gotCount++;
+        }
+        if(gotCount) toast('✓ Found '+gotCount+' of '+needBroll.length+' real photo(s)');
+        else toast('No real photos found for these clips — check your Pexels key or search terms');
+      }
+    }
+
+    for(let i=0;i<included.length;i++){
+      if(cancelRequested) break;
+      const seg=included[i];
+      $('progLabel').textContent='Clip '+(i+1)+' of '+included.length+' — '+seg.label;
+      $('progFill').style.width=Math.round((i/included.length)*100)+'%';
+
+      const subWindows = (autoPauseOn && analysisBuf) ? computeSpeakingWindows(analysisBuf, seg.start, seg.end, pauseParams) : [[seg.start, seg.end]];
+
+      for(let wi=0; wi<subWindows.length; wi++){
+        if(cancelRequested) break;
+        const win=subWindows[wi];
+        const wStart=win[0], wEnd=win[1];
+        const winDurMs=(wEnd-wStart)*1000;
+        /* v3.5: only the FIRST sub-window of a segment (a real cut-to-a-new-clip boundary) gets the full
+           visual blend; internal pause-removal joins (wi>0) skip the heavy compositing entirely — this is
+           the direct fix for the reported sync drift / early-ending video. */
+        const isSegBoundary = (wi===0);
+        const effTransMs = (isSegBoundary && transitionParams.style!=='none') ? Math.max(0, Math.min(transitionParams.ms, winDurMs*0.4)) : 0;
+        const audioFadeSec = effTransMs>0 ? Math.min(effTransMs/1000,0.3) : 0.015;
+
+        video.pause();
+        await seekVideoTo(video, wStart);
+        voiceGain.gain.cancelScheduledValues(audioCtx.currentTime);
+        voiceGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        try{ await video.play(); }catch(err){}
+        fadeVoice(1, audioFadeSec);
+
+        const transStartTs=performance.now();
+        let fadeStarted=false;
+        await new Promise(resolve=>{
+          function step(){
+            if(cancelRequested || video.currentTime>=wEnd || video.ended){
+              voiceGain.gain.cancelScheduledValues(audioCtx.currentTime);
+              voiceGain.gain.setValueAtTime(0, audioCtx.currentTime);
+              video.pause();
+              transCtx.clearRect(0,0,W,H);
+              transCtx.drawImage(cv,0,0,W,H);
+              resolve();
+              return;
+            }
+            const remaining=wEnd-video.currentTime;
+            if(!fadeStarted && remaining<=audioFadeSec){ fadeVoice(0, Math.max(0.01,remaining)); fadeStarted=true; }
+
+            ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+            if(seg.brollImg) drawCover(ctx, seg.brollImg, seg.brollImg.naturalWidth, seg.brollImg.naturalHeight, 0,0,W,H);
+            else drawCover(ctx, video, video.videoWidth, video.videoHeight, 0,0,W,H);
+            if(captionsOn){ const c=findCueIn(displayCues, video.currentTime); if(c) drawCaption(ctx, W, H, c.text, capSettings, capCache); }
+
+            if(effTransMs>0){
+              const elapsed=performance.now()-transStartTs;
+              if(elapsed<effTransMs){
+                const t=elapsed/effTransMs;
+                if(transitionParams.style==='cross'){
+                  ctx.save(); ctx.globalAlpha=1-t; ctx.drawImage(transCv,0,0,W,H); ctx.restore();
+                } else if(transitionParams.style==='black'){
+                  ctx.save();
+                  if(t<0.5){ ctx.drawImage(transCv,0,0,W,H); ctx.globalAlpha=t/0.5; ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); }
+                  else { ctx.globalAlpha=1-(t-0.5)/0.5; ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); }
+                  ctx.restore();
+                }
+              }
+            }
+
+            requestAnimationFrame(step);
+          }
+          step();
+        });
+      }
+    }
+
+    $('progLabel').textContent='Finishing…'; $('progFill').style.width='100%';
+    video.pause();
+    if(musicEl) musicEl.pause();
+    if(mr.state==='recording') mr.stop();
+    await stopPromise;
+
+    try{ voiceGain.disconnect(audioCtx.destination); }catch(err){}
+
+    $('processingPanel').classList.add('hidden');
+    if(cancelRequested){ toast('Cancelled'); return; }
+    $('takeVid').src=URL.createObjectURL(resultBlob);
+    $('after').classList.add('show');
+  } catch(err){
+    console.error(err);
+    $('processingPanel').classList.add('hidden');
+    toast('Build failed — '+(err.message||'something went wrong'));
+  } finally {
+    isBuilding=false;
+    $('buildBtn').disabled=false; $('addSegBtn').disabled=false;
+    $('segList').classList.remove('locked');
+    updateBuildEnabled();
+  }
+};
+
+$('cancelBtn').onclick=()=>{
+  cancelRequested=true;
+  toast('Cancelling…');
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'clipassembler-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+$('saveTake').onclick=()=>{
+  const a=document.createElement('a'); a.href=URL.createObjectURL(resultBlob); a.download=fileBase()+(/mp4/i.test(resultBlob.type)?'.mp4':'.webm'); a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause(); };
+</script>
+</body>
+</html>

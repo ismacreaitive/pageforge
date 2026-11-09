@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<!-- screen-demo.html — v4 — StoryForge Pack 2 · 📱 Screen Demo. v4: (1) zoom sound is now a 3-way select (Whoosh / Soft Click / No Sound) instead of an on/off checkbox, since people react differently to sound and some viewers should get a silent version. (2) added "Continue numbering across screens" checkbox (default off) — when on, highlight-point numbers keep counting up across every uploaded screenshot (screen one ends at 5, screen two starts at 6) instead of each screenshot restarting at 1; purely affects the marking UI's displayed numbers via a shared recomputeAllMarkerNumbers() pass, does not change playback (each screenshot already plays right after the last with only one countdown at the very start). v3: fixed marker-clamp bug blocking top/bottom edge taps, fixed hint-label intercepting taps near the bottom, added hook/outro suggestion helper (content type + optional pasted heading -> 3 hook + 3 outro pill options). v2: whoosh sound on zoom transitions, blank intro/outro by default, in-UI tip for Chrome's full-page screenshot capture. v1: upload screenshots, tap to drop numbered highlight points with captions, camera auto zooms/pans/holds on each in order. Multiple screenshots chain into one video (Intro -> countdown -> scenes -> Outro -> loop). 3 frame styles, 3 motion effects, 4 themes, PNG + REC. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Screen Demo</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=file]{padding:6px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.scenehead{display:flex;gap:8px;align-items:center}
+.scenehead b{flex:1}
+.scenehead .btn{flex:0 0 auto;width:auto;padding:6px 10px;font-size:13px}
+.shotwrap{position:relative;margin-top:10px;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;line-height:0}
+.shotwrap img{display:block;width:100%;height:auto}
+.markerlayer{position:absolute;inset:0;pointer-events:none}
+.mdot{position:absolute;width:26px;height:26px;margin-left:-13px;margin-top:-13px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,0,0,.5)}
+.shothint{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:#fff;background:rgba(0,0,0,.45);padding:4px;pointer-events:none}
+.tipbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;font-size:13px;color:var(--muted)}
+.tipbox b{color:var(--text)}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>📱 Screen Demo <small>v4</small></h1>
+  <small>Upload screenshots, tap to highlight, the camera does the rest</small>
+
+  <div class="card">
+    <h2>Screens in this video</h2>
+    <small id="sceneHint">Upload an image, then tap it to drop highlight points (optional). Each gets its own caption.</small>
+    <div class="tipbox">
+      <b>Showing a whole website in one smooth shot:</b> in Chrome, open your site, press F12, then Ctrl+Shift+P (Cmd+Shift+P on Mac), type "screenshot", and choose "Capture full size screenshot." That saves one single tall image of the entire page. Upload that one image below and mark as many points as you like, top to bottom.
+    </div>
+    <div class="checkrow">
+      <input type="checkbox" id="continueNumbering">
+      <label for="continueNumbering">Continue highlight numbering across screens (screen one ends at 5, screen two starts at 6)</label>
+    </div>
+    <div id="demoScenesContainer"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="addDemoBtn" type="button">+ Add another screen</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro (optional)</h2>
+    <small>Leave either blank to skip it. Or get suggestions based on what you uploaded:</small>
+    <div class="row" style="margin-top:8px">
+      <select id="contentType">
+        <option value="website">Website</option>
+        <option value="app">App</option>
+        <option value="product">Product / Service</option>
+        <option value="islamic">Islamic Content</option>
+        <option value="general">General</option>
+      </select>
+    </div>
+    <input id="contentKeyword" placeholder="Paste the page's main heading, or a few words about it (optional)" style="margin-top:8px">
+    <div class="row" style="margin-top:8px">
+      <button class="btn gold" id="suggestBtn" type="button">💡 Suggest hooks &amp; outros</button>
+    </div>
+    <div id="hookPills" class="hidden" style="margin-top:10px">
+      <small>Pick a hook (tap to use):</small>
+      <div class="pills" id="hookPillsList" style="margin-top:6px"></div>
+    </div>
+    <div id="outroPills" class="hidden" style="margin-top:10px">
+      <small>Pick an outro (tap to use):</small>
+      <div class="pills" id="outroPillsList" style="margin-top:6px"></div>
+    </div>
+    <input id="introText" placeholder="Intro text (or pick a suggestion above)" style="margin-top:10px" value="">
+    <input id="outroText" placeholder="Outro text (or pick a suggestion above)" style="margin-top:8px" value="">
+    <div class="checkrow">
+      <input type="checkbox" id="showCountdown" checked>
+      <label for="showCountdown">Show 3-2-1 countdown before the first screen</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="smooth">Smooth pan</option><option value="snappy">Snappy zoom</option><option value="pulse">Pulsing highlight</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="speed"><option value="normal" selected>Normal</option><option value="fast">Fast</option><option value="slow">Slow</option></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sound</h2>
+    <small>Sound when the camera moves to a highlight point:</small>
+    <div class="row" style="margin-top:6px">
+      <select id="zoomSfxType">
+        <option value="whoosh">🔊 Whoosh (smooth sweep)</option>
+        <option value="click">🔘 Soft click (short tick)</option>
+        <option value="none">🔇 No sound on zoom</option>
+      </select>
+    </div>
+    <small>Background music (optional, separate from the above):</small>
+    <div class="row" style="margin-top:6px">
+      <select id="soundType">
+        <option value="none">🔇 No background music</option>
+        <option value="pad">🎵 Soft pad (built-in, royalty-free)</option>
+        <option value="upload">⬆ Upload your own (e.g. a nasheed you have)</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview video</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', accentLight:'#e9cf78', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', accentLight:'#c3dcff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', accentLight:'#f3c594', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', accentLight:'#f3c3d0', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+const FADE=300;
+
+/* ===== hook / outro suggestion helper ===== */
+const HOOK_TEMPLATES = {
+  website: ['Ever Wondered What Makes a Website Actually Work?','Here Is a Website Built to Convert Visitors Into Customers','This Is What Great Web Design Looks Like'],
+  app: ['Here Is an App Worth Knowing About','This App Solves a Problem You Did Not Know Had a Solution','Take a Look Inside This App'],
+  product: ['Here Is What You Get','This Could Change How You Work','Take a Closer Look'],
+  islamic: ['Did You Know This?','Here Is Something Worth Knowing','A Quick Reminder for Today'],
+  general: ['Take a Look at This','Here Is Something Worth Seeing','Check This Out']
+};
+const OUTRO_TEMPLATES = {
+  website: ['Link Below — Go Explore','Visit the Website — Link in Bio','Want One Like This? Link Below'],
+  app: ['Download Below','Get the App — Link in Bio','Try It Yourself — Link Below'],
+  product: ['Order Below','Link in Bio to Get Yours','Available Now — Link Below'],
+  islamic: ['Follow for More Reminders','Share This With Someone Who Needs It','Save This for Later'],
+  general: ['Link Below','Follow for More','More Like This Coming Soon']
+};
+function keywordHeadline(raw){
+  const words=raw.trim().split(/\s+/).filter(Boolean).slice(0,7);
+  if(!words.length) return '';
+  return words.join(' ').replace(/[.:;,]+$/,'');
+}
+function renderPills(containerId, options, targetInputId){
+  const box=$(containerId);
+  box.innerHTML='';
+  options.forEach(opt=>{
+    const p=document.createElement('div');
+    p.className='p'; p.textContent=opt;
+    p.onclick=()=>{
+      $(targetInputId).value=opt;
+      [...box.children].forEach(c=>c.classList.remove('on'));
+      p.classList.add('on');
+    };
+    box.appendChild(p);
+  });
+}
+$('suggestBtn').onclick=()=>{
+  const type=$('contentType').value;
+  const kw=keywordHeadline($('contentKeyword').value);
+  let hooks=HOOK_TEMPLATES[type].slice();
+  const outros=OUTRO_TEMPLATES[type].slice();
+  if(kw){ hooks=[kw+' — See How', hooks[0], hooks[1]]; }
+  renderPills('hookPillsList', hooks, 'introText');
+  renderPills('outroPillsList', outros, 'outroText');
+  $('hookPills').classList.remove('hidden');
+  $('outroPills').classList.remove('hidden');
+  toast('✓ Suggestions ready — tap one to use it, or keep typing your own');
+};
+
+/* ===== scene cards: upload + click-to-mark, with optional continuing numbers ===== */
+function recomputeAllMarkerNumbers(){
+  const continueOn = $('continueNumbering') ? $('continueNumbering').checked : false;
+  let running=0;
+  const cards=[...$('demoScenesContainer').children];
+  cards.forEach(c=>{
+    const st=c._sceneState;
+    const start = continueOn ? running+1 : 1;
+    if(c._renderMarkers) c._renderMarkers(start);
+    if(st) running += st.markers.length;
+  });
+}
+$('continueNumbering').addEventListener('change', recomputeAllMarkerNumbers);
+
+function addDemoScene(){
+  const card=document.createElement('div');
+  card.className='card'; card.style.background='var(--panel2)';
+  card.innerHTML =
+    '<div class="scenehead"><b>Screen <span class="sceneNum"></span></b><button class="btn" type="button" data-remove>Remove</button></div>'+
+    '<input type="file" accept="image/*" data-file style="margin-top:8px">'+
+    '<div class="shotwrap hidden" data-shotwrap>'+
+      '<img data-img alt="">'+
+      '<div class="markerlayer" data-markerlayer></div>'+
+      '<div class="shothint" data-shothint>Tap the screenshot to add a highlight point</div>'+
+    '</div>'+
+    '<div data-markerlist></div>'+
+    '<div class="row" style="margin-top:8px">'+
+      '<select data-frame><option value="none">No frame</option><option value="phone">Phone frame</option><option value="browser">Browser frame</option></select>'+
+    '</div>'+
+    '<input data-caption placeholder="Overview caption (shown before any highlight, or on its own)" style="margin-top:8px">';
+
+  const state={ img:null, naturalW:0, naturalH:0, markers:[] };
+  card._sceneState=state;
+
+  const fileInput=card.querySelector('[data-file]');
+  const shotwrap=card.querySelector('[data-shotwrap]');
+  const imgEl=card.querySelector('[data-img]');
+  const markerLayer=card.querySelector('[data-markerlayer]');
+  const markerList=card.querySelector('[data-markerlist]');
+  const hintEl=card.querySelector('[data-shothint]');
+
+  function renderMarkers(startNumber){
+    if(state.markers.length>0){ hintEl.classList.add('hidden'); } else { hintEl.classList.remove('hidden'); }
+    markerLayer.innerHTML='';
+    state.markers.forEach((m,i)=>{
+      const dot=document.createElement('div');
+      dot.className='mdot';
+      dot.style.left=m.xPct+'%'; dot.style.top=m.yPct+'%';
+      dot.textContent=String(startNumber+i);
+      markerLayer.appendChild(dot);
+    });
+    markerList.innerHTML='';
+    state.markers.forEach((m,i)=>{
+      const n=startNumber+i;
+      const row=document.createElement('div');
+      row.className='row'; row.style.marginTop='6px';
+      row.innerHTML = '<input data-mcap placeholder="Caption for point '+n+'" value="'+escapeAttr(m.text)+'" style="flex:3">'+
+                      '<button class="btn" type="button" data-mrm style="flex:0 0 auto;width:auto;padding:6px 10px">✕</button>';
+      row.querySelector('[data-mcap]').oninput=(ev)=>{ m.text=ev.target.value; };
+      row.querySelector('[data-mrm]').onclick=()=>{ state.markers.splice(i,1); recomputeAllMarkerNumbers(); };
+      markerList.appendChild(row);
+    });
+  }
+  card._renderMarkers=renderMarkers;
+
+  card.querySelector('[data-remove]').onclick=()=>{ card.remove(); renumberDemoScenes(); recomputeAllMarkerNumbers(); };
+
+  fileInput.onchange=(e)=>{
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      const im=new Image();
+      im.onload=()=>{
+        state.img=im; state.naturalW=im.naturalWidth; state.naturalH=im.naturalHeight;
+        imgEl.src=ev.target.result;
+        shotwrap.classList.remove('hidden');
+        toast('✓ Screenshot loaded — tap it to add highlight points, or leave it as is');
+      };
+      im.src=ev.target.result;
+    };
+    reader.readAsDataURL(f);
+  };
+
+  imgEl.addEventListener('click', (e)=>{
+    const rect=imgEl.getBoundingClientRect();
+    const xPct=Math.max(0.5,Math.min(99.5,(e.clientX-rect.left)/rect.width*100));
+    const yPct=Math.max(0.5,Math.min(99.5,(e.clientY-rect.top)/rect.height*100));
+    state.markers.push({xPct,yPct,text:''});
+    recomputeAllMarkerNumbers();
+  });
+
+  $('demoScenesContainer').appendChild(card);
+  renumberDemoScenes();
+  recomputeAllMarkerNumbers();
+}
+function renumberDemoScenes(){
+  const cards=[...$('demoScenesContainer').children];
+  cards.forEach((c,i)=>{
+    const n=c.querySelector('.sceneNum'); if(n) n.textContent=String(i+1);
+    const rm=c.querySelector('[data-remove]'); if(rm) rm.style.display = cards.length>1?'':'none';
+  });
+}
+$('addDemoBtn').onclick=()=>{ addDemoScene(); };
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+function collectDemoScenes(){
+  const cards=[...$('demoScenesContainer').children];
+  const scenes=[]; let skippedNoImage=0;
+  cards.forEach(c=>{
+    const st=c._sceneState;
+    if(!st) return;
+    if(!st.img){ skippedNoImage++; return; }
+    const frame=c.querySelector('[data-frame]').value;
+    const caption=c.querySelector('[data-caption]').value.trim();
+    scenes.push({ img:st.img, naturalW:st.naturalW, naturalH:st.naturalH, frame, caption,
+      markers: st.markers.map(m=>({xPct:m.xPct,yPct:m.yPct,text:m.text.trim()})) });
+  });
+  return {scenes, skippedNoImage};
+}
+
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function easeInOutCubic(t){ t=Math.max(0,Math.min(1,t)); return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+function easeOutBack(t){ const c1=1.70158, c3=c1+1, tt=t-1; return 1+c3*Math.pow(tt,3)+c1*Math.pow(tt,2); }
+function roundRect(ctx,x,y,w,h,r){
+  if(w<=0||h<=0) return;
+  r=Math.max(0,Math.min(r, w/2, h/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+
+/* ===== audio: ambient background music + zoom sound (shared graph) ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Music loaded');
+});
+function playWhoosh(){
+  const now=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(); o.type='sine';
+  const filt=audioCtx.createBiquadFilter(); filt.type='lowpass';
+  const g=audioCtx.createGain();
+  o.frequency.setValueAtTime(900, now);
+  o.frequency.exponentialRampToValueAtTime(220, now+0.35);
+  filt.frequency.setValueAtTime(2200, now);
+  filt.frequency.exponentialRampToValueAtTime(400, now+0.35);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.22, now+0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+0.4);
+  o.connect(filt); filt.connect(g); g.connect(ambientGain);
+  o.start(now); o.stop(now+0.42);
+}
+function playClick(){
+  const now=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(); o.type='triangle';
+  const g=audioCtx.createGain();
+  o.frequency.setValueAtTime(1200, now);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.18, now+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+  o.connect(g); g.connect(ambientGain);
+  o.start(now); o.stop(now+0.14);
+}
+function playZoomSound(){
+  if(!audioCtx || !ambientGain) return;
+  const type=$('zoomSfxType').value;
+  if(type==='none') return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(type==='whoosh') playWhoosh();
+  else if(type==='click') playClick();
+}
+
+/* ===== camera / crop maths (Ken Burns: fixed destination box, moving source crop) ===== */
+function computeCrop(img, frameAspect, camX, camY, zoom){
+  const iw=img.naturalWidth, ih=img.naturalHeight, imgAspect=iw/ih;
+  let baseW, baseH;
+  if(imgAspect>frameAspect){ baseH=ih; baseW=ih*frameAspect; } else { baseW=iw; baseH=iw/frameAspect; }
+  const cw=baseW/zoom, ch=baseH/zoom;
+  let sx=camX*iw-cw/2, sy=camY*ih-ch/2;
+  sx=Math.max(0, Math.min(iw-cw, sx));
+  sy=Math.max(0, Math.min(ih-ch, sy));
+  return {sx,sy,sw:cw,sh:ch};
+}
+function frameRect(frame, W, H){
+  const marginX=W*0.07, topY=H*0.12, bottomY=H*0.90;
+  if(frame==='phone'){
+    const h=bottomY-topY, w=h*(9/19.5), x=(W-w)/2;
+    return { x, y:topY, w, h, chrome:0 };
+  }
+  if(frame==='browser'){
+    const w=W-marginX*2, chrome=H*0.05, y=topY+chrome, h=(bottomY-topY)-chrome;
+    return { x:marginX, y, w, h, chrome, barX:marginX, barY:topY, barW:w };
+  }
+  const w=W-marginX*2, h=bottomY-topY;
+  return { x:marginX, y:topY, w, h, chrome:0 };
+}
+
+/* ===== per-scene stops (camera keyframes) ===== */
+let DEMOCFG={ transition:700, markerHold:2200, introHold:1300, outroHold:1000, kenburns:4500 };
+const DEMO_SPEEDS={
+  fast:   { transition:450, markerHold:1400, introHold:900,  outroHold:700,  kenburns:3200 },
+  normal: { transition:700, markerHold:2200, introHold:1300, outroHold:1000, kenburns:4500 },
+  slow:   { transition:1000,markerHold:3200, introHold:1800, outroHold:1400, kenburns:6000 }
+};
+function stopsForScene(scene){
+  if(!scene.markers.length){
+    return [{x:0.5,y:0.5,zoomStart:1.0,zoomEnd:1.15,caption:scene.caption||'',dur:DEMOCFG.kenburns,isMarker:false}];
+  }
+  const stops=[{x:0.5,y:0.5,zoomStart:1.0,zoomEnd:1.0,caption:scene.caption||'',dur:DEMOCFG.introHold,isMarker:false}];
+  scene.markers.forEach(m=>{
+    stops.push({x:m.xPct/100,y:m.yPct/100,zoomStart:2.15,zoomEnd:2.4,caption:m.text||'',dur:DEMOCFG.markerHold,isMarker:true});
+  });
+  stops.push({x:0.5,y:0.5,zoomStart:1.0,zoomEnd:1.0,caption:'',dur:DEMOCFG.outroHold,isMarker:false});
+  return stops;
+}
+function cameraAt(stops, elapsed, motion){
+  let acc=0;
+  for(let i=0;i<stops.length;i++){
+    const s=stops[i];
+    const isLast=i===stops.length-1;
+    if(elapsed<acc+s.dur || isLast){
+      const local=Math.max(0, elapsed-acc);
+      const tIn = i===0?0:Math.min(DEMOCFG.transition, s.dur*0.6);
+      const prev = i===0? s : stops[i-1];
+      let x,y,zoom;
+      if(local<tIn){
+        const raw=tIn>0?local/tIn:1;
+        const t = motion==='snappy' ? easeOutBack(raw) : easeInOutCubic(raw);
+        x=prev.x+(s.x-prev.x)*t;
+        y=prev.y+(s.y-prev.y)*t;
+        zoom=prev.zoomEnd+(s.zoomStart-prev.zoomEnd)*t;
+      } else {
+        const dl=local-tIn, dd=Math.max(1,s.dur-tIn), dt=Math.min(1,dl/dd);
+        x=s.x; y=s.y; zoom=s.zoomStart+(s.zoomEnd-s.zoomStart)*dt;
+      }
+      let capAlpha=0;
+      if(s.caption){
+        capAlpha=1;
+        if(tIn>0){ capAlpha=Math.min(capAlpha, local/Math.min(tIn,300)); }
+        const fadeOutStart=s.dur-250;
+        if(local>fadeOutStart){ capAlpha=Math.min(capAlpha, Math.max(0,(s.dur-local)/250)); }
+        capAlpha=Math.max(0,Math.min(1,capAlpha));
+      }
+      return { x, y, zoom, caption:s.caption, capAlpha, isMarker:s.isMarker, stopIndex:i };
+    }
+    acc+=s.dur;
+  }
+  const last=stops[stops.length-1];
+  return { x:last.x, y:last.y, zoom:last.zoomEnd, caption:last.caption, capAlpha:0, isMarker:last.isMarker, stopIndex:stops.length-1 };
+}
+
+/* ===== drawing: intro / countdown / scene / outro ===== */
+function drawIntro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center';
+  const hook=$('introText').value.trim();
+  const fs=Math.round(W*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, hook, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawOutro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center';
+  const txt=$('outroText').value.trim();
+  const fs=Math.round(W*0.065);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, txt, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdown(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save(); ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+function drawScreenDemo(scene, cam, th, localElapsed){
+  const frame=frameRect(scene.frame, W, H);
+  const frameAspect=frame.w/frame.h;
+  const crop=computeCrop(scene.img, frameAspect, cam.x, cam.y, cam.zoom);
+
+  ctx.save();
+  if(scene.frame==='phone'){
+    roundRect(ctx, frame.x-14, frame.y-14, frame.w+28, frame.h+28, 42);
+    ctx.fillStyle='#000'; ctx.globalAlpha=0.85; ctx.fill(); ctx.globalAlpha=1;
+    roundRect(ctx, frame.x+frame.w/2-50, frame.y-6, 100, 22, 11);
+    ctx.fillStyle='#000'; ctx.fill();
+  }
+  if(scene.frame==='browser'){
+    roundRect(ctx, frame.barX, frame.barY, frame.barW, frame.chrome, 14);
+    ctx.fillStyle='#e9e9ee'; ctx.fill();
+    ctx.fillStyle='#d2433c'; ctx.beginPath(); ctx.arc(frame.barX+22, frame.barY+frame.chrome/2, 7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#e6b429'; ctx.beginPath(); ctx.arc(frame.barX+46, frame.barY+frame.chrome/2, 7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#39b54a'; ctx.beginPath(); ctx.arc(frame.barX+70, frame.barY+frame.chrome/2, 7,0,Math.PI*2); ctx.fill();
+  }
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=36; ctx.shadowOffsetY=14;
+  roundRect(ctx, frame.x, frame.y, frame.w, frame.h, scene.frame==='phone'?34:10);
+  ctx.fillStyle='#000'; ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  roundRect(ctx, frame.x, frame.y, frame.w, frame.h, scene.frame==='phone'?34:10);
+  ctx.clip();
+  ctx.drawImage(scene.img, crop.sx, crop.sy, crop.sw, crop.sh, frame.x, frame.y, frame.w, frame.h);
+  ctx.restore();
+
+  if(cam.isMarker && cam.capAlpha>0.02){
+    const cx=frame.x+frame.w/2, cy=frame.y+frame.h/2;
+    const motion=$('motion').value;
+    const pulse = motion==='pulse' ? (1+0.25*Math.abs(Math.sin(localElapsed/260))) : 1;
+    const R=26*pulse;
+    ctx.save(); ctx.globalAlpha=cam.capAlpha;
+    if(motion==='pulse'){ ctx.shadowColor=th.accent; ctx.shadowBlur=30; }
+    ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle=hexAlpha(th.accent,0.25);
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  if(cam.caption && cam.capAlpha>0.02){
+    ctx.save(); ctx.globalAlpha=cam.capAlpha;
+    const fs=Math.round(W*0.032);
+    ctx.font='800 '+fs+'px system-ui';
+    const maxW=W*0.78;
+    const lines=wrapText(ctx, cam.caption, maxW-40, ctx.font);
+    const widths=lines.map(l=>ctx.measureText(l).width);
+    const lh=fs*1.3, padY=18, padX=24;
+    const bw=Math.min(maxW, Math.max.apply(null, widths)+padX*2);
+    const bh=lines.length*lh+padY*2;
+    const bx=W/2-bw/2, by=H-bh-Math.max(30,H*0.035);
+    roundRect(ctx, bx, by, bw, bh, 18);
+    ctx.fillStyle=hexAlpha(th.bg1,0.88); ctx.fill();
+    ctx.strokeStyle=th.accent; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle=th.text; ctx.textAlign='center';
+    let ty=by+padY+fs*0.85;
+    lines.forEach(l=>{ ctx.fillText(l, W/2, ty); ty+=lh; });
+    ctx.restore();
+  }
+}
+
+/* ===== timeline assembly ===== */
+function buildTimeline(scenes){
+  const hookText=$('introText').value.trim();
+  const outroText=$('outroText').value.trim();
+  const showCountdown=$('showCountdown').checked;
+  const introMs = hookText?2600:0;
+  const countdownMs = showCountdown?3000:0;
+  const sceneTL = scenes.map(sc=>{
+    const stops=stopsForScene(sc);
+    const totalMs=stops.reduce((a,s)=>a+s.dur,0);
+    return Object.assign({}, sc, {stops, totalMs});
+  });
+  const outroMs = outroText?3000:0;
+  const total = introMs+countdownMs+sceneTL.reduce((a,s)=>a+s.totalMs,0)+outroMs;
+  return {introMs,countdownMs,scenes:sceneTL,outroMs,total};
+}
+function phaseAt(t){
+  let rem=t;
+  if(rem<TL.introMs) return {phase:'intro', localT:rem};
+  rem-=TL.introMs;
+  if(rem<TL.countdownMs) return {phase:'countdown', localT:rem};
+  rem-=TL.countdownMs;
+  for(let i=0;i<TL.scenes.length;i++){
+    const s=TL.scenes[i];
+    if(rem<s.totalMs) return {phase:'scene', sceneIndex:i, localT:rem};
+    rem-=s.totalMs;
+  }
+  return {phase:'outro', localT:rem};
+}
+
+let cv,ctx,W,H,startTs=null,rafId,TL=null,lastTransKey='';
+let mr,chunks=[],blob,pngBlob;
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  let elapsed=ts-startTs;
+  if(TL.total>0) elapsed = elapsed % TL.total;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  const ph=phaseAt(elapsed);
+  if(ph.phase==='intro'){ drawIntro(ph.localT, th); }
+  else if(ph.phase==='countdown'){ drawCountdown(ph.localT, th); }
+  else if(ph.phase==='scene'){
+    const scene=TL.scenes[ph.sceneIndex];
+    const cam=cameraAt(scene.stops, ph.localT, $('motion').value);
+
+    const key=ph.sceneIndex+':'+cam.stopIndex;
+    if(key!==lastTransKey){
+      if(cam.stopIndex>0 && cam.isMarker) playZoomSound();
+      lastTransKey=key;
+    }
+
+    const fadeAlpha = ph.localT<FADE ? ph.localT/FADE : 1;
+    ctx.save(); ctx.globalAlpha=fadeAlpha;
+    drawScreenDemo(scene, cam, th, ph.localT);
+    if(TL.scenes.length>1){
+      ctx.textAlign='right'; ctx.fillStyle=th.textDim; ctx.font='700 '+Math.round(W*0.022)+'px system-ui';
+      ctx.fillText((ph.sceneIndex+1)+' / '+TL.scenes.length, W-30, 46);
+    }
+    ctx.restore();
+  } else { drawOutro(ph.localT, th); }
+}
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const {scenes, skippedNoImage} = collectDemoScenes();
+  if(!scenes.length){ toast('Upload at least one screenshot first'); return; }
+  if(skippedNoImage>0){ toast(skippedNoImage+' screen(s) skipped — no screenshot uploaded'); }
+  DEMOCFG = DEMO_SPEEDS[$('speed').value] || DEMO_SPEEDS.normal;
+  TL = buildTimeline(scenes);
+  startTs=null; lastTransKey='';
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  $('player').classList.add('show');
+  ensureAmbientGraph();
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  startTs=null; lastTransKey='';
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'screendemo-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+
+/* default starter so the sequence is immediately usable */
+addDemoScene();
+</script>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaptionForge — Free Auto Captions</title>
+<link rel="stylesheet" href="forge.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Noto+Naskh+Arabic:wght@700&display=swap" rel="stylesheet">
+<style>
+.wrap{position:relative;display:inline-block;line-height:0}
+#video{display:block;max-width:100%;max-height:calc(100vh - 400px);min-height:160px;border-radius:6px;background:#000}
+#cap{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.segs{height:260px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+.seg{display:grid;grid-template-columns:100px 1fr 34px;gap:8px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+.seg.now{border-color:var(--warn)}
+.seg .t{display:flex;flex-direction:column;gap:4px}
+.seg .t input{padding:4px 6px;font-size:12px}
+.seg textarea{min-height:52px;font-family:"Segoe UI","Noto Naskh Arabic",Arial,sans-serif;font-size:14px;line-height:1.6}
+.muted{color:var(--muted);font-size:13px;padding:8px 0}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">CC</div>CaptionForge <small>automatic subtitles · free · runs on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🎙️</div><strong>Drop your video here</strong><span>or click to choose · MP4, MOV, WebM</span></label>
+  <div class="file-info" id="fileInfo">No video selected</div>
+
+  <div><div class="label">Language spoken in the video</div>
+    <select id="lang">
+      <option value="auto" selected>Detect automatically</option>
+      <option value="quran">Arabic: Quran recitation (special AI)</option>
+      <option value="arabic">Arabic (normal speech)</option>
+      <option value="english">English</option>
+      <option value="french">French</option>
+      <option value="spanish">Spanish</option>
+      <option value="portuguese">Portuguese</option>
+      <option value="german">German</option>
+      <option value="yoruba">Yoruba</option>
+      <option value="hausa">Hausa</option>
+      <option value="swahili">Swahili</option>
+      <option value="hindi">Hindi</option>
+      <option value="chinese">Chinese</option>
+    </select>
+  </div>
+  <div id="modelRow"><div class="label">Accuracy</div>
+    <select id="model">
+      <option value="Xenova/whisper-tiny">Fast (small download)</option>
+      <option value="Xenova/whisper-base" selected>Balanced (recommended)</option>
+      <option value="Xenova/whisper-small">Most accurate (slower, about 250 MB download)</option>
+    </select>
+  </div>
+  <div class="note ok hidden" id="quranNote">Quran mode uses a special AI trained on Quran recitation (about 100–200 MB the first time, then saved). Captions are cut at the reciter's natural pauses.</div>
+
+  <button class="primary big" id="transcribeBtn" disabled>1. Create captions</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+
+  <div class="stack hidden" id="styleBox">
+    <div class="label">Caption style</div>
+    <div class="row">
+      <select id="look"><option value="box" selected>White on dark box</option><option value="outline">White with outline</option><option value="yellow">Yellow with outline</option></select>
+      <select id="pos"><option value="bottom">Bottom</option><option value="middle">Middle</option><option value="top">Top</option></select>
+    </div>
+    <select id="wpc"><option value="0">Full sentences</option><option value="8">Up to 8 words at a time</option><option value="5">Up to 5 words at a time</option><option value="3">Up to 3 words (TikTok style)</option></select>
+    <label class="slider">Size <input type="range" id="size" min="3" max="10" step="0.5" value="5"></label>
+    <label class="check"><input type="checkbox" id="upper"> CAPITAL LETTERS</label>
+  </div>
+
+  <button class="primary big hidden" id="burnBtn">2. Burn captions into video</button>
+  <div class="row hidden" id="dlRow"><button id="srtBtn">⬇ .srt</button><button id="vttBtn">⬇ .vtt</button><button id="txtBtn">⬇ .txt</button></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download captioned video</button><video id="resultVideo" controls playsinline></video></div>
+</aside>
+
+<section class="out">
+  <div class="out-head"><span id="hint">Your video appears here</span><button class="mini hidden" id="addLineBtn">+ Add caption line here</button></div>
+  <div class="stage">
+    <div class="empty" id="empty">🎙️<br>Open a video to start</div>
+    <div class="wrap hidden" id="wrap"><video id="video" controls playsinline preload="auto"></video><canvas id="cap"></canvas></div>
+  </div>
+  <div class="segs" id="segs"><div class="muted">Your captions will appear here after step 1. You can fix any word before burning them in.</div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import * as Bridge from './forge-bridge.js';
+Bridge.dock('captions');
+const $=id=>document.getElementById(id);
+const video=$('video'), cap=$('cap'), cctx=cap.getContext('2d');
+let MBP=null, TFP=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const QURAN_MODEL='iqbalaesthetic/Basira';
+const RTL=/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+const AR_FONT='"Amiri","Noto Naskh Arabic","Segoe UI",Arial,sans-serif';
+
+let file=null, url=null, segs=[], shown=[], busy=false, conv=null, cancelled=false;
+let asr=null, asrModel='', asrDevice='', resultUrl=null, resultBlob=null, wakeLock=null, token=0, lastIdx=-1;
+document.fonts.load('700 40px Amiri').catch(()=>{}); document.fonts.load('700 40px "Noto Naskh Arabic"').catch(()=>{});
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); }
+function fmtSize(b){ return b>1073741824?(b/1073741824).toFixed(2)+' GB':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtClock(s){ if(!isFinite(s)) return '0:00'; s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+function fmtTime(s){ s=Math.round(s); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function stamp(s,sep){
+  const t=Math.max(0,Math.round(s*1000));
+  const h=Math.floor(t/3600000), m=Math.floor(t/60000)%60, sec=Math.floor(t/1000)%60, ms=t%1000;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+sep+String(ms).padStart(3,'0');
+}
+function saveText(text,name,type){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\ufeff'+text],{type:type+';charset=utf-8'})); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+const baseName=()=> file ? file.name.replace(/\.[^.]+$/,'') : 'video';
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+$('lang').addEventListener('change',()=>{ const q=$('lang').value==='quran'; $('quranNote').classList.toggle('hidden',!q); $('modelRow').classList.toggle('hidden',q); });
+
+/* ---------- caption drawing (preview AND final video), right-to-left aware ---------- */
+function wrapLines(ctx,text,maxW){
+  const words=text.split(/\s+/).filter(Boolean), lines=[]; let line='';
+  for(const w of words){ const test=line ? line+' '+w : w; if(ctx.measureText(test).width>maxW && line){ lines.push(line); line=w; } else line=test; }
+  if(line) lines.push(line);
+  return lines;
+}
+function drawCaption(ctx,W,H,text,st){
+  if(!text) return;
+  const rtl=RTL.test(text);
+  if(st.upper && !rtl) text=text.toUpperCase();
+  const fs=Math.max(12,Math.round(Math.min(W,H)*st.size/100));
+  ctx.save();
+  ctx.direction=rtl ? 'rtl' : 'ltr';
+  ctx.font=rtl ? '700 '+Math.round(fs*1.08)+'px '+AR_FONT : '800 '+fs+'px "Segoe UI", Roboto, Arial, sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const lines=wrapLines(ctx,text,W*0.86), lh=fs*(rtl ? 1.7 : 1.3), total=lines.length*lh;
+  const top = st.pos==='top' ? H*0.08 : st.pos==='middle' ? (H-total)/2 : H*0.9-total;
+  lines.forEach((ln,i)=>{
+    const y=top+i*lh+lh/2;
+    if(st.look==='box'){
+      const w=ctx.measureText(ln).width+fs*0.7;
+      ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(W/2-w/2,y-lh/2,w,lh,fs*0.22); else ctx.rect(W/2-w/2,y-lh/2,w,lh);
+      ctx.fill(); ctx.fillStyle='#ffffff'; ctx.fillText(ln,W/2,y);
+    }else{
+      ctx.lineJoin='round'; ctx.lineWidth=Math.max(3,fs*0.18); ctx.strokeStyle='#000000'; ctx.strokeText(ln,W/2,y);
+      ctx.fillStyle= st.look==='yellow' ? '#ffd60a' : '#ffffff'; ctx.fillText(ln,W/2,y);
+    }
+  });
+  ctx.restore();
+}
+const getStyle=()=>({ size:+$('size').value, pos:$('pos').value, look:$('look').value, upper:$('upper').checked });
+function refreshShown(){
+  const n=+$('wpc').value, out=[];
+  const sorted=segs.filter(s=>s.text.trim()).slice().sort((a,b)=>a.start-b.start);
+  for(const s of sorted){
+    const words=s.text.trim().split(/\s+/);
+    if(!n || words.length<=n){ out.push({start:s.start,end:s.end,text:s.text.trim()}); continue; }
+    const per=(s.end-s.start)/words.length;
+    for(let i=0;i<words.length;i+=n) out.push({ start:s.start+i*per, end:s.start+Math.min(words.length,i+n)*per, text:words.slice(i,i+n).join(' ') });
+  }
+  shown=out;
+}
+function textAt(list,t){ let res=''; for(const s of list){ if(s.start>t) break; if(t<s.end) res=s.text; } return res; }
+
+/* ---------- preview ---------- */
+function renderCap(){
+  if(!video.videoWidth) return;
+  const W=video.videoWidth, H=video.videoHeight;
+  if(cap.width!==W || cap.height!==H){ cap.width=W; cap.height=H; }
+  cctx.clearRect(0,0,W,H);
+  drawCaption(cctx,W,H,textAt(shown,video.currentTime),getStyle());
+  const t=video.currentTime, idx=segs.findIndex(s=>t>=s.start && t<s.end);
+  if(idx!==lastIdx){
+    const rows=$('segs').querySelectorAll('.seg');
+    if(rows[lastIdx]) rows[lastIdx].classList.remove('now');
+    if(rows[idx]){ rows[idx].classList.add('now'); if(!$('segs').contains(document.activeElement)) rows[idx].scrollIntoView({block:'nearest'}); }
+    lastIdx=idx;
+  }
+}
+['seeked','timeupdate','loadeddata'].forEach(ev=>video.addEventListener(ev,renderCap));
+['look','pos','wpc','size','upper'].forEach(id=>$(id).addEventListener('input',()=>{ refreshShown(); renderCap(); }));
+
+/* ---------- loading a video ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+function loadFile(f){
+  if(!f || busy) return;
+  if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name)) return toast('Please choose a video file');
+  file=f; token++; lastIdx=-1;
+  if(url) URL.revokeObjectURL(url);
+  url=URL.createObjectURL(f);
+  segs=[]; refreshShown(); renderSegs();
+  ['note','prog','doneBox','styleBox','burnBtn','dlRow','addLineBtn'].forEach(hide);
+  $('fileInfo').textContent='Opening '+f.name+'…';
+  video.src=url; $('transcribeBtn').disabled=false; loadMB().catch(()=>{});
+}
+video.addEventListener('loadedmetadata',()=>{
+  hide('empty'); show('wrap');
+  $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+fmtClock(video.duration)+(video.videoWidth?' · '+video.videoWidth+'×'+video.videoHeight:'');
+  $('hint').textContent='Choose the language, then click "1. Create captions"';
+  const tk=token;
+  if('requestVideoFrameCallback' in HTMLVideoElement.prototype){ const loop=()=>{ if(tk!==token) return; renderCap(); video.requestVideoFrameCallback(loop); }; video.requestVideoFrameCallback(loop); }
+  renderCap();
+});
+video.addEventListener('error',()=>{ if(file){ show('note'); showNote('Your browser cannot open this video. Try converting it to MP4 first (use the Video Toolkit).'); } });
+
+/* ---------- speech to text ---------- */
+async function getAudio16k(f){
+  const buf=await f.arrayBuffer(), ctx=new AudioContext({sampleRate:16000});
+  try{ const ab=await ctx.decodeAudioData(buf), n=ab.length, ch=ab.numberOfChannels, out=new Float32Array(n); for(let c=0;c<ch;c++){ const d=ab.getChannelData(c); for(let i=0;i<n;i++) out[i]+=d[i]/ch; } return out; }
+  finally{ ctx.close(); }
+}
+async function gpuInfo(){ try{ if(!('gpu' in navigator)) return null; const a=await navigator.gpu.requestAdapter(); return a ? { f16:a.features.has('shader-f16') } : null; }catch{ return null; } }
+async function getASR(model,forceWasm){
+  if(asr && asrModel===model && !(forceWasm && asrDevice!=='wasm')) return asr;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  const progress_callback=p=>{ if(p.status==='progress' && typeof p.progress==='number') setP(p.progress/100,'Downloading the AI listener (first time only)… '+Math.round(p.progress)+'%'); };
+  if(asr){ try{ await asr.dispose(); }catch{} asr=null; }
+  if(model===QURAN_MODEL){
+    const gpu=forceWasm ? null : await gpuInfo();
+    const tries=gpu ? [{ device:'webgpu', dtype:gpu.f16 ? 'fp16' : 'q4' },{ device:'wasm', dtype:'q8' }] : [{ device:'wasm', dtype:'q8' }];
+    let err=null;
+    for(const t of tries){ try{ asr=await TF.pipeline('automatic-speech-recognition',model,{ device:t.device, dtype:t.dtype, progress_callback }); asrDevice=t.device; break; }catch(e){ err=e; console.warn(e); } }
+    if(!asr) throw err || new Error('the Quran AI could not load');
+  }else{ asr=await TF.pipeline('automatic-speech-recognition',model,{ progress_callback }); asrDevice='wasm'; }
+  asrModel=model; return asr;
+}
+// Cut the audio at natural pauses (reciters pause between ayat)
+function splitBySilence(a){
+  const SR=16000, F=320, n=Math.floor(a.length/F), rms=new Float32Array(n);
+  for(let i=0;i<n;i++){ let s=0; for(let j=i*F;j<(i+1)*F;j++) s+=a[j]*a[j]; rms[i]=Math.sqrt(s/F); }
+  const sorted=Float32Array.from(rms).sort(), noise=sorted[Math.floor(n*0.1)]||0, loud=sorted[Math.floor(n*0.9)]||0, thr=noise+(loud-noise)*0.15;
+  const runs=[]; let start=-1, quiet=0;
+  for(let i=0;i<n;i++){
+    if(rms[i]>thr){ if(start<0) start=i; quiet=0; }
+    else if(start>=0){ quiet++; if(quiet>=15){ runs.push([start,i-quiet+1]); start=-1; quiet=0; } }
+  }
+  if(start>=0) runs.push([start,n]);
+  const out=[], pad=Math.round(0.15*SR), MAX=28*SR, MIN_CUT=18*SR;
+  for(const [r0,r1] of runs){
+    let s=Math.max(0,r0*F-pad), e=Math.min(a.length,r1*F+pad);
+    if(e-s<0.4*SR) continue;
+    while(e-s>MAX){
+      let best=s+MAX, bv=1e9;
+      for(let f=Math.floor((s+MIN_CUT)/F); f<Math.floor((s+MAX)/F); f++){ if(rms[f]<bv){ bv=rms[f]; best=f*F; } }
+      out.push([s,best]); s=best;
+    }
+    out.push([s,e]);
+  }
+  return out;
+}
+function setBusy(on){
+  busy=on; $('transcribeBtn').disabled=on || !file; $('burnBtn').disabled=on;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  ['lang','model'].forEach(id=>$(id).disabled=on);
+  drop.style.pointerEvents=on?'none':''; keepAwake(on);
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(conv){ try{ await conv.cancel(); }catch{} } };
+
+$('transcribeBtn').onclick=async()=>{
+  if(!file || busy) return;
+  video.pause(); cancelled=false; setBusy(true);
+  hide('note'); hide('doneBox'); show('prog'); setP(0,'Reading the sound from your video…');
+  try{
+    const audio=await getAudio16k(file).catch(()=>{ throw new Error('could not read the sound in this video (does it have sound?)'); });
+    if(!audio.length) throw new Error('this video has no sound');
+    const lang=$('lang').value, quran=lang==='quran', total=audio.length, t0=performance.now();
+    setP(0,'Loading the AI listener…');
+    let pipe=await getASR(quran ? QURAN_MODEL : $('model').value);
+    segs=[];
+    if(quran){
+      const parts=splitBySilence(audio);
+      if(!parts.length) throw new Error('no recitation was found in this video');
+      for(let k=0;k<parts.length;k++){
+        if(cancelled) break;
+        const [s,e]=parts[k], chunk=audio.subarray(s,e);
+        let out;
+        try{ out=await pipe(chunk,{ language:'arabic', task:'transcribe' }); }
+        catch(err){ if(asrDevice!=='webgpu') throw err; setP(k/parts.length,'Switching to safe mode (slower)…'); pipe=await getASR(QURAN_MODEL,true); out=await pipe(chunk,{ language:'arabic', task:'transcribe' }); }
+        const text=(out.text||'').trim();
+        if(text) segs.push({ start:s/16000, end:e/16000, text });
+        const done=(k+1)/parts.length, secs=(performance.now()-t0)/1000;
+        setP(done,'Listening to the recitation… '+Math.round(done*100)+'%'+(done>0.04 && done<1 ? ' · about '+fmtTime(secs/done*(1-done))+' left' : ''));
+        refreshShown(); renderSegs(); renderCap();
+        await new Promise(r=>setTimeout(r,10));
+      }
+    }else{
+      const CH=30*16000;
+      for(let off=0; off<total; off+=CH){
+        if(cancelled) break;
+        const chunk=audio.subarray(off,Math.min(total,off+CH)), opts={ return_timestamps:true, task:'transcribe' };
+        if(lang!=='auto') opts.language=lang;
+        const out=await pipe(chunk,opts), base=off/16000, dur=chunk.length/16000;
+        const parts=(out.chunks && out.chunks.length) ? out.chunks : [{ timestamp:[0,dur], text:out.text||'' }];
+        for(const c of parts){
+          const text=(c.text||'').trim();
+          if(!text || /^[\[(].*[\])]$/.test(text)) continue;
+          const s=(c.timestamp && c.timestamp[0]!=null) ? c.timestamp[0] : 0, e=(c.timestamp && c.timestamp[1]!=null) ? c.timestamp[1] : dur;
+          segs.push({ start:base+s, end:base+Math.max(e,s+0.4), text });
+        }
+        const done=Math.min(1,(off+CH)/total), secs=(performance.now()-t0)/1000;
+        setP(done,'Listening… '+Math.round(done*100)+'%'+(done>0.04 && done<1 ? ' · about '+fmtTime(secs/done*(1-done))+' left' : ''));
+        refreshShown(); renderSegs(); renderCap();
+        await new Promise(r=>setTimeout(r,20));
+      }
+    }
+    if(!segs.length) throw new Error(cancelled ? 'stopped before any speech was found' : 'no speech was found in this video');
+    show('styleBox'); show('burnBtn'); show('dlRow'); show('addLineBtn');
+    $('hint').textContent='Check the captions below the video and fix any wrong words';
+    show('note'); showNote((cancelled?'Stopped early. ':'')+'Captions ready: '+segs.length+' lines. Read through them below the video, fix any mistakes, then burn them in or download a subtitle file.','ok');
+  }catch(err){ show('note'); showNote('Could not create captions: '+(err.message||err)+'.'); }
+  finally{ setBusy(false); }
+};
+
+/* ---------- caption editor ---------- */
+function renderSegs(){
+  lastIdx=-1;
+  $('segs').innerHTML = segs.length
+    ? segs.map((s,i)=>'<div class="seg" data-i="'+i+'"><div class="t"><input type="number" step="0.1" min="0" class="s-start" title="Start (seconds)" value="'+s.start.toFixed(1)+'"><input type="number" step="0.1" min="0" class="s-end" title="End (seconds)" value="'+s.end.toFixed(1)+'"></div><textarea class="s-text" dir="auto">'+esc(s.text)+'</textarea><button class="mini x" title="Delete line">✕</button></div>').join('')
+    : '<div class="muted">Your captions will appear here after step 1. You can fix any word before burning them in.</div>';
+}
+$('segs').addEventListener('input',e=>{
+  const row=e.target.closest('.seg'); if(!row) return;
+  const s=segs[+row.dataset.i]; if(!s) return;
+  const c=e.target.classList, v=parseFloat(e.target.value);
+  if(c.contains('s-text')) s.text=e.target.value;
+  if(c.contains('s-start') && !isNaN(v)) s.start=Math.max(0,v);
+  if(c.contains('s-end') && !isNaN(v)) s.end=Math.max(0,v);
+  refreshShown(); renderCap();
+});
+$('segs').addEventListener('focusin',e=>{
+  const row=e.target.closest('.seg'); if(!row || busy) return;
+  const s=segs[+row.dataset.i];
+  if(s && (video.currentTime<s.start || video.currentTime>=s.end)) video.currentTime=s.start+0.01;
+});
+$('segs').addEventListener('click',e=>{
+  if(!e.target.classList.contains('x')) return;
+  segs.splice(+e.target.closest('.seg').dataset.i,1);
+  renderSegs(); refreshShown(); renderCap();
+});
+$('addLineBtn').onclick=()=>{
+  const t=video.currentTime||0;
+  segs.push({ start:t, end:t+2, text:'New caption' });
+  segs.sort((a,b)=>a.start-b.start);
+  renderSegs(); refreshShown(); renderCap();
+};
+
+/* ---------- subtitle files (UTF-8 with BOM so Arabic opens correctly everywhere) ---------- */
+$('srtBtn').onclick=()=>{ refreshShown(); saveText(shown.map((s,i)=>(i+1)+'\n'+stamp(s.start,',')+' --> '+stamp(s.end,',')+'\n'+s.text).join('\n\n')+'\n', baseName()+'.srt','text/plain'); };
+$('vttBtn').onclick=()=>{ refreshShown(); saveText('WEBVTT\n\n'+shown.map(s=>stamp(s.start,'.')+' --> '+stamp(s.end,'.')+'\n'+s.text).join('\n\n')+'\n', baseName()+'.vtt','text/vtt'); };
+$('txtBtn').onclick=()=>{ saveText(segs.map(s=>s.text.trim()).join('\n')+'\n', baseName()+'-transcript.txt','text/plain'); };
+
+/* ---------- burn captions into the video ---------- */
+$('burnBtn').onclick=async()=>{
+  if(!file || busy || !segs.length) return;
+  if(!('VideoEncoder' in window)){ show('note'); return showNote('Burning captions needs Google Chrome or Microsoft Edge on a computer. You can still download the .srt file.'); }
+  video.pause(); cancelled=false; setBusy(true);
+  hide('note'); hide('doneBox'); show('prog'); setP(0,'Loading the video engine…');
+  try{
+    await document.fonts.ready;
+    const MB=await loadMB();
+    refreshShown();
+    const list=shown.map(s=>({...s})), st=getStyle();
+    const input=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    const output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:'in-memory' }), target:new MB.BufferTarget() });
+    let cv=null, cx=null;
+    conv=await MB.Conversion.init({ input, output, video:{
+      forceTranscode:true, allowTransformationMetadata:false, quality:new MB.Quality('high'),
+      process:(sample)=>{
+        const W=sample.displayWidth, H=sample.displayHeight;
+        if(!cv){ cv=new OffscreenCanvas(W,H); cx=cv.getContext('2d'); }
+        else if(cv.width!==W || cv.height!==H){ cv.width=W; cv.height=H; }
+        sample.draw(cx,0,0);
+        drawCaption(cx,W,H,textAt(list,sample.timestamp),st);
+        return cv;
+      }
+    }});
+    if(!conv.isValid) throw new Error('this video format cannot be processed here ('+(conv.discardedTracks||[]).map(d=>d.reason).join(', ')+'). Convert it to MP4 first');
+    const t0=performance.now();
+    conv.onProgress=p=>{ const secs=(performance.now()-t0)/1000; setP(p,'Adding captions… '+Math.round(p*100)+'%'+(p>0.02?' · about '+fmtTime(secs/p*(1-p))+' left':'')); };
+    await conv.execute();
+    resultBlob=new Blob([output.target.buffer],{type:'video/mp4'});
+    if(resultUrl) URL.revokeObjectURL(resultUrl);
+    resultUrl=URL.createObjectURL(resultBlob);
+    $('resultVideo').src=resultUrl;
+    setP(1,'Finished in '+fmtTime((performance.now()-t0)/1000)+' · '+fmtSize(resultBlob.size));
+    show('doneBox'); show('note'); showNote('Done! Play the result below, then click Download.','ok');
+    Bridge.setResult(resultBlob,baseName()+'-captioned.mp4');
+  }catch(err){
+    const c=err && (err.name==='ConversionCanceledError' || /cancel/i.test(err.message||''));
+    show('note'); showNote(c ? 'Cancelled.' : 'Something went wrong: '+(err.message||err)+'.');
+  }finally{ conv=null; setBusy(false); }
+};
+$('downloadBtn').onclick=()=>{
+  if(!resultBlob) return;
+  const a=document.createElement('a'); a.href=resultUrl; a.download=baseName()+'-captioned.mp4';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

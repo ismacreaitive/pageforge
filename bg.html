@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CutOut Pro — Remove & Replace Photo Backgrounds</title>
+<link rel="stylesheet" href="forge.css">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+#view{display:block;max-width:100%;max-height:calc(100vh - 170px);border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5);touch-action:none}
+#view.move{cursor:move}#view.brush{cursor:crosshair}
+.checker{background-color:#fff;background-image:linear-gradient(45deg,#d5d9e0 25%,transparent 25%),linear-gradient(-45deg,#d5d9e0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d5d9e0 75%),linear-gradient(-45deg,transparent 75%,#d5d9e0 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.th{position:relative;aspect-ratio:1;border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--panel-2)}
+.th.sel{border-color:var(--warn)}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .st{position:absolute;left:4px;bottom:4px;font-size:10px;padding:2px 5px;border-radius:6px;background:rgba(0,0,0,.75)}
+.th .st.ok{color:var(--ok)}
+.th .x{position:absolute;top:3px;right:3px;padding:0 6px;font-size:11px;line-height:18px;border-radius:6px;background:rgba(0,0,0,.6)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{padding:7px 4px;font-size:12px}
+.seg button.on{border-color:var(--accent);color:var(--accent);background:#1f2633}
+.swatches{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.sw{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);padding:0;cursor:pointer}
+.sw.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.studio .sw{border-radius:8px;width:38px;height:38px}
+input[type=color]{width:34px;height:28px;border:none;background:none;padding:0;cursor:pointer}
+.pick{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel-2);font-size:13px}
+.pick:hover{border-color:var(--accent)}
+.results{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:250px;overflow:auto}
+.results img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;display:block}
+.results img:hover{border-color:var(--accent)}
+.sec{font-size:13px;font-weight:700;margin-top:4px}
+.credit{font-size:12px;color:var(--muted)}.credit a{color:var(--accent)}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel-2);display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">🪄</div>CutOut Pro <small>remove &amp; replace photo backgrounds · free · runs on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="image/*" multiple hidden><div class="drop-icon">🖼️</div><strong>Drop your photos here</strong><span>or click to choose · JPG, PNG, WebP · or paste with Ctrl+V</span></label>
+  <div class="thumbs" id="thumbs"></div>
+  <div><div class="label">What is in the photo?</div>
+    <select id="model"><option value="any">Anything: products, pets, people (best)</option><option value="people">People and portraits only (fast)</option></select>
+  </div>
+  <button class="primary big" id="runBtn" disabled>Remove background</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+
+  <div class="sec">🎨 New background</div>
+  <div class="seg" id="bgMode">
+    <button data-m="none" class="on">None</button><button data-m="color">Colour</button><button data-m="studio">Studio</button>
+    <button data-m="image">My photo</button><button data-m="search">🔍 Describe</button><button data-m="blur">Blur</button>
+  </div>
+  <div class="swatches hidden" id="colorBox">
+    <button class="sw on" data-c="#ffffff" style="background:#ffffff"></button><button class="sw" data-c="#000000" style="background:#000000"></button>
+    <button class="sw" data-c="#f1f3f5" style="background:#f1f3f5"></button><button class="sw" data-c="#5b8cff" style="background:#5b8cff"></button>
+    <button class="sw" data-c="#3ecf8e" style="background:#3ecf8e"></button><button class="sw" data-c="#ffd60a" style="background:#ffd60a"></button>
+    <button class="sw" data-c="#e63946" style="background:#e63946"></button><input type="color" id="colorPick" value="#ffffff" title="Any colour">
+  </div>
+  <div class="swatches studio hidden" id="studioBox"></div>
+  <div class="hidden" id="imgBox"><label class="pick">🏞️ Choose a background photo<input type="file" id="bgInput" accept="image/*" hidden></label><div class="ptext" id="bgName">No background photo yet</div></div>
+  <div class="box hidden" id="searchBox">
+    <div class="row"><input type="text" id="q" placeholder="Describe it, e.g. modern office, beach sunset"><button class="primary" id="qBtn" style="flex:none">Search</button></div>
+    <input type="text" id="pkey" placeholder="Free Pexels key (pexels.com/api)" autocomplete="off" spellcheck="false">
+    <div class="results" id="results"></div>
+    <div class="credit">Photos provided by <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></div>
+  </div>
+  <label class="slider hidden" id="blurBox">Blur amount <input type="range" id="blurAmt" min="4" max="40" value="16"></label>
+  <div class="credit" id="credit"></div>
+
+  <div class="sec">📐 Layout</div>
+  <div><div class="label">Picture size</div>
+    <select id="size"><option value="original">Same as my photo</option><option value="fit">Fit to the subject</option><option value="sq">Square 1080×1080 (products)</option><option value="portrait">Instagram 4:5 (1080×1350)</option><option value="story">Story / Status 9:16</option><option value="wide">Wide 16:9 (1920×1080)</option></select>
+  </div>
+  <label class="slider">Subject size <input type="range" id="scale" min="20" max="200" value="100"></label>
+  <button class="mini" id="centerBtn">⊕ Centre the subject</button>
+  <div class="ptext" style="margin:0">Tip: drag the subject on the picture to move it.</div>
+
+  <div class="sec">✨ Finish</div>
+  <div class="row">
+    <div><div class="label">Edges</div><select id="edge"><option value="soft">Soft (hair, fur)</option><option value="normal" selected>Normal</option><option value="crisp">Crisp (products)</option></select></div>
+    <div><div class="label">Shadow</div><select id="shadow"><option value="none">None</option><option value="soft">Soft drop</option><option value="floor">Floor (product)</option></select></div>
+  </div>
+  <label class="check"><input type="checkbox" id="light" checked> Match lighting to the new background</label>
+
+  <div class="box">
+    <button id="touchBtn">✏️ Touch up edges</button>
+    <div class="stack hidden" id="touchOpts" style="gap:8px">
+      <div class="seg" id="brushMode" style="grid-template-columns:1fr 1fr"><button data-b="erase" class="on">🧽 Erase leftovers</button><button data-b="restore">🖌️ Restore</button></div>
+      <label class="slider">Brush size <input type="range" id="brush" min="1" max="20" value="5"></label>
+      <button class="mini" id="undoBtn">↶ Undo last stroke</button>
+    </div>
+  </div>
+
+  <div><div class="label">Save as</div><select id="fmt"><option value="png">PNG (best, keeps transparency)</option><option value="jpg">JPG (smallest)</option><option value="webp">WebP (small, keeps transparency)</option></select></div>
+  <div class="row hidden" id="dlRow"><button class="primary" id="dlBtn">⬇ Download</button><button id="dlAllBtn">⬇ All as .zip</button></div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Add a photo to start</span><button class="mini hidden" id="holdBtn">Hold to see original</button></div>
+  <div class="stage"><div class="empty" id="empty">🪄<br>Add a photo to start</div><canvas id="view" class="hidden"></canvas></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const view=$('view'), vctx=view.getContext('2d');
+let TFP=null;
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const MODELS={
+  any:{ id:'d30social/ormbg-ortweb', task:'image-segmentation', read:'mask', f16:true },
+  people:{ id:'Xenova/modnet', task:'background-removal', read:'alpha', f16:false }
+};
+const MAX_SIDE=4096, AI_SIDE=1280, KEY_STORE='forge:pexelsKey';
+const EDGE={ soft:[0,255], normal:[25,230], crisp:[90,170] };
+const SIZES={ sq:[1080,1080], portrait:[1080,1350], story:[1080,1920], wide:[1920,1080] };
+const STUDIO=[['#ffffff','#e3e6ea'],['#f4f4f4','#c4cad3'],['#fff6ea','#dfc296'],['#eef4ff','#aec3ec'],['#4a505c','#0f1114'],['#fff1f6','#eeb8cd']];
+let items=[], sel=-1, busy=false, ai=null, bgMode='none', bgColor='#ffffff', studio=0, bgBmp=null, holding=false, drawQueued=false, wakeLock=null;
+let touch=false, brushErase=true, lastL=null, drag=null, photos=[];
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const toBlob=(c,type,q)=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('the picture is too large to save')),type,q));
+function saveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+if(location.protocol==='file:') showNote('This page was opened by double-clicking the file, so the AI cannot load. Open it with Live Server in VS Code, or on your Netlify site.');
+
+/* ---------- photos ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ addFiles([...e.target.files]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); addFiles([...e.dataTransfer.files]); });
+document.addEventListener('paste',e=>{ if(/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return; const fs=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/')); if(fs.length) addFiles(fs); });
+async function addFiles(fs){
+  if(busy) return;
+  for(const f of fs){
+    if(f.type.startsWith('video/')){ showNote('This tool is for photos. For videos, open the 🧍 Video background tool (bgvideo.html).'); continue; } if(!f.type.startsWith('image/')) continue;
+    try{
+      let bmp=await createImageBitmap(f);
+      const m=Math.max(bmp.width,bmp.height);
+      if(m>MAX_SIDE){ const k=MAX_SIDE/m, s=await createImageBitmap(bmp,{ resizeWidth:Math.round(bmp.width*k), resizeHeight:Math.round(bmp.height*k), resizeQuality:'high' }); bmp.close(); bmp=s; }
+      items.push({ name:f.name.replace(/\.[^.]+$/,'')||'photo', bmp, w:bmp.width, h:bmp.height, thumb:URL.createObjectURL(f), mask:null, maskModel:'', cut:null, cutKey:'', box:null, place:null, undo:null, subLum:null });
+    }catch{ toast('Could not open '+f.name+' (iPhone HEIC photos must be converted to JPG first)'); }
+  }
+  if(sel<0 && items.length) sel=0;
+  renderThumbs(); updateUI(); draw();
+}
+function renderThumbs(){
+  $('thumbs').innerHTML=items.map((it,i)=>'<div class="th'+(i===sel?' sel':'')+'" data-i="'+i+'"><img src="'+it.thumb+'" alt=""><span class="st'+(it.mask?' ok':'')+'">'+(it.mask?'✓ done':'not yet')+'</span><button class="x" title="Remove">✕</button></div>').join('');
+}
+$('thumbs').addEventListener('click',e=>{
+  const th=e.target.closest('.th'); if(!th || busy) return;
+  const i=+th.dataset.i;
+  if(e.target.classList.contains('x')){ const it=items[i]; it.bmp.close(); URL.revokeObjectURL(it.thumb); items.splice(i,1); if(sel>=items.length) sel=items.length-1; }
+  else sel=i;
+  renderThumbs(); updateUI(); draw();
+});
+const todo=()=>items.filter(it=>it.maskModel!==$('model').value);
+function updateUI(){
+  const n=todo().length, it=items[sel];
+  $('runBtn').disabled=busy || !n;
+  $('runBtn').textContent=!items.length ? 'Remove background' : n ? 'Remove background'+(n>1?' ('+n+' photos)':'') : '✓ All done';
+  const done=items.filter(x=>x.mask).length;
+  $('dlRow').classList.toggle('hidden',!done); $('dlAllBtn').classList.toggle('hidden',done<2);
+  $('holdBtn').classList.toggle('hidden',!(it && it.mask));
+  $('hint').textContent=!it ? 'Add a photo to start' : !it.mask ? 'Click "Remove background"' : touch ? 'Paint on the picture to '+(brushErase?'erase leftovers':'restore missing parts') : 'Pick a new background · drag the subject to move it';
+  if(it){ hide('empty'); show('view'); } else { show('empty'); hide('view'); }
+}
+$('model').onchange=updateUI;
+
+/* ---------- AI ---------- */
+async function gpuInfo(){ try{ if(!('gpu' in navigator)) return null; const a=await navigator.gpu.requestAdapter(); return a ? { f16:a.features.has('shader-f16') } : null; }catch{ return null; } }
+async function getAI(key,forceWasm){
+  if(ai && ai.key===key && !(forceWasm && ai.device!=='wasm')) return ai;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  const cfg=MODELS[key], gpu=forceWasm ? null : await gpuInfo();
+  const progress_callback=p=>{ if(p.status==='progress' && typeof p.progress==='number' && /\.onnx/.test(p.file||'')) setP(p.progress/100,'Downloading the AI model (first time only)… '+Math.round(p.progress)+'%'); };
+  const tries=gpu ? [{ device:'webgpu', dtype:cfg.f16 && gpu.f16 ? 'fp16' : 'fp32' },{ device:'wasm', dtype:'fp32' }] : [{ device:'wasm', dtype:'fp32' }];
+  let pipe=null, device='', err=null;
+  for(const t of tries){ try{ pipe=await TF.pipeline(cfg.task,cfg.id,{ device:t.device, dtype:t.dtype, revision:'main', progress_callback }); device=t.device; break; }catch(e){ err=e; console.warn(e); } }
+  if(!pipe) throw err || new Error('the AI model could not load');
+  if(ai && ai.pipe){ try{ await ai.pipe.dispose(); }catch{} }
+  ai={ key, TF, cfg, pipe, device }; return ai;
+}
+async function makeMask(it,A){
+  const k=Math.min(1,AI_SIDE/Math.max(it.w,it.h));
+  const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(it.w*k)); c.height=Math.max(1,Math.round(it.h*k));
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(it.bmp,0,0,c.width,c.height);
+  const raw=A.TF.RawImage.fromCanvas ? await A.TF.RawImage.fromCanvas(c) : await A.TF.RawImage.fromBlob(await toBlob(c,'image/png'));
+  const out=await A.pipe(raw), res=A.cfg.read==='mask' ? (out && out[0] && out[0].mask) : (out && out[0]);
+  if(!res) throw new Error('the AI returned no result');
+  const mc=res.toCanvas(), big=document.createElement('canvas'); big.width=it.w; big.height=it.h;
+  const bx=big.getContext('2d',{willReadFrequently:true}); bx.imageSmoothingQuality='high'; bx.drawImage(mc,0,0,it.w,it.h);
+  const a=bx.getImageData(0,0,it.w,it.h).data, m=new Uint8ClampedArray(it.w*it.h), off=A.cfg.read==='alpha' ? 3 : 0;
+  for(let i=0;i<m.length;i++) m[i]=a[i*4+off];
+  it.mask=m; it.cut=null; it.place=null; it.undo=null; it.subLum=null;
+}
+function setBusy(on){ busy=on; updateUI(); $('model').disabled=on; drop.style.pointerEvents=on?'none':''; keepAwake(on); }
+$('runBtn').onclick=async()=>{
+  const list=todo(); if(!list.length || busy) return;
+  const key=$('model').value;
+  setBusy(true); hide('note'); show('prog'); setP(0,'Loading the AI model…');
+  try{
+    let A=await getAI(key);
+    for(let n=0;n<list.length;n++){
+      const it=list[n];
+      setP(n/list.length,'Removing background… photo '+(n+1)+' of '+list.length+(A.device==='webgpu'?' (graphics card)':' (processor)'));
+      await new Promise(r=>setTimeout(r,30));
+      try{ await makeMask(it,A); }
+      catch(e){ if(A.device!=='webgpu') throw e; setP(n/list.length,'Switching to safe mode (slower)…'); A=await getAI(key,true); await makeMask(it,A); }
+      it.maskModel=key; sel=items.indexOf(it); renderThumbs(); updateUI(); draw();
+    }
+    setP(1,'Finished');
+    showNote('Done! Now choose a new background, layout and finish on the left. Use "Touch up edges" if anything was missed.','ok');
+  }catch(err){ console.error(err); showNote('Could not remove the background: '+(err.message||err)+'.'); }
+  finally{ setBusy(false); }
+};
+
+/* ---------- cut-out ---------- */
+function edgeLUT(key){ const [lo,hi]=EDGE[key], l=new Uint8ClampedArray(256); for(let i=0;i<256;i++) l[i]=(i-lo)*255/(hi-lo); return l; }
+function getCut(it){
+  const key=$('edge').value;
+  if(it.cut && it.cutKey===key) return it.cut;
+  const W=it.w, H=it.h;
+  if(!it.src){ it.src=document.createElement('canvas'); it.src.width=W; it.src.height=H; it.srcCtx=it.src.getContext('2d',{willReadFrequently:true}); it.srcCtx.drawImage(it.bmp,0,0); }
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const img=it.srcCtx.getImageData(0,0,W,H), d=img.data, m=it.mask, lut=edgeLUT(key);
+  let x0=W, y0=H, x1=-1, y1=-1;
+  for(let y=0,i=0;y<H;y++) for(let x=0;x<W;x++,i++){
+    const a=Math.min(d[i*4+3],lut[m[i]]); d[i*4+3]=a;
+    if(a>16){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  }
+  c.getContext('2d').putImageData(img,0,0);
+  if(!it.box || !it.cut){
+    if(x1<0) it.box={ x:0, y:0, w:W, h:H };
+    else{ const pad=Math.round(Math.max(W,H)*0.03), bx=Math.max(0,x0-pad), by=Math.max(0,y0-pad); it.box={ x:bx, y:by, w:Math.min(W,x1+pad+1)-bx, h:Math.min(H,y1+pad+1)-by }; }
+  }
+  it.cut=c; it.cutKey=key; it.subLum=null;
+  return c;
+}
+function updateCut(it,x,y,w,h){
+  const lut=edgeLUT($('edge').value), img=it.srcCtx.getImageData(x,y,w,h), d=img.data;
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const p=(j*w+i)*4; d[p+3]=Math.min(d[p+3],lut[it.mask[(y+j)*it.w+x+i]]); }
+  it.cut.getContext('2d').putImageData(img,x,y);
+}
+function paint(it,ix,iy,rad,erase){
+  const x0=Math.max(0,Math.floor(ix-rad)), x1=Math.min(it.w-1,Math.ceil(ix+rad)), y0=Math.max(0,Math.floor(iy-rad)), y1=Math.min(it.h-1,Math.ceil(iy+rad));
+  if(x1<x0 || y1<y0) return;
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    const dd=Math.hypot(x-ix,y-iy)/rad; if(dd>1) continue;
+    const f=dd<0.6 ? 1 : (1-dd)/0.4, i=y*it.w+x, m=it.mask[i];
+    it.mask[i]=erase ? Math.min(m,Math.round((1-f)*255)) : Math.max(m,Math.round(f*255));
+  }
+  updateCut(it,x0,y0,x1-x0+1,y1-y0+1);
+}
+
+/* ---------- layout & compositing ---------- */
+function coverDraw(g,img,W,H){ const k=Math.max(W/img.width,H/img.height), w=img.width*k, h=img.height*k; g.drawImage(img,(W-w)/2,(H-h)/2,w,h); }
+function layout(it){
+  const cut=getCut(it), key=$('size').value, b=it.box;
+  let W, H;
+  if(key==='original'){ W=it.w; H=it.h; } else if(key==='fit'){ W=b.w; H=b.h; } else [W,H]=SIZES[key];
+  if(!it.place || it.place.key!==key){
+    let fx=0.5, fy=0.5, k=1;
+    if(key==='original'){ fx=(b.x+b.w/2)/W; fy=(b.y+b.h/2)/H; }
+    else if(key!=='fit'){ k=Math.min(W*0.8/b.w,H*0.82/b.h); fy=0.5+Math.max(0,(H-b.h*k)/H)*0.3; }
+    it.place={ key, fx, fy, k };
+  }
+  const k=it.place.k*(+$('scale').value/100), sw=b.w*k, sh=b.h*k;
+  return { key, W, H, b, k, sw, sh, x:it.place.fx*W-sw/2, y:it.place.fy*H-sh/2, cut };
+}
+function drawBackground(g,L,it){
+  const { W, H }=L;
+  if(bgMode==='color'){ g.fillStyle=bgColor; g.fillRect(0,0,W,H); }
+  else if(bgMode==='studio'){ const [a,b]=STUDIO[studio], gr=g.createRadialGradient(W/2,H*0.42,0,W/2,H*0.42,Math.max(W,H)*0.8); gr.addColorStop(0,a); gr.addColorStop(1,b); g.fillStyle=gr; g.fillRect(0,0,W,H); }
+  else if((bgMode==='image' || bgMode==='search') && bgBmp) coverDraw(g,bgBmp,W,H);
+  else if(bgMode==='blur'){
+    const r=Math.max(2,Math.round(Math.max(W,H)*$('blurAmt').value/1000)); g.save(); g.filter='blur('+r+'px)';
+    if(L.key==='original') g.drawImage(it.bmp,-r*2,-r*2,W+r*4,H+r*4);
+    else{ const k=Math.max(W/it.w,H/it.h)*1.08, w=it.w*k, h=it.h*k; g.drawImage(it.bmp,(W-w)/2,(H-h)/2,w,h); }
+    g.restore();
+  }
+}
+function avgLum(src,sx,sy,sw,sh,alpha){
+  const c=document.createElement('canvas'); c.width=24; c.height=24; const g=c.getContext('2d',{willReadFrequently:true});
+  g.drawImage(src,sx,sy,sw,sh,0,0,24,24);
+  const d=g.getImageData(0,0,24,24).data; let s=0, w=0;
+  for(let i=0;i<d.length;i+=4){ const a=alpha ? d[i+3]/255 : 1; s+=(d[i]*2+d[i+1]*5+d[i+2])/8*a; w+=a; }
+  return w ? s/w : 128;
+}
+function compose(it){
+  const L=layout(it), c=document.createElement('canvas'); c.width=L.W; c.height=L.H; const g=c.getContext('2d');
+  drawBackground(g,L,it);
+  let filter='none';
+  if($('light').checked && bgMode!=='none'){
+    if(it.subLum==null) it.subLum=avgLum(L.cut,L.b.x,L.b.y,L.b.w,L.b.h,true);
+    const lb=avgLum(c,0,0,L.W,L.H,false), r=clamp(Math.pow((lb+20)/(it.subLum+20),0.35),0.85,1.18);
+    filter='brightness('+r.toFixed(3)+')';
+  }
+  const sh=$('shadow').value;
+  if(sh==='floor'){
+    const ew=L.sw*0.8, eh=Math.max(3,L.sw*0.08);
+    g.save(); g.translate(L.x+L.sw/2,L.y+L.sh-eh*0.25); g.scale(1,eh/ew);
+    const gr=g.createRadialGradient(0,0,0,0,0,ew/2); gr.addColorStop(0,'rgba(0,0,0,0.42)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(0,0,ew/2,0,Math.PI*2); g.fill(); g.restore();
+  }
+  g.save(); g.filter=filter;
+  if(sh==='soft'){ const s=Math.min(L.sw,L.sh); g.shadowColor='rgba(0,0,0,0.45)'; g.shadowBlur=s*0.05; g.shadowOffsetY=s*0.025; }
+  g.drawImage(L.cut,L.b.x,L.b.y,L.b.w,L.b.h,L.x,L.y,L.sw,L.sh);
+  g.restore();
+  return { c, L };
+}
+function draw(){
+  if(drawQueued) return; drawQueued=true;
+  requestAnimationFrame(()=>{
+    drawQueued=false; const it=items[sel]; if(!it) return;
+    let src;
+    if(!it.mask || holding){ src=it.bmp; lastL=null; } else { const r=compose(it); src=r.c; lastL=r.L; }
+    view.width=src.width; view.height=src.height; vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(src,0,0);
+    view.classList.toggle('checker',!!it.mask && !holding && bgMode==='none');
+    view.classList.toggle('brush',touch && !!it.mask); view.classList.toggle('move',!touch && !!it.mask);
+  });
+}
+
+/* ---------- moving the subject & touch-up brush ---------- */
+function vp(e){ const r=view.getBoundingClientRect(); return { x:(e.clientX-r.left)*view.width/r.width, y:(e.clientY-r.top)*view.height/r.height }; }
+const brushR=()=>Math.max(2,lastL.W*(+$('brush').value)/400);
+function brushAt(it,p){ const L=lastL; paint(it,L.b.x+(p.x-L.x)/L.k,L.b.y+(p.y-L.y)/L.k,brushR()/L.k,brushErase); }
+view.addEventListener('pointerdown',e=>{
+  const it=items[sel]; if(!it || !it.mask || !lastL || busy) return;
+  const p=vp(e); view.setPointerCapture(e.pointerId);
+  if(touch){ it.undo=it.mask.slice(); drag={ type:'brush', last:p }; brushAt(it,p); draw(); }
+  else drag={ type:'move', sx:p.x, sy:p.y, fx:it.place.fx, fy:it.place.fy };
+});
+view.addEventListener('pointermove',e=>{
+  if(!drag) return; const it=items[sel]; if(!it || !lastL) return; const p=vp(e);
+  if(drag.type==='move'){ it.place.fx=clamp(drag.fx+(p.x-drag.sx)/lastL.W,-0.2,1.2); it.place.fy=clamp(drag.fy+(p.y-drag.sy)/lastL.H,-0.2,1.2); }
+  else{ const dx=p.x-drag.last.x, dy=p.y-drag.last.y, n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/Math.max(1,brushR()*0.3))); for(let i=1;i<=n;i++) brushAt(it,{ x:drag.last.x+dx*i/n, y:drag.last.y+dy*i/n }); drag.last=p; }
+  draw();
+});
+['pointerup','pointercancel'].forEach(ev=>view.addEventListener(ev,()=>{ if(drag && drag.type==='brush'){ const it=items[sel]; if(it) it.subLum=null; } drag=null; draw(); }));
+$('touchBtn').onclick=()=>{ touch=!touch; $('touchBtn').textContent=touch ? '✅ Done touching up' : '✏️ Touch up edges'; $('touchOpts').classList.toggle('hidden',!touch); updateUI(); draw(); };
+$('brushMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; brushErase=b.dataset.b==='erase'; $('brushMode').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); updateUI(); };
+$('undoBtn').onclick=()=>{ const it=items[sel]; if(!it || !it.undo) return toast('Nothing to undo'); it.mask=it.undo; it.undo=null; it.cut=null; draw(); };
+$('centerBtn').onclick=()=>{ const it=items[sel]; if(!it || !it.place) return; it.place.fx=0.5; it.place.fy=0.5; draw(); };
+$('size').onchange=()=>{ $('scale').value=100; draw(); };
+['edge','shadow','light','blurAmt','scale'].forEach(id=>$(id).addEventListener('input',draw));
+const hb=$('holdBtn');
+hb.addEventListener('pointerdown',()=>{ holding=true; draw(); });
+['pointerup','pointerleave','pointercancel'].forEach(ev=>hb.addEventListener(ev,()=>{ if(holding){ holding=false; draw(); } }));
+
+/* ---------- background choices ---------- */
+$('studioBox').innerHTML=STUDIO.map((s,i)=>'<button class="sw'+(i===0?' on':'')+'" data-i="'+i+'" style="background:radial-gradient(circle at 50% 40%,'+s[0]+','+s[1]+')"></button>').join('');
+$('bgMode').onclick=e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  bgMode=b.dataset.m;
+  $('bgMode').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  $('colorBox').classList.toggle('hidden',bgMode!=='color'); $('studioBox').classList.toggle('hidden',bgMode!=='studio');
+  $('imgBox').classList.toggle('hidden',bgMode!=='image'); $('searchBox').classList.toggle('hidden',bgMode!=='search');
+  $('blurBox').classList.toggle('hidden',bgMode!=='blur');
+  if(bgMode!=='search') $('credit').innerHTML='';
+  if(bgMode==='image' && !bgBmp) $('bgInput').click();
+  if(bgMode==='search') setTimeout(()=>$('q').focus(),50);
+  draw();
+};
+$('colorBox').addEventListener('click',e=>{ const s=e.target.closest('.sw'); if(!s) return; bgColor=s.dataset.c; $('colorBox').querySelectorAll('.sw').forEach(x=>x.classList.toggle('on',x===s)); draw(); });
+$('colorPick').addEventListener('input',()=>{ bgColor=$('colorPick').value; $('colorBox').querySelectorAll('.sw').forEach(x=>x.classList.remove('on')); draw(); });
+$('studioBox').addEventListener('click',e=>{ const s=e.target.closest('.sw'); if(!s) return; studio=+s.dataset.i; $('studioBox').querySelectorAll('.sw').forEach(x=>x.classList.toggle('on',x===s)); draw(); });
+$('bgInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ bgBmp=await createImageBitmap(f); $('bgName').textContent='🏞️ '+f.name; draw(); }catch{ toast('Could not open that photo'); }
+};
+
+/* ---------- describe → search professional photos (Pexels) ---------- */
+$('pkey').value=localStorage.getItem(KEY_STORE)||'';
+$('pkey').addEventListener('input',()=>localStorage.setItem(KEY_STORE,$('pkey').value.trim()));
+function orientNow(){
+  const k=$('size').value, it=items[sel];
+  if(k==='sq') return 'square'; if(k==='story' || k==='portrait') return 'portrait'; if(k==='wide') return 'landscape';
+  if(!it) return 'landscape'; return it.w>it.h*1.1 ? 'landscape' : it.h>it.w*1.1 ? 'portrait' : 'square';
+}
+async function pexelsPhotos(q,orient){
+  const qs='v1/search?query='+encodeURIComponent(q)+'&per_page=18&orientation='+orient, opts={ headers:{ Authorization:$('pkey').value.trim() } };
+  let res; try{ res=await fetch('https://api.pexels.com/'+qs,opts); }catch{ res=await fetch('/pexels-api/'+qs,opts).catch(()=>null); }
+  if(!res) throw new Error('Could not reach Pexels. Check your internet.');
+  if(res.status===401 || res.status===403) throw new Error('The Pexels key was not accepted. Copy it again from pexels.com/api');
+  if(res.status===429) throw new Error('Pexels limit reached for this hour. Try again later.');
+  if(!res.ok || !/json/.test(res.headers.get('content-type')||'')) throw new Error('Pexels answered with an error ('+res.status+')');
+  return (await res.json()).photos || [];
+}
+async function loadPhoto(link){
+  try{ const r=await fetch(link); if(r.ok) return await createImageBitmap(await r.blob()); }catch{}
+  const m=link.match(/^https:\/\/images\.pexels\.com\/(.+)$/);
+  if(m){ try{ const r=await fetch('/pexels-img/'+m[1]); if(r.ok && /image/.test(r.headers.get('content-type')||'')) return await createImageBitmap(await r.blob()); }catch{} }
+  throw new Error('Could not load that photo. Check that the _redirects file includes the /pexels-img/ line.');
+}
+async function runSearch(){
+  const q=$('q').value.trim();
+  if(!q) return toast('Describe the background you want');
+  if(!$('pkey').value.trim()){ $('pkey').focus(); return toast('Paste your free Pexels key first (pexels.com/api)'); }
+  $('results').innerHTML='<div class="ptext">Searching…</div>';
+  try{
+    photos=await pexelsPhotos(q,orientNow());
+    $('results').innerHTML=photos.length ? photos.map((p,i)=>'<img src="'+esc(p.src.medium)+'" data-i="'+i+'" title="Photo by '+esc(p.photographer)+'" loading="lazy" alt="'+esc(p.alt||'')+'">').join('') : '<div class="ptext">No photos found. Try simpler words, like "office" or "beach".</div>';
+  }catch(e){ $('results').innerHTML='<div class="ptext">'+esc(e.message)+'</div>'; }
+}
+$('qBtn').onclick=runSearch;
+$('q').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });
+$('results').addEventListener('click',async e=>{
+  const im=e.target.closest('img'); if(!im) return;
+  const p=photos[+im.dataset.i]; toast('Loading this background…');
+  try{
+    bgBmp=await loadPhoto(p.src.large2x || p.src.large);
+    $('credit').innerHTML='Background: photo by <a href="'+esc(p.url)+'" target="_blank" rel="noopener">'+esc(p.photographer)+'</a> on Pexels';
+    draw();
+  }catch(err){ toast(err.message); }
+});
+
+/* ---------- download ---------- */
+async function exportOne(it){
+  const fmt=$('fmt').value; let c=compose(it).c;
+  if(fmt==='jpg' && bgMode==='none'){ const w=document.createElement('canvas'); w.width=c.width; w.height=c.height; const g=w.getContext('2d'); g.fillStyle='#ffffff'; g.fillRect(0,0,w.width,w.height); g.drawImage(c,0,0); c=w; }
+  const type={ png:'image/png', jpg:'image/jpeg', webp:'image/webp' }[fmt];
+  return { blob:await toBlob(c,type,0.93), name:it.name+'-cutout.'+fmt };
+}
+$('dlBtn').onclick=async()=>{
+  const it=items[sel]; if(!it || !it.mask) return toast('Remove the background from this photo first');
+  try{ const r=await exportOne(it); saveBlob(r.blob,r.name); toast('Downloaded '+r.name); }catch(e){ toast(e.message); }
+};
+$('dlAllBtn').onclick=async()=>{
+  const done=items.filter(it=>it.mask);
+  if(!window.JSZip) return toast('The zip maker did not load. Check your internet.');
+  const btn=$('dlAllBtn'); btn.disabled=true; btn.textContent='Packing…';
+  try{
+    const zip=new JSZip(), used=new Set();
+    for(const it of done){ const r=await exportOne(it); let nm=r.name, k=2; while(used.has(nm)) nm=r.name.replace(/(\.\w+)$/,'-'+(k++)+'$1'); used.add(nm); zip.file(nm,r.blob); }
+    saveBlob(await zip.generateAsync({type:'blob'}),'cutouts.zip');
+  }catch(e){ toast('Could not make the zip: '+e.message); }
+  btn.disabled=false; btn.textContent='⬇ All as .zip';
+};
+</script>
+</body>
+</html>

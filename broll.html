@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoRoll — Automatic B-roll for Talking Videos</title>
+<link rel="stylesheet" href="forge.css">
+<style>
+.wrap{position:relative;display:inline-block;line-height:0}
+#video{display:block;max-width:100%;max-height:calc(100vh - 480px);min-height:180px;border-radius:6px;background:#000}
+#ov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px;opacity:0;transition:opacity .25s;pointer-events:none;background:#000}
+#ov.on{opacity:1}
+.badge{position:absolute;top:10px;left:10px;line-height:1;background:var(--warn);color:#111;font-size:11px;font-weight:800;padding:5px 8px;border-radius:6px;opacity:0;transition:.2s;pointer-events:none}
+.badge.on{opacity:1}
+.timeline{position:relative;height:26px;margin:10px 16px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;flex:none}
+.timeline .blk{position:absolute;top:3px;bottom:3px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+.timeline .blk.off{background:#3a4352}
+.timeline .head{position:absolute;top:0;bottom:0;width:2px;background:var(--warn);left:0}
+.moments{height:300px;flex:none;overflow:auto;border-top:1px solid var(--line);background:var(--panel);padding:10px 16px;display:flex;flex-direction:column;gap:10px}
+.mo{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px;display:flex;flex-direction:column;gap:8px}
+.mo.off{opacity:.5}
+.mo.now{border-color:var(--warn)}
+.mo-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.mo-top input[type=number]{width:68px;padding:4px 6px}
+.mo-top input.q{flex:1;min-width:150px;width:auto;padding:5px 8px}
+.mo-top .check{color:var(--text)}
+.mo-text{font-size:13px;line-height:1.5;color:var(--text);opacity:.85}
+.clips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.clip{flex:none;width:122px;border:3px solid transparent;border-radius:9px;overflow:hidden;cursor:pointer;background:#000;position:relative}
+.clip img{display:block;width:100%;height:72px;object-fit:cover}
+.clip span{position:absolute;bottom:3px;right:4px;font-size:10px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px}
+.clip.on{border-color:var(--ok)}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.credit{font-size:12px;color:var(--muted)}
+.credit a,.ptext a{color:var(--accent)}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">🎬</div>AutoRoll <small>automatic B-roll for talking videos · free · renders on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🎙️</div><strong>Drop your talking video here</strong><span>or click to choose · MP4, MOV, WebM</span></label>
+  <div class="file-info" id="fileInfo">No video selected</div>
+
+  <div><div class="label">Pexels API key (free)</div>
+    <input type="text" id="apiKey" placeholder="Paste your Pexels key here" autocomplete="off" spellcheck="false">
+    <div class="ptext">Get one free in a minute at <a href="https://www.pexels.com/api/new/" target="_blank" rel="noopener">pexels.com/api</a>. It is saved only in this browser.</div>
+  </div>
+  <div class="row">
+    <div><div class="label">Language spoken</div>
+      <select id="lang"><option value="auto">Detect</option><option value="english" selected>English</option><option value="french">French</option><option value="spanish">Spanish</option><option value="portuguese">Portuguese</option><option value="german">German</option><option value="arabic">Arabic</option><option value="yoruba">Yoruba</option><option value="hausa">Hausa</option><option value="swahili">Swahili</option><option value="hindi">Hindi</option><option value="chinese">Chinese</option></select>
+    </div>
+    <div><div class="label">Accuracy</div>
+      <select id="model"><option value="Xenova/whisper-tiny">Fast</option><option value="Xenova/whisper-base" selected>Balanced</option><option value="Xenova/whisper-small">Best (250 MB)</option></select>
+    </div>
+  </div>
+  <div><div class="label">How much B-roll</div>
+    <select id="density"><option value="14">A little (about every 14 s)</option><option value="9" selected>Balanced (about every 9 s)</option><option value="6">A lot (about every 6 s)</option></select>
+  </div>
+  <label class="slider">Clip length <input type="range" id="clipLen" min="2" max="6" step="0.5" value="3"><b id="clipLenVal">3s</b></label>
+  <label class="slider">Show my face first <input type="range" id="skipStart" min="0" max="10" step="1" value="3"><b id="skipVal">3s</b></label>
+
+  <button class="primary big" id="findBtn" disabled>1. Find B-roll moments</button>
+  <button class="primary big hidden" id="searchBtn">2. Find stock clips</button>
+  <div class="stack hidden" id="renderBox">
+    <div><div class="label">Output size</div><select id="outSize"><option value="0">Same as original</option><option value="1080" selected>1080p (Full HD)</option><option value="720">720p (faster, smaller)</option></select></div>
+    <label class="check"><input type="checkbox" id="fade" checked> Smooth fade in and out</label>
+    <label class="check hidden" id="diskWrap"><input type="checkbox" id="toDisk"> Save straight to disk (best for long videos)</label>
+  </div>
+  <button class="primary big hidden" id="renderBtn">3. Render final video</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download video</button><button id="creditsBtn" style="width:100%;margin-top:8px">⬇ Clip credits (.txt)</button><video id="resultVideo" controls playsinline></video></div>
+  <div class="credit">Stock videos provided by <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Your video appears here</span><button class="mini hidden" id="addBtn">+ Add B-roll here</button></div>
+  <div class="stage">
+    <div class="empty" id="empty">🎬<br>Open a talking video to start</div>
+    <div class="wrap hidden" id="wrap"><video id="video" controls playsinline preload="auto"></video><video id="ov" muted playsinline preload="auto"></video><div class="badge" id="badge">B-ROLL PREVIEW</div></div>
+  </div>
+  <div class="timeline hidden" id="timeline"><div class="head" id="head"></div></div>
+  <div class="moments" id="moments"></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+    import * as Bridge from './forge-bridge.js';
+Bridge.dock('broll');
+const $=id=>document.getElementById(id);
+const video=$('video'), ov=$('ov');
+let MBP=null, TFP=null, MB=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const CLIP_OFFSET=0.5, FADE=0.3, KEY_STORE='forge:pexelsKey';
+let file=null, url=null, busy=false, conv=null, cancelled=false, asr=null, asrModel='', token=0, segsKey='';
+let segs=[], moments=[], df=new Map(), nextId=1, resultBlob=null, resultUrl=null, resultName='', credits='', wakeLock=null, lastNow=-1;
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function fmtSize(b){ return b>1073741824?(b/1073741824).toFixed(2)+' GB':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtClock(s){ if(!isFinite(s)) return '0:00'; s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+function fmtTime(s){ s=Math.round(s); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function setP(p,text){ $('bar').style.width=(Math.min(1,Math.max(0,p))*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+$('apiKey').value=localStorage.getItem(KEY_STORE)||'';
+$('apiKey').addEventListener('input',()=>localStorage.setItem(KEY_STORE,$('apiKey').value.trim()));
+$('clipLen').oninput=()=>$('clipLenVal').textContent=$('clipLen').value+'s';
+$('skipStart').oninput=()=>$('skipVal').textContent=$('skipStart').value+'s';
+
+/* ---------- loading the video ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+function loadFile(f){
+  if(!f || busy) return;
+  if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name)) return toast('Please choose a video file');
+  file=f; token++; segs=[]; segsKey=''; moments=[]; lastNow=-1;
+  if(url) URL.revokeObjectURL(url); url=URL.createObjectURL(f);
+  ['note','prog','doneBox','searchBtn','renderBox','renderBtn'].forEach(hide);
+  renderMoments(); $('fileInfo').textContent='Opening '+f.name+'…';
+  video.src=url; $('findBtn').disabled=false; loadMB().catch(()=>{});
+  const big=f.size>700*1048576 && 'showSaveFilePicker' in window;
+  $('diskWrap').classList.toggle('hidden',!big); $('toDisk').checked=big;
+}
+video.addEventListener('loadedmetadata',()=>{
+  hide('empty'); show('wrap'); show('timeline'); show('addBtn');
+  $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+video.videoWidth+'×'+video.videoHeight+' · '+fmtClock(video.duration);
+  $('hint').textContent='Paste your Pexels key, then click "1. Find B-roll moments"';
+  renderTimeline();
+  const tk=token;
+  if('requestVideoFrameCallback' in HTMLVideoElement.prototype){
+    const loop=()=>{ if(tk!==token) return; syncOverlay(); video.requestVideoFrameCallback(loop); };
+    video.requestVideoFrameCallback(loop);
+  }
+});
+video.addEventListener('error',()=>{ if(file) showNote('Your browser cannot open this video. Convert it to MP4 first with the Video Toolkit.'); });
+['timeupdate','seeked','pause','play'].forEach(ev=>video.addEventListener(ev,syncOverlay));
+ov.addEventListener('loadedmetadata',syncOverlay);
+
+/* ---------- live preview of the chosen clips ---------- */
+function syncOverlay(){
+  const d=video.duration||0, t=video.currentTime;
+  if(d) $('head').style.left=(t/d*100)+'%';
+  const m=moments.find(m=>m.on && t>=m.start && t<m.start+m.len);
+  const id=m ? m.id : -1;
+  if(id!==lastNow){
+    const box=$('moments'); box.querySelector('.mo.now')?.classList.remove('now');
+    const el=m && box.querySelector('[data-id="'+m.id+'"]');
+    if(el){ el.classList.add('now'); if(!box.contains(document.activeElement)) el.scrollIntoView({block:'nearest'}); }
+    lastNow=id;
+  }
+  const v=m && m.results && m.pick>=0 ? m.results[m.pick] : null, f=v && previewFile(v);
+  if(!f || busy){ ov.classList.remove('on'); $('badge').classList.remove('on'); if(!ov.paused) ov.pause(); return; }
+  if(ov.dataset.src!==f.link){ ov.dataset.src=f.link; ov.src=f.link; }
+  const lt=t-m.start+CLIP_OFFSET;
+  if(ov.readyState>=1 && Math.abs(ov.currentTime-lt)>0.4) ov.currentTime=lt;
+  if(video.paused){ if(!ov.paused) ov.pause(); } else if(ov.paused) ov.play().catch(()=>{});
+  ov.classList.add('on'); $('badge').classList.add('on');
+}
+
+/* ---------- speech to text (same engine as CaptionForge) ---------- */
+async function getAudio16k(f){
+  const buf=await f.arrayBuffer(), ctx=new AudioContext({sampleRate:16000});
+  try{
+    const ab=await ctx.decodeAudioData(buf), n=ab.length, ch=ab.numberOfChannels, out=new Float32Array(n);
+    for(let c=0;c<ch;c++){ const d=ab.getChannelData(c); for(let i=0;i<n;i++) out[i]+=d[i]/ch; }
+    return out;
+  }finally{ ctx.close(); }
+}
+async function getASR(model){
+  if(asr && asrModel===model) return asr;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  asr=await TF.pipeline('automatic-speech-recognition',model,{ progress_callback:p=>{ if(p.status==='progress' && typeof p.progress==='number') setP(p.progress/100,'Downloading the AI listener (first time only)… '+Math.round(p.progress)+'%'); } });
+  asrModel=model; return asr;
+}
+
+/* ---------- finding topics ---------- */
+const STOP=new Set(`a about above actually after again against ago ah all almost alone along already alright also although always am among an and another any anybody anyone anything anyway are aren't around as ask asked at away back bad basically be became because become been before being below best better between big bit both but by call called came can can't cannot come comes coming could couldn't day days did didn't do does doesn't doing don't done down during each easy either else end enough even ever every everybody everyone everything example exactly fact feel few find first for found from full further get gets getting give given go goes going gone gonna good got gotta great guess guy guys had hadn't happen happened has hasn't have haven't having he he'd he'll he's hear hello her here hey hi him himself his honestly hope how however huh i i'd i'll i'm i've idea if important in instead into is isn't it it's its itself just keep kind kinda know known last least left less let let's life like likely literally little long look looking lot lots made make makes making many matter may maybe me mean means meant might mind mine more most much must my myself need needs never new next nice no nobody none nor not nothing now number of off often oh ok okay old on once one ones only or other others our ours out over own part people per perhaps place point pretty probably put quite rather really reason right said same saw say saying says see seem seems seen several shall she should shouldn't show side since so some somebody someone something sometimes soon sort start started still stuff such super sure take taking talk talking tell than thank thanks that that's the their them themselves then there there's these they they'd they'll they're they've thing things think thinking this those though thought through time times to today together told too took top totally toward tried true try trying turn two um uh under understand until up upon us use used using very video videos want wanted wants was wasn't watch way ways we we'd we'll we're we've welcome well went were weren't what what's whatever when where which while who whole whom whose why will with within without won't wonder work works would wouldn't wow yeah year years yes yet you you'd you'll you're you've your yours yourself subscribe channel comment comments like button link description episode`.split(/\s+/));
+const tokens=text=>text.toLowerCase().replace(/[’']s\b/g,'').replace(/[^a-z0-9\s'-]/g,' ').split(/\s+/).filter(Boolean);
+const goodWord=w=>w.length>=3 && !STOP.has(w) && !/^\d+$/.test(w) && !/['-]$/.test(w);
+function buildDF(){ df=new Map(); for(const s of segs) for(const w of new Set(tokens(s.text))) df.set(w,(df.get(w)||0)+1); }
+function score(w){ return Math.log(1+(segs.length+1)/(1+(df.get(w)||0)))*(1+Math.min(w.length,10)/10); }
+function keyOf(text){
+  const w=tokens(text), c=[];
+  for(let i=0;i<w.length;i++){
+    if(!goodWord(w[i])) continue;
+    c.push({ q:w[i], s:score(w[i]) });
+    if(i+1<w.length && goodWord(w[i+1])) c.push({ q:w[i]+' '+w[i+1], s:(score(w[i])+score(w[i+1]))*0.75 });
+  }
+  c.sort((a,b)=>b.s-a.s);
+  return c[0]||null;
+}
+const mk=(start,len,text,query)=>({ id:nextId++, start, len, text, query, on:true, results:null, pick:-1, status:'' });
+function suggest(){
+  buildDF();
+  const gap=+$('density').value, len=+$('clipLen').value, skip=+$('skipStart').value, dur=video.duration||0;
+  const c=segs.map(s=>({ s, k:keyOf(s.text) })).filter(x=>x.k && x.s.start>=skip && x.s.start<dur-1.5).sort((a,b)=>b.k.s-a.k.s);
+  const max=Math.max(1,Math.floor((dur-skip)/gap)), out=[];
+  for(const x of c){
+    const st=Math.round((x.s.start+0.2)*10)/10;
+    if(out.some(m=>Math.abs(m.start-st)<gap)) continue;
+    const l=Math.min(len,Math.round((dur-st-0.3)*10)/10);
+    if(l<1) continue;
+    out.push(mk(st,l,x.s.text,x.k.q));
+    if(out.length>=max) break;
+  }
+  return out.sort((a,b)=>a.start-b.start);
+}
+
+function setBusy(on){
+  busy=on;
+  $('findBtn').disabled=on || !file; $('searchBtn').disabled=on; $('renderBtn').disabled=on; $('addBtn').disabled=on;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  ['lang','model','density','clipLen','skipStart','apiKey','outSize','fade','toDisk'].forEach(id=>$(id).disabled=on);
+  drop.style.pointerEvents=on?'none':''; $('moments').style.pointerEvents=on?'none':''; $('moments').style.opacity=on?'.6':'';
+  keepAwake(on); syncOverlay();
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(conv){ try{ await conv.cancel(); }catch{} } };
+
+$('findBtn').onclick=async()=>{
+  if(!file || busy) return;
+  video.pause(); cancelled=false; setBusy(true); hide('note'); hide('doneBox'); show('prog');
+  try{
+    const key=token+'|'+$('lang').value+'|'+$('model').value;
+    if(segsKey!==key){
+      setP(0,'Reading the sound from your video…');
+      const audio=await getAudio16k(file).catch(()=>{ throw new Error('could not read the sound in this video (does it have sound?)'); });
+      if(!audio.length) throw new Error('this video has no sound');
+      setP(0,'Loading the AI listener…');
+      const pipe=await getASR($('model').value);
+      const lang=$('lang').value, CH=30*16000, total=audio.length, t0=performance.now();
+      segs=[];
+      for(let off=0;off<total;off+=CH){
+        if(cancelled) break;
+        const chunk=audio.subarray(off,Math.min(total,off+CH));
+        const opts={ return_timestamps:true, task: lang==='english' ? 'transcribe' : 'translate' };
+        if(lang!=='auto') opts.language=lang;
+        const out=await pipe(chunk,opts);
+        const base=off/16000, dur=chunk.length/16000;
+        const parts=(out.chunks && out.chunks.length) ? out.chunks : [{ timestamp:[0,dur], text:out.text||'' }];
+        for(const c of parts){
+          const text=(c.text||'').trim();
+          if(!text || /^[\[(].*[\])]$/.test(text)) continue;
+          const s=c.timestamp?.[0] ?? 0, e=c.timestamp?.[1] ?? dur;
+          segs.push({ start:base+s, end:base+Math.max(e,s+0.4), text });
+        }
+        const done=Math.min(1,(off+CH)/total), secs=(performance.now()-t0)/1000;
+        setP(done,'Listening… '+Math.round(done*100)+'%'+(done>0.04 && done<1 ? ' · about '+fmtTime(secs/done*(1-done))+' left' : ''));
+        await sleep(20);
+      }
+      if(!segs.length) throw new Error(cancelled ? 'stopped before any speech was found' : 'no speech was found in this video');
+      if(!cancelled) segsKey=key;
+    }
+    moments=suggest(); renderMoments(); renderTimeline();
+    show('searchBtn'); setP(1,'Listening finished');
+    showNote(moments.length
+      ? 'Found '+moments.length+' good moments. Check the search words under the video (one or two simple nouns work best), then click "2. Find stock clips".'
+      : 'No clear topics were found. Pause the video where you want B-roll and click "+ Add B-roll here".','ok');
+  }catch(err){ showNote('Could not listen to the video: '+(err.message||err)+'.'); }
+  finally{ setBusy(false); }
+};
+
+/* ---------- moments panel ---------- */
+function cardHtml(m){
+  let clips;
+  if(m.status) clips='<div class="muted">'+esc(m.status)+'</div>';
+  else if(!m.results) clips='<div class="muted">No clips yet. Click "2. Find stock clips" or 🔍 Search.</div>';
+  else if(!m.results.length) clips='<div class="muted">No clips found. Try simpler words, like "city street" or "laptop".</div>';
+  else clips='<div class="clips">'+m.results.map((v,k)=>'<div class="clip'+(k===m.pick?' on':'')+'" data-k="'+k+'" title="Video by '+esc(v.user?.name||'Pexels')+'"><img src="'+esc(v.image)+'" alt="" loading="lazy"><span>'+v.duration+'s</span></div>').join('')+'</div>'
+    +(m.pick>=0 ? '<div class="credit">Clip by <a href="'+esc(m.results[m.pick].url)+'" target="_blank" rel="noopener">'+esc(m.results[m.pick].user?.name||'Pexels')+'</a> on Pexels</div>' : '');
+  return '<div class="mo'+(m.on?'':' off')+'" data-id="'+m.id+'"><div class="mo-top">'
+    +'<label class="check"><input type="checkbox" class="m-on"'+(m.on?' checked':'')+'> Use</label>'
+    +'at <input type="number" class="m-start" step="0.1" min="0" value="'+m.start.toFixed(1)+'"> s for <input type="number" class="m-len" step="0.5" min="0.5" value="'+m.len+'"> s'
+    +'<input type="text" class="q" value="'+esc(m.query)+'" placeholder="Search words, e.g. city traffic">'
+    +'<button class="mini m-search">🔍 Search</button><button class="mini m-go" title="Play this moment">▶</button><button class="mini m-del" title="Remove">✕</button>'
+    +'</div>'+(m.text?'<div class="mo-text">“'+esc(m.text)+'”</div>':'')+clips+'</div>';
+}
+function renderMoments(){
+  lastNow=-1;
+  $('moments').innerHTML=moments.length ? moments.map(cardHtml).join('') : '<div class="muted">B-roll moments appear here after step 1. Each one gets search words you can change and a row of stock clips to pick from.</div>';
+}
+function renderOne(m){ const el=$('moments').querySelector('[data-id="'+m.id+'"]'); if(el){ el.outerHTML=cardHtml(m); lastNow=-1; } }
+function renderTimeline(){
+  const tl=$('timeline'), d=video.duration||0; if(!d) return;
+  tl.querySelectorAll('.blk').forEach(b=>b.remove());
+  for(const m of moments){
+    const b=document.createElement('div'); b.className='blk'+(m.on && m.pick>=0 ? '' : ' off');
+    b.style.left=(m.start/d*100)+'%'; b.style.width=Math.max(0.4,m.len/d*100)+'%'; b.title=m.query;
+    tl.insertBefore(b,$('head'));
+  }
+}
+$('timeline').addEventListener('click',e=>{ const r=$('timeline').getBoundingClientRect(); video.currentTime=Math.max(0,(e.clientX-r.left)/r.width*(video.duration||0)); });
+const momentOf=el=>moments.find(m=>m.id===+el.closest('.mo')?.dataset.id);
+$('moments').addEventListener('input',e=>{
+  const m=momentOf(e.target); if(!m) return;
+  const c=e.target.classList, v=parseFloat(e.target.value);
+  if(c.contains('q')) m.query=e.target.value;
+  if(c.contains('m-start') && !isNaN(v)) m.start=Math.max(0,v);
+  if(c.contains('m-len') && !isNaN(v)) m.len=Math.max(0.5,v);
+  if(c.contains('m-on')){ m.on=e.target.checked; e.target.closest('.mo').classList.toggle('off',!m.on); }
+  renderTimeline();
+});
+$('moments').addEventListener('keydown',e=>{ if(e.key==='Enter' && e.target.classList.contains('q')){ const m=momentOf(e.target); if(m) searchOne(m).catch(err=>showNote('Search failed: '+err.message+'.')); } });
+$('moments').addEventListener('click',e=>{
+  const m=momentOf(e.target); if(!m) return;
+  const c=e.target.classList, clip=e.target.closest('.clip');
+  if(clip){ m.pick=+clip.dataset.k; renderOne(m); renderTimeline(); video.currentTime=m.start; syncOverlay(); }
+  else if(c.contains('m-search')) searchOne(m).catch(err=>showNote('Search failed: '+err.message+'.'));
+  else if(c.contains('m-go')){ video.currentTime=Math.max(0,m.start-0.5); video.play(); }
+  else if(c.contains('m-del')){ moments=moments.filter(x=>x!==m); renderMoments(); renderTimeline(); }
+});
+$('addBtn').onclick=()=>{
+  if(busy) return;
+  const t=video.currentTime||0;
+  const s=segs.find(s=>t>=s.start && t<s.end) || segs.reduce((b,s)=>!b || Math.abs(s.start-t)<Math.abs(b.start-t) ? s : b,null);
+  if(segs.length && !df.size) buildDF();
+  const k=s ? keyOf(s.text) : null;
+  const m=mk(Math.round(t*10)/10,+$('clipLen').value,s?s.text:'',k?k.q:'');
+  moments.push(m); moments.sort((a,b)=>a.start-b.start); renderMoments(); renderTimeline();
+  show('renderBox'); show('renderBtn');
+  if(m.query && $('apiKey').value.trim()) searchOne(m).catch(err=>showNote('Search failed: '+err.message+'.'));
+  else $('moments').querySelector('[data-id="'+m.id+'"] .q')?.focus();
+};
+
+/* ---------- Pexels ---------- */
+function orientation(){ const w=video.videoWidth, h=video.videoHeight; return w>h*1.1 ? 'landscape' : h>w*1.1 ? 'portrait' : 'square'; }
+const mp4s=v=>(v.video_files||[]).filter(f=>f.link && f.width && f.height && /mp4/.test(f.file_type||'')).sort((a,b)=>a.width*a.height-b.width*b.height);
+function previewFile(v){ const l=mp4s(v); return l.find(f=>Math.min(f.width,f.height)>=360) || l[0] || null; }
+function pickFile(v,short){ const l=mp4s(v); return l.find(f=>Math.min(f.width,f.height)>=short) || l[l.length-1] || null; }
+async function pexels(query,orient){
+  const key=$('apiKey').value.trim(), qs='v1/videos/search?query='+encodeURIComponent(query)+'&per_page=8&orientation='+orient, opts={ headers:{ Authorization:key } };
+  let res;
+  try{ res=await fetch('https://api.pexels.com/'+qs,opts); }
+  catch{ res=await fetch('/pexels-api/'+qs,opts).catch(()=>null); }   // fallback through the Netlify proxy
+  if(!res) throw new Error('could not reach Pexels. Check your internet connection');
+  if(res.status===401 || res.status===403) throw new Error('the Pexels key was not accepted. Copy it again from pexels.com/api');
+  if(res.status===429) throw new Error('the Pexels limit was reached (200 searches per hour). Wait a while and try again');
+  if(!res.ok || !/json/.test(res.headers.get('content-type')||'')) throw new Error('Pexels answered with an error ('+res.status+')');
+  const j=await res.json();
+  return (j.videos||[]).filter(v=>v.duration>=2 && mp4s(v).length);
+}
+async function searchOne(m){
+  if(!$('apiKey').value.trim()){ $('apiKey').focus(); throw new Error('paste your free Pexels API key first'); }
+  if(!m.query.trim()) throw new Error('type some search words for the moment at '+m.start.toFixed(1)+'s');
+  m.status='Searching Pexels for "'+m.query+'"…'; renderOne(m);
+  try{ m.results=await pexels(m.query.trim(),orientation()); m.pick=m.results.length ? 0 : -1; }
+  finally{ m.status=''; renderOne(m); renderTimeline(); }
+}
+$('searchBtn').onclick=async()=>{
+  const list=moments.filter(m=>m.on); if(!list.length || busy) return;
+  cancelled=false; setBusy(true); hide('note'); show('prog');
+  try{
+    for(let i=0;i<list.length;i++){
+      if(cancelled) break;
+      setP(i/list.length,'Searching stock clips… '+(i+1)+' of '+list.length);
+      await searchOne(list[i]); await sleep(250);
+    }
+    setP(1,'Search finished'); show('renderBox'); show('renderBtn');
+    $('hint').textContent='Press play to preview the B-roll, pick other clips if you like, then render';
+    showNote('Clips found! The first clip is chosen for each moment (green border). Click another to change it, untick "Use" to skip a moment, then click "3. Render final video".','ok');
+  }catch(err){ showNote('Search stopped: '+(err.message||err)+'.'); }
+  finally{ setBusy(false); }
+};
+
+/* ---------- rendering ---------- */
+async function getClipBlob(link){
+  try{ const r=await fetch(link); if(r.ok) return await r.blob(); }catch{}
+  const m=link.match(/^https:\/\/videos\.pexels\.com\/(.+)$/);
+  if(m){
+    try{ const r=await fetch('/pexels-video/'+m[1]); if(r.ok && !/text\/html/.test(r.headers.get('content-type')||'')) return await r.blob(); }catch{}
+  }
+  throw new Error('a stock clip could not be downloaded. Make sure the _redirects file is uploaded to Netlify');
+}
+async function closeSeg(s){ if(s.state==='done') return; s.state='done'; try{ if(s.iter) await s.iter.return(); }catch{} try{ s.input?.dispose?.(); }catch{} }
+async function brollFrame(s,W,H,lt){
+  if(s.state==='done') return null;
+  if(!s.state){
+    s.state='open';
+    try{
+      s.input=new MB.Input({ source:new MB.BlobSource(s.blob), formats:MB.ALL_FORMATS });
+      const track=await s.input.getPrimaryVideoTrack();
+      if(!track || !(await track.canDecode())) throw new Error('cannot decode');
+      const first=await track.getFirstTimestamp(), dur=await track.computeDuration();
+      s.from=first+Math.max(0,Math.min(CLIP_OFFSET,dur-first-(s.end-s.start)-0.1));
+      s.sink=new MB.CanvasSink(track,{ width:W, height:H, fit:'cover', poolSize:2 });
+      s.iter=s.sink.canvases(s.from);
+      s.hold=new OffscreenCanvas(W,H); s.hx=s.hold.getContext('2d'); s.has=false;
+      const r=await s.iter.next(); s.next=r.done ? null : r.value;
+    }catch{ s.failed=true; await closeSeg(s); return null; }
+  }
+  const target=s.from+lt;
+  while(s.next && (!s.has || s.next.timestamp<=target+0.001)){
+    s.hx.drawImage(s.next.canvas,0,0,W,H); s.has=true;
+    const r=await s.iter.next(); s.next=r.done ? null : r.value;
+  }
+  return s.has ? s.hold : null;
+}
+
+$('renderBtn').onclick=async()=>{
+  if(!file || busy) return;
+  if(!('VideoEncoder' in window)) return showNote('Rendering needs Google Chrome or Microsoft Edge on a computer.');
+  const list=moments.filter(m=>m.on && m.results && m.pick>=0 && m.results[m.pick])
+    .map(m=>({ start:Math.max(0,m.start), end:Math.min(video.duration,m.start+m.len), v:m.results[m.pick] })).sort((a,b)=>a.start-b.start);
+  for(let i=1;i<list.length;i++) if(list[i].start<list[i-1].end) list[i].start=list[i-1].end;
+  const R=list.filter(s=>s.end-s.start>=0.5);
+  if(!R.length) return showNote('No clips are chosen yet. Click a clip under a moment so it gets a green border.');
+  video.pause(); cancelled=false; setBusy(true); hide('note'); hide('doneBox'); show('prog');
+  const useDisk=$('toDisk').checked && 'showSaveFilePicker' in window;
+  let writable=null;
+  try{
+    setP(0,'Loading the video engine…');
+    MB=await loadMB();
+    const W0=video.videoWidth, H0=video.videoHeight, target=+$('outSize').value, short0=Math.min(W0,H0);
+    const k=(target && target<short0) ? target/short0 : 1, outShort=Math.round(short0*k);
+    for(let i=0;i<R.length;i++){
+      if(cancelled) throw new Error('cancelled');
+      setP(i/R.length*0.2,'Downloading stock clip '+(i+1)+' of '+R.length+'…');
+      const f=pickFile(R[i].v,outShort); if(!f) throw new Error('a chosen clip has no MP4 version');
+      R[i].blob=await getClipBlob(f.link);
+    }
+    resultName=file.name.replace(/\.[^.]+$/,'')+'-broll.mp4';
+    if(useDisk){
+      const handle=await window.showSaveFilePicker({ suggestedName:resultName, types:[{ description:'MP4 video', accept:{ 'video/mp4':['.mp4'] } }] });
+      writable=await handle.createWritable();
+    }
+    const input=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    const output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:useDisk ? false : 'in-memory' }), target:useDisk ? new MB.StreamTarget(writable,{ chunked:true }) : new MB.BufferTarget() });
+    const fade=$('fade').checked;
+    let cv=null, cx=null;
+    const vopts={
+      forceTranscode:true, allowTransformationMetadata:false, quality:new MB.Quality('high'),
+      process:async(sample)=>{
+        const W=sample.displayWidth, H=sample.displayHeight, t=sample.timestamp;
+        if(!cv){ cv=new OffscreenCanvas(W,H); cx=cv.getContext('2d'); }
+        else if(cv.width!==W || cv.height!==H){ cv.width=W; cv.height=H; }
+        sample.draw(cx,0,0);
+        for(const s of R) if(s.state==='open' && t>=s.end) await closeSeg(s);
+        const s=R.find(s=>t>=s.start && t<s.end);
+        if(s){
+          const fr=await brollFrame(s,W,H,t-s.start);
+          if(fr){
+            const a=fade ? Math.max(0,Math.min(1,(t-s.start)/FADE,(s.end-t)/FADE)) : 1;
+            cx.globalAlpha=a; cx.drawImage(fr,0,0,W,H); cx.globalAlpha=1;
+          }
+        }
+        return cv;
+      }
+    };
+    if(k<1){ vopts.width=Math.round(W0*k/2)*2; vopts.height=Math.round(H0*k/2)*2; vopts.fit='fill'; }
+    conv=await MB.Conversion.init({ input, output, video:vopts });
+    if(!conv.isValid) throw new Error('this video cannot be processed here ('+(conv.discardedTracks||[]).map(d=>d.reason).join(', ')+'). Convert it to MP4 first');
+    const t0=performance.now();
+    conv.onProgress=p=>{ const secs=(performance.now()-t0)/1000; setP(0.2+p*0.8,'Rendering… '+Math.round(p*100)+'%'+(p>0.02?' · about '+fmtTime(secs/p*(1-p))+' left':'')); };
+    await conv.execute();
+
+    credits='Stock videos provided by Pexels (https://www.pexels.com)\n\n'+R.map((s,i)=>(i+1)+'. at '+fmtClock(s.start)+': video by '+(s.v.user?.name||'unknown')+' on Pexels, '+s.v.url).join('\n')+'\n';
+    const failed=R.filter(s=>s.failed).length, took=fmtTime((performance.now()-t0)/1000);
+    const extra=failed ? ' '+failed+' clip(s) could not be read and were skipped.' : '';
+    if(useDisk){
+      try{ await writable.close(); }catch{}
+      setP(1,'Finished in '+took); show('doneBox'); hide('downloadBtn'); hide('resultVideo');
+      showNote('Done! Your video was saved to the file you chose.'+extra,'ok');
+    }else{
+      resultBlob=new Blob([output.target.buffer],{type:'video/mp4'});
+      if(resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl=URL.createObjectURL(resultBlob); $('resultVideo').src=resultUrl;
+      setP(1,'Finished in '+took+' · '+fmtSize(resultBlob.size));
+      show('doneBox'); show('downloadBtn'); show('resultVideo');
+      showNote('Done! Play it below, then click Download. Please keep the clip credits.'+extra,'ok');
+    }
+  }catch(err){
+    const c=err && (err.name==='AbortError' || err.name==='ConversionCanceledError' || /cancel/i.test(err.message||''));
+    showNote(c ? 'Cancelled.' : 'Something went wrong: '+(err.message||err)+'.');
+    if(writable){ try{ await writable.abort(); }catch{} }
+  }finally{
+    for(const s of R) await closeSeg(s);
+    conv=null; setBusy(false);
+  }
+};
+$('downloadBtn').onclick=()=>{ if(!resultBlob) return; const a=document.createElement('a'); a.href=resultUrl; a.download=resultName; document.body.appendChild(a); a.click(); a.remove(); };
+$('creditsBtn').onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([credits],{type:'text/plain'})); a.download='broll-credits.txt'; document.body.appendChild(a); a.click(); a.remove(); };
+renderMoments();
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

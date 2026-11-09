@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocForge — Any PDF to Editable Text & Word</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{
+  --bg:#0e1116;--panel:#151a21;--panel-2:#1c222b;--line:#262d38;
+  --text:#e6e9ef;--muted:#8a94a6;--accent:#5b8cff;--accent-2:#7c5cff;
+  --ok:#3ecf8e;--warn:#f5b84a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;flex-wrap:wrap}
+.logo{width:34px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-size:11px;font-weight:800}
+.brand small{color:var(--muted);font-weight:500}
+main{flex:1;display:flex;min-height:0}
+aside{width:340px;padding:18px;border-right:1px solid var(--line);background:var(--panel);overflow:auto;display:flex;flex-direction:column;gap:14px}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;transition:.15s;background:var(--panel-2)}
+.drop:hover,.drop.over{border-color:var(--accent);background:#1f2633}
+.drop-icon{font-size:34px}
+.drop span{color:var(--muted);font-size:13px}
+.file-info{font-size:13px;color:var(--muted);word-break:break-word;line-height:1.5}
+.label{font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px}
+.row{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+input[type=number],select{width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer;line-height:1.4}
+.check small{color:var(--muted)}
+button{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 13px;font:inherit;font-size:13px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border:none;font-weight:600}
+button.big{padding:12px;font-size:14px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hidden{display:none!important}
+.bar{height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden}
+#bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .2s}
+.ptext{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.note{font-size:13px;line-height:1.55;padding:10px 12px;border-radius:10px;background:#2a2314;color:var(--warn);border:1px solid #4a3b1a}
+.note.ok{background:#12261d;color:var(--ok);border-color:#1d4a35}
+section{flex:1;display:flex;flex-direction:column;min-width:0}
+.out-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.actions{display:flex;gap:8px}
+#output{flex:1;resize:none;border:none;outline:none;background:#fbfbfc;color:#1f2328;font:15px/1.75 Georgia,"Times New Roman",serif;padding:32px max(24px,calc((100% - 760px)/2));white-space:pre-wrap;overflow:auto}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:860px){body{overflow:auto}main{flex-direction:column}aside{width:100%;border-right:none;border-bottom:1px solid var(--line)}#output{min-height:60vh}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">PDF</div>DocForge <small>any PDF, scanned or not, any length → editable text &amp; Word · files never leave your computer</small></div>
+</header>
+
+<main>
+  <aside>
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+      <div class="drop-icon">📄</div>
+      <strong>Drop your PDF here</strong>
+      <span>or click to choose · scanned or not · any number of pages</span>
+    </label>
+    <div class="file-info" id="fileInfo">No file selected</div>
+
+    <div>
+      <div class="label">What kind of PDF is it?</div>
+      <select id="docType">
+        <option value="doc">Book, letter or report (normal pages)</option>
+        <option value="slides">Slides, posters &amp; diagrams</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="label">Reading mode</div>
+      <select id="mode">
+        <option value="auto">Auto: real text, OCR for scanned pages</option>
+        <option value="ocr">OCR every page (if Auto gives rubbish)</option>
+        <option value="text">Real text only (fastest, no OCR)</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="label">Document language (for OCR)</div>
+      <select id="lang">
+        <option value="eng">English</option>
+        <option value="eng+fra">English + French</option>
+        <option value="fra">French</option>
+        <option value="spa">Spanish</option>
+        <option value="por">Portuguese</option>
+        <option value="deu">German</option>
+        <option value="ara">Arabic</option>
+        <option value="yor">Yoruba</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="label">Pages (leave blank for all)</div>
+      <div class="row">
+        <input type="number" id="fromPage" min="1" placeholder="From 1">
+        <span>to</span>
+        <input type="number" id="toPage" min="1" placeholder="Last">
+      </div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="resume" checked> Continue where I stopped <small>(progress is saved after every page)</small></label>
+    <label class="check"><input type="checkbox" id="markPages" checked> Mark pages <small>(adds page breaks in Word)</small></label>
+    <label class="check"><input type="checkbox" id="keepLines"> Keep original line breaks <small>(for poems, lists, tables)</small></label>
+
+    <button class="primary big" id="convertBtn" disabled>Convert to text</button>
+    <button id="cancelBtn" class="hidden">Pause / Cancel</button>
+
+    <div class="hidden" id="progressBox">
+      <div class="bar"><div id="bar"></div></div>
+      <div class="ptext" id="ptext"></div>
+    </div>
+    <div class="note hidden" id="note"></div>
+  </aside>
+
+  <section>
+    <div class="out-head">
+      <span id="stats">Converted text appears here. You can edit it before downloading.</span>
+      <div class="actions">
+        <button id="copyBtn">Copy</button>
+        <button id="txtBtn">⬇ .txt</button>
+        <button id="docxBtn" class="primary">⬇ Word (.docx)</button>
+      </div>
+    </div>
+    <textarea id="output" spellcheck="false" placeholder="Choose a PDF on the left and click Convert..."></textarea>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const OCR_SCALE = 2.5;        // sharpness of page pictures for OCR
+const MAX_SIDE  = 3000;       // max picture size in pixels
+const RECYCLE   = 120;        // restart each OCR engine after this many pages (keeps memory low)
+const MAX_EDIT  = 2000000;    // above this many characters, the text box shows a preview only
+const LANES = Math.min(4, Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 2)));
+
+const output = $('output');
+let pdf=null, fileKey='', baseName='document', busy=false, cancelled=false, statTimer;
+let fullText='', previewOnly=false, live=null, wakeLock=null;
+
+/* ---------- small helpers ---------- */
+const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id).classList.add('hidden');
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
+function showNote(msg, type){ const n=$('note'); n.textContent=msg; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function fmtSize(b){ return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtTime(s){ s=Math.round(s); if(s<60) return s+'s'; const m=Math.floor(s/60); return m<60 ? m+'m '+(s%60)+'s' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+const pageList = a => a.slice(0,15).join(', ') + (a.length>15 ? '…' : '');
+function saveBlob(blob, name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function updateStats(){
+  const v=previewOnly ? fullText : output.value;
+  if(!v){ $('stats').textContent='Converted text appears here. You can edit it before downloading.'; return; }
+  const words=(v.match(/\S+/g)||[]).length;
+  $('stats').textContent=words.toLocaleString()+' words · '+v.length.toLocaleString()+' characters'+(previewOnly?' · preview (downloads have everything)':' · editable');
+}
+output.addEventListener('input',()=>{ clearTimeout(statTimer); statTimer=setTimeout(updateStats,500); });
+
+async function keepAwake(on){
+  try{
+    if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen');
+    else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; }
+  }catch{}
+}
+document.addEventListener('visibilitychange',()=>{ if(busy && document.visibilityState==='visible') keepAwake(true); });
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+
+/* ---------- saved progress (IndexedDB) ---------- */
+const DB={
+  db:null, broken:false,
+  async open(){
+    if(this.db || this.broken) return this.db;
+    try{
+      this.db=await new Promise((res,rej)=>{
+        const r=indexedDB.open('docforge',1);
+        r.onupgradeneeded=()=>r.result.createObjectStore('pages');
+        r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+      });
+    }catch{ this.broken=true; }
+    return this.db;
+  },
+  async get(key){
+    const db=await this.open(); if(!db) return undefined;
+    return new Promise(res=>{ try{ const r=db.transaction('pages').objectStore('pages').get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>res(undefined); }catch{ res(undefined); } });
+  },
+  async put(key,val){
+    const db=await this.open(); if(!db) return;
+    return new Promise(res=>{ try{ const t=db.transaction('pages','readwrite'); t.objectStore('pages').put(val,key); t.oncomplete=()=>res(); t.onerror=()=>res(); }catch{ res(); } });
+  },
+  async clearPrefix(prefix){
+    const db=await this.open(); if(!db) return;
+    return new Promise(res=>{ try{ const t=db.transaction('pages','readwrite'); t.objectStore('pages').delete(IDBKeyRange.bound(prefix, prefix+'\uffff')); t.oncomplete=()=>res(); t.onerror=()=>res(); }catch{ res(); } });
+  }
+};
+
+/* ---------- loading the PDF ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+async function openPdf(f, password){
+  const data=new Uint8Array(await f.arrayBuffer());
+  try { return await pdfjsLib.getDocument({data, password}).promise; }
+  catch(e){
+    if(e.name==='PasswordException'){
+      const pw=prompt(e.code===2 ? 'Wrong password. Try again:' : 'This PDF is password-protected. Enter the password:');
+      if(pw===null) throw new Error('Password required');
+      return openPdf(f, pw);
+    }
+    throw e;
+  }
+}
+
+async function loadFile(f){
+  if(!f || busy) return;
+  if(!window.pdfjsLib) return showNote('The PDF engine did not load. Check your internet connection and refresh the page.');
+  if(!/\.pdf$/i.test(f.name) && f.type!=='application/pdf') return toast('Please choose a PDF file');
+  hide('note'); hide('progressBox'); $('convertBtn').disabled=true;
+  baseName=f.name.replace(/\.pdf$/i,'') || 'document';
+  fileKey=[f.name,f.size,f.lastModified].join('~');
+  $('fileInfo').textContent='Opening '+f.name+'…';
+  try{
+    if(pdf) pdf.destroy();
+    pdf=await openPdf(f);
+    let hint='';
+    try{
+      const p=await pdf.getPage(1); const c=await p.getTextContent();
+      const t=c.items.map(i=>i.str||'').join('');
+      hint = (t.replace(/\s/g,'').length < 25 || looksGarbled(t)) ? ' · 🖼 looks scanned, OCR will be used' : ' · ✓ has real text';
+      p.cleanup();
+    }catch{}
+    $('fileInfo').textContent=f.name+' · '+fmtSize(f.size)+' · '+pdf.numPages.toLocaleString()+' pages'+hint;
+    $('fromPage').value=''; $('toPage').value='';
+    $('toPage').placeholder='Last ('+pdf.numPages+')';
+    $('convertBtn').disabled=false;
+  }catch(err){
+    pdf=null; $('fileInfo').textContent=f.name;
+    showNote('Could not open this PDF: '+(err.message||err)+'. If the file is very large (over about 1.5 GB), split it first.');
+  }
+}
+
+/* ---------- text checks ---------- */
+function looksGarbled(t){
+  const s=t.replace(/\s/g,''); if(s.length<25) return false;
+  const good=(s.match(/[\p{L}\p{N}.,;:!?'"()\-–—%&\/]/gu)||[]).length;
+  const bad=(s.match(/[\uFFFD\uE000-\uF8FF]/g)||[]).length;
+  return good/s.length<0.6 || bad/s.length>0.05;
+}
+
+/* ---------- real-text pages → clean paragraphs ---------- */
+function pageToText(items, keepLines){
+  const lines=[]; let cur=null;
+  for(const it of items){
+    if(!('str' in it) || !it.str) continue;
+    const x=it.transform[4], y=it.transform[5];
+    const h=Math.abs(it.transform[3]) || it.height || 10;
+    if(cur && Math.abs(y-cur.y) <= h*0.5){
+      const gap=x-cur.endX;
+      if(gap > h*0.15 && !/\s$/.test(cur.text) && !/^\s/.test(it.str)) cur.text+=' ';
+      cur.text+=it.str; cur.endX=x+(it.width||0); cur.h=Math.max(cur.h,h);
+    }else{
+      cur={text:it.str, y, h, endX:x+(it.width||0)};
+      lines.push(cur);
+    }
+  }
+  const clean=lines.map(l=>({...l, text:l.text.replace(/\s+/g,' ').trim()})).filter(l=>l.text);
+  if(!clean.length) return '';
+  if(keepLines) return clean.map(l=>l.text).join('\n');
+  const maxLen=Math.max(...clean.map(l=>l.text.length));
+  const paras=[]; let p=clean[0].text;
+  for(let i=1;i<clean.length;i++){
+    const prev=clean[i-1], l=clean[i];
+    const gap=prev.y-l.y;
+    const newPara =
+      gap > Math.max(prev.h,l.h)*1.8 || gap < 0 ||
+      Math.abs(prev.h-l.h) > 1.5 ||
+      (/[.!?:;]["')\]”’]?$/.test(prev.text) && prev.text.length < maxLen*0.75) ||
+      /^([•●▪◦*–-]\s|\d+[.)]\s)/.test(l.text);
+    if(newPara){ paras.push(p); p=l.text; }
+    else if(/[A-Za-z]-$/.test(p) && /^[a-z]/.test(l.text)) p=p.slice(0,-1)+l.text;
+    else p+=' '+l.text;
+  }
+  paras.push(p);
+  return paras.join('\n\n');
+}
+
+/* ---------- OCR results → clean paragraphs ---------- */
+function joinLines(texts, keep){
+  if(keep) return texts.join('\n');
+  let p='';
+  for(const t of texts){
+    if(!p) p=t;
+    else if(/[A-Za-z]-$/.test(p) && /^[a-z]/.test(t)) p=p.slice(0,-1)+t;
+    else p+=' '+t;
+  }
+  return p;
+}
+function ocrToText(raw, keepLines){
+  const t=(raw||'').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').trim();
+  if(keepLines) return t.replace(/\n{3,}/g,'\n\n');
+  return t.split(/\n\s*\n/).map(b=>joinLines(b.split('\n').map(s=>s.trim()).filter(Boolean), false)).filter(Boolean).join('\n\n');
+}
+function getParagraphs(data){
+  if(data.paragraphs && data.paragraphs.length) return data.paragraphs;
+  return (data.blocks||[]).flatMap(b=>b.paragraphs||[]);
+}
+function getLines(data){
+  if(data.lines && data.lines.length) return data.lines;
+  return getParagraphs(data).flatMap(p=>p.lines||[]);
+}
+function cleanLine(line){
+  let text;
+  if(line.words && line.words.length){
+    text=line.words.filter(w=>w.confidence>=35 && /[\p{L}\p{N}&]/u.test(w.text)).map(w=>w.text).join(' ');
+  }else text=line.text||'';
+  text=text.replace(/\s+/g,' ').trim();
+  const alnum=(text.match(/[\p{L}\p{N}]/gu)||[]).length;
+  const total=text.replace(/\s/g,'').length;
+  if(alnum<3 || alnum/total<0.6) return null;
+  return { text, b: line.bbox };
+}
+function docToText(data, keep){
+  const paras=getParagraphs(data);
+  if(!paras.length) return ocrToText(data.text, keep);
+  const out=[];
+  for(const p of paras){
+    const lines=(p.lines||[]).map(cleanLine).filter(Boolean).map(l=>l.text);
+    if(lines.length) out.push(joinLines(lines, keep));
+  }
+  return out.length ? out.join('\n\n') : ocrToText(data.text, keep);
+}
+function slidesToText(data, keep){
+  const lines=getLines(data).map(cleanLine).filter(l=>l && l.b);
+  if(!lines.length) return ocrToText(data.text, keep);
+  lines.sort((a,b)=>a.b.y0-b.b.y0 || a.b.x0-b.b.x0);
+  const rows=[];
+  for(const l of lines){
+    const h=l.b.y1-l.b.y0, cy=(l.b.y0+l.b.y1)/2;
+    const r=rows.find(r=>{
+      const rh=r.b.y1-r.b.y0, rcy=(r.b.y0+r.b.y1)/2, m=Math.max(h,rh);
+      return Math.abs(cy-rcy)<m*0.5 && l.b.x0>r.b.x0 && l.b.x0-r.b.x1<m*1.2;
+    });
+    if(r){
+      r.text+=' '+l.text;
+      r.b={x0:r.b.x0, y0:Math.min(r.b.y0,l.b.y0), x1:Math.max(r.b.x1,l.b.x1), y1:Math.max(r.b.y1,l.b.y1)};
+    }else rows.push({ text:l.text, b:{...l.b} });
+  }
+  const n=rows.length, parent=rows.map((_,i)=>i);
+  const find=i=>parent[i]===i ? i : (parent[i]=find(parent[i]));
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+    const a=rows[i].b, c=rows[j].b;
+    const ha=a.y1-a.y0, hc=c.y1-c.y0, h=Math.max(ha,hc);
+    if(h/Math.max(1,Math.min(ha,hc)) > 1.4) continue;
+    const vGap=Math.max(a.y0,c.y0)-Math.min(a.y1,c.y1);
+    const hOverlap=Math.min(a.x1,c.x1)-Math.max(a.x0,c.x0);
+    if(vGap>=-h*0.3 && vGap<h*0.9 && hOverlap>0) parent[find(j)]=find(i);
+  }
+  const groups=new Map();
+  rows.forEach((r,i)=>{ const k=find(i); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r); });
+  const blocks=[...groups.values()].map(rs=>{
+    rs.sort((a,b)=>a.b.y0-b.b.y0);
+    return { text:joinLines(rs.map(r=>r.text), keep), x0:Math.min(...rs.map(r=>r.b.x0)), y0:Math.min(...rs.map(r=>r.b.y0)), h:rs[0].b.y1-rs[0].b.y0 };
+  });
+  blocks.sort((a,b)=>Math.abs(a.y0-b.y0) < Math.min(a.h,b.h)*1.5 ? a.x0-b.x0 : a.y0-b.y0);
+  return blocks.map(b=>b.text).join('\n\n');
+}
+
+/* ---------- page picture for OCR ---------- */
+async function renderPage(page, maxScale){
+  const base=page.getViewport({scale:1});
+  const scale=Math.min(maxScale, MAX_SIDE/Math.max(base.width, base.height));
+  const vp=page.getViewport({scale});
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.floor(vp.width)); canvas.height=Math.max(1,Math.floor(vp.height));
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  return { canvas, ctx };
+}
+function enhance(ctx, w, h){
+  const img=ctx.getImageData(0,0,w,h), d=img.data, n=w*h, hist=new Uint32Array(256);
+  for(let i=0;i<d.length;i+=4){ const g=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000|0; d[i]=g; hist[g]++; }
+  let lo=0, hi=255, acc=0;
+  for(;lo<255;lo++){ acc+=hist[lo]; if(acc>n*0.01) break; }
+  acc=0; for(;hi>0;hi--){ acc+=hist[hi]; if(acc>n*0.01) break; }
+  const range=Math.max(hi-lo,1);
+  for(let i=0;i<d.length;i+=4){ let v=(d[i]-lo)*255/range; v=v<0?0:v>255?255:v; d[i]=d[i+1]=d[i+2]=v; }
+  ctx.putImageData(img,0,0);
+}
+
+/* ---------- converting ---------- */
+function setBusy(on){
+  busy=on; $('convertBtn').disabled=on;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  drop.style.pointerEvents=on?'none':'';
+  ['docType','mode','lang','fromPage','toPage','resume','markPages','keepLines'].forEach(id=>$(id).disabled=on);
+  keepAwake(on);
+}
+function assemble(st){
+  return st.results.filter(Boolean).map(r=>(st.mark?'--- Page '+r.n+' ---\n\n':'')+r.text).join('\n\n').trim();
+}
+function currentText(){
+  if(busy && live) return assemble(live);
+  return previewOnly ? fullText : output.value;
+}
+
+$('cancelBtn').onclick=()=>{ cancelled=true; $('ptext').textContent='Stopping after the current page(s)… Your progress is saved.'; };
+
+$('convertBtn').onclick=async()=>{
+  if(!pdf || busy) return;
+  const total=pdf.numPages;
+  let from=parseInt($('fromPage').value)||1, to=parseInt($('toPage').value)||total;
+  from=Math.min(Math.max(1,from),total); to=Math.min(Math.max(from,to),total);
+  const mark=$('markPages').checked, keep=$('keepLines').checked;
+  const mode=$('mode').value, lang=$('lang').value, docType=$('docType').value;
+  const prefix=fileKey+'|'+[mode,lang,docType,keep?1:0].join(',')+'|';
+  if(!$('resume').checked) await DB.clearPrefix(prefix);
+
+  const count=to-from+1, results=new Array(count), K=Math.min(LANES,count);
+  live={ results, mark };
+  let next=from, done=0, ocrCount=0, restored=0, ocrBroken=null, engineShown=false;
+  const workers=new Array(K).fill(null), used=new Array(K).fill(0);
+  let chain=Promise.resolve();
+  const t0=performance.now();
+
+  cancelled=false; previewOnly=false; output.readOnly=false;
+  setBusy(true); hide('note'); show('progressBox');
+  $('bar').style.width='0%'; $('ptext').textContent='Starting…';
+
+  async function makeWorker(){
+    if(!window.Tesseract) throw new Error('OCR engine did not load');
+    if(!engineShown){ engineShown=true; $('ptext').textContent='Loading the OCR engine (first time downloads the language data, then it is cached)…'; }
+    const w=await Tesseract.createWorker(lang);
+    await w.setParameters({ tessedit_pageseg_mode: docType==='slides' ? '11' : '3' });
+    return w;
+  }
+  async function getWorker(i, fresh){
+    if(ocrBroken) throw ocrBroken;
+    if(workers[i] && (fresh || used[i]>=RECYCLE)){
+      const old=workers[i]; workers[i]=null;
+      try{ await old.terminate(); }catch{}
+    }
+    if(!workers[i]){
+      chain=chain.then(makeWorker, makeWorker);
+      try{ workers[i]=await chain; }catch(e){ ocrBroken=e; throw e; }
+      used[i]=0;
+    }
+    used[i]++;
+    return workers[i];
+  }
+  async function ocrPage(page, i){
+    for(let attempt=0; attempt<2; attempt++){
+      let canvas=null;
+      try{
+        const r=await renderPage(page, attempt ? 1.6 : OCR_SCALE);
+        canvas=r.canvas;
+        enhance(r.ctx, canvas.width, canvas.height);
+        const w=await getWorker(i, attempt>0);
+        const { data }=await w.recognize(canvas);
+        return data;
+      }catch(e){
+        if(ocrBroken || attempt) throw e;
+      }finally{
+        if(canvas){ canvas.width=0; canvas.height=0; }
+      }
+    }
+  }
+  const tick=()=>{
+    const secs=(performance.now()-t0)/1000, fresh=Math.max(done-restored,1);
+    $('bar').style.width=(done/count*100)+'%';
+    if(!cancelled) $('ptext').textContent=done.toLocaleString()+' of '+count.toLocaleString()+' pages done'
+      +(ocrCount?' · '+ocrCount.toLocaleString()+' read with OCR':'')
+      +(restored?' · '+restored.toLocaleString()+' restored from saved progress':'')
+      +' · about '+fmtTime(secs/fresh*(count-done))+' left · you can download what is done any time';
+  };
+
+  async function lane(i){
+    while(!cancelled && next<=to){
+      const n=next++, key=prefix+String(n).padStart(6,'0');
+      let r=await DB.get(key);
+      if(r){ restored++; }
+      else{
+        r={ text:'', how:'text', conf:null };
+        try{
+          const page=await pdf.getPage(n);
+          if(mode!=='ocr') r.text=pageToText((await page.getTextContent()).items, keep);
+          if(mode!=='text' && (r.text.replace(/\s/g,'').length<25 || looksGarbled(r.text))){
+            const data=await ocrPage(page, i);
+            r.text = docType==='slides' ? slidesToText(data, keep) : docToText(data, keep);
+            r.how='ocr'; r.conf=data.confidence;
+          }
+          page.cleanup();
+          if(!r.text.trim()) r.how='empty';
+          await DB.put(key, r);
+        }catch(e){ console.error('Page '+n, e); r={ text:'', how:'failed', conf:null }; }
+      }
+      if(r.how==='ocr') ocrCount++;
+      results[n-from]={ n, ...r };
+      done++; tick();
+    }
+  }
+
+  await Promise.all(Array.from({length:K},(_,i)=>lane(i)));
+  for(const w of workers){ if(w){ try{ await w.terminate(); }catch{} } }
+
+  fullText=assemble(live);
+  if(fullText.length > MAX_EDIT){
+    previewOnly=true; output.readOnly=true;
+    output.value=fullText.slice(0, MAX_EDIT)+'\n\n[… Preview ends here. The .txt and Word downloads contain the FULL text …]';
+  }else output.value=fullText;
+  output.scrollTop=0; setBusy(false); updateStats();
+  $('bar').style.width=(done/count*100)+'%';
+
+  const list=results.filter(Boolean), secs=(performance.now()-t0)/1000;
+  const empty=list.filter(r=>r.how==='empty').map(r=>r.n);
+  const failed=list.filter(r=>r.how==='failed').map(r=>r.n);
+  const low=list.filter(r=>r.how==='ocr' && r.conf!==null && r.conf<55).map(r=>r.n);
+
+  let msg=cancelled ? 'Paused after '+list.length.toLocaleString()+' of '+count.toLocaleString()+' pages. Click Convert again to continue. '
+                    : 'Done! '+list.length.toLocaleString()+' pages in '+fmtTime(secs)+'. ';
+  if(restored) msg+=restored.toLocaleString()+' page(s) came from saved progress. ';
+  if(ocrCount) msg+=ocrCount.toLocaleString()+' page(s) were read with OCR, so please proofread them. ';
+  if(low.length) msg+='Unclear scan on page(s) '+pageList(low)+'. ';
+  if(empty.length) msg+='No text found on page(s) '+pageList(empty)+(mode==='text' ? '. Switch Reading mode to Auto to read scanned pages. ' : ' (blank or pictures only). ');
+  if(ocrBroken) msg+='The OCR engine could not load. Check your internet connection and click Convert again. ';
+  else if(failed.length) msg+='Could not read page(s) '+pageList(failed)+'. Click Convert again to retry only those pages. ';
+  $('ptext').textContent=list.length.toLocaleString()+' of '+count.toLocaleString()+' pages processed';
+  showNote(msg, (cancelled||low.length||empty.length||failed.length||ocrBroken)?'warn':'ok');
+};
+
+/* ---------- Word (.docx) builder ---------- */
+function xmlEsc(s){
+  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,'')
+          .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,'')
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+const RPR='<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/></w:rPr>';
+function para(text, breakBefore){
+  const runs=text.split('\n').map((line,i)=>(i?'<w:r><w:br/></w:r>':'')+'<w:r>'+RPR+'<w:t xml:space="preserve">'+xmlEsc(line)+'</w:t></w:r>').join('');
+  return '<w:p><w:pPr>'+(breakBefore?'<w:pageBreakBefore/>':'')+'<w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr>'+runs+'</w:p>';
+}
+async function makeDocx(text){
+  const blocks=text.replace(/\r\n/g,'\n').split(/\n{2,}/);
+  const parts=[]; let started=false, pendingBreak=false;
+  for(const b of blocks){
+    const t=b.replace(/^\n+|\s+$/g,'');
+    if(!t.trim()) continue;
+    if(/^--- Page \d+ ---$/.test(t.trim())){ if(started) pendingBreak=true; continue; }
+    parts.push(para(t, pendingBreak)); pendingBreak=false; started=true;
+  }
+  const doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+    +(parts.length ? parts.join('') : para('', false))
+    +'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>'
+    +'</w:body></w:document>';
+  const zip=new JSZip();
+  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  zip.folder('_rels').file('.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  zip.folder('word').file('document.xml', doc);
+  return zip.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+
+/* ---------- download buttons ---------- */
+$('docxBtn').onclick=async()=>{
+  const text=currentText();
+  if(!text.trim()) return toast('Nothing to download yet');
+  if(!window.JSZip) return toast('Word builder did not load. Check your internet and refresh.');
+  const btn=$('docxBtn'); btn.disabled=true; btn.textContent='Building…';
+  try{ saveBlob(await makeDocx(text), baseName+'.docx'); toast(busy?'Downloaded the pages finished so far':'Downloaded '+baseName+'.docx'); }
+  catch(e){ console.error(e); toast('Could not build the Word file'); }
+  btn.disabled=false; btn.textContent='⬇ Word (.docx)';
+};
+$('txtBtn').onclick=()=>{
+  const text=currentText();
+  if(!text.trim()) return toast('Nothing to download yet');
+  saveBlob(new Blob(['\ufeff'+text],{type:'text/plain;charset=utf-8'}), baseName+'.txt');
+  toast(busy?'Downloaded the pages finished so far':'Downloaded '+baseName+'.txt');
+};
+$('copyBtn').onclick=async()=>{
+  const text=currentText();
+  if(!text.trim()) return toast('Nothing to copy yet');
+  try{ await navigator.clipboard.writeText(text); toast('Text copied'); }
+  catch{ output.select(); toast('Press Ctrl + C to copy'); }
+};
+</script>
+</body>
+</html>

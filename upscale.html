@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UpScale — Free AI Photo & Video Upscaler</title>
+<link rel="stylesheet" href="forge.css">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.all.min.js"></script>
+<style>
+#video{display:block;max-width:100%;max-height:calc(100vh - 190px);border-radius:6px;background:#000}
+.stage.zoomed{align-items:flex-start;justify-content:flex-start}
+.cmp{position:relative;display:inline-block;line-height:0;user-select:none;touch-action:none}
+.cmp.ready{cursor:ew-resize}
+.cmp canvas{display:block;border-radius:6px}
+#after{max-width:100%;max-height:calc(100vh - 190px)}
+.cmp.zoom #after{max-width:none;max-height:none}
+#before{position:absolute;inset:0;width:100%;height:100%}
+.divider{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);pointer-events:none}
+.divider::after{content:'⇔';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;color:#111;font-size:13px;line-height:1;padding:6px 7px;border-radius:99px}
+.tag{position:absolute;top:10px;font-size:11px;font-weight:800;line-height:1;padding:5px 8px;border-radius:6px;background:rgba(0,0,0,.72);color:#fff;pointer-events:none}
+.tag.l{left:10px}.tag.r{right:10px;background:var(--accent)}
+.adj{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+.adj.locked{opacity:.55}
+.adj-head{display:flex;justify-content:space-between;align-items:center}
+.adj .slider b{min-width:40px;text-align:right;color:var(--text)}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">4K</div>UpScale <small>AI upscaler for photos and videos · free · runs on your computer</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="image/*,video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">✨</div><strong>Drop a photo or video here</strong><span>or click to choose · JPG, PNG, WebP, MP4, MOV, WebM</span></label>
+  <div class="file-info" id="fileInfo">Nothing selected</div>
+
+  <div><div class="label">Upscale method</div>
+    <select id="engine">
+      <option value="ai-fast">AI upscale: fast (photos and videos)</option>
+      <option value="ai-max">AI upscale: maximum detail (photos only, slower)</option>
+      <option value="fast">Quick enhance: no AI (instant)</option>
+    </select>
+  </div>
+  <div><div class="label">New size</div><select id="size"></select><div class="ptext" id="sizeInfo"></div></div>
+
+  <div class="stack hidden" id="videoOpts">
+    <button id="previewBtn">👁 1. Preview the current frame</button>
+    <label class="check"><input type="checkbox" id="testRun" checked> Quick test: first 10 seconds only</label>
+    <label class="check hidden" id="diskWrap"><input type="checkbox" id="toDisk"> Save straight to disk (best for long or 4K videos)</label>
+  </div>
+  <button class="primary big" id="runBtn" disabled>✨ Upscale</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+
+  <div class="adj locked" id="adj">
+    <div class="adj-head"><div class="label" style="margin:0">Live adjustments</div><button class="mini" id="resetBtn">↺ Reset</button></div>
+    <div class="ptext" id="adjHint" style="margin:0">Upscale first, then drag any slider. The picture updates instantly.</div>
+    <label class="slider">AI detail <input type="range" id="blend" min="0" max="100" value="100"><b id="blendVal">100%</b></label>
+    <label class="slider">Sharpen <input type="range" id="sharpen" min="0" max="100" value="30"><b id="sharpenVal">30</b></label>
+    <label class="slider">Brightness <input type="range" id="bright" min="-40" max="40" value="0"><b id="brightVal">0</b></label>
+    <label class="slider">Contrast <input type="range" id="contrast" min="-40" max="40" value="0"><b id="contrastVal">0</b></label>
+    <label class="slider">Colour <input type="range" id="sat" min="-50" max="50" value="0"><b id="satVal">0</b></label>
+  </div>
+
+  <div class="hidden" id="imgOpts"><div class="label">Save as</div><select id="imgFmt"><option value="png">PNG (best quality)</option><option value="jpg">JPG (smaller)</option><option value="webp">WebP (smallest)</option></select></div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download</button><video id="resultVideo" class="hidden" controls playsinline></video></div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Your photo or video appears here</span><span style="display:flex;gap:6px"><button class="mini hidden" id="backBtn">◀ Back to video</button><button class="mini hidden" id="zoomBtn">🔍 Actual size</button></span></div>
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">✨<br>Open a photo or video to start</div>
+    <video id="video" class="hidden" controls playsinline preload="auto"></video>
+    <div class="cmp hidden" id="cmp"><canvas id="after"></canvas><canvas id="before" class="hidden"></canvas><div class="divider hidden" id="divider"></div><span class="tag l hidden" id="tagL">BEFORE</span><span class="tag r hidden" id="tagR">AFTER</span></div>
+  </div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+    import * as Bridge from './forge-bridge.js';
+Bridge.dock('upscale');
+const $=id=>document.getElementById(id);
+const video=$('video'), before=$('before'), after=$('after'), cmp=$('cmp'), ort=window.ort;
+let MBP=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const HF='https://huggingface.co/jonathanst29/tinier-upscale-models/resolve/main/';
+const MODELS={
+  'ai-fast':{ file:'realesr-general-x4v3.onnx', label:'fast AI model (5 MB)' },
+  'ai-max':{ file:'realesrgan-x4plus.onnx', label:'maximum-detail AI model (64 MB)' }
+};
+const MAX_OUT_IMG=8192, MAX_OUT_VID=3840, MAX_AI_IN=2048, OVER=12;
+const DEFAULTS={ blend:100, sharpen:30, bright:0, contrast:0, sat:0 };
+let file=null, kind='', url=null, srcBmp=null, hasAlpha=false, busy=false, cancelled=false, conv=null, token=0;
+let sess=null, sessKey='', sessEP='', sharpener, wakeLock=null, comparing=false;
+let cache=null, liveFin=null, recQueued=false, resultBlob=null, resultUrl=null, resultName='';
+if(ort) ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3000); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function setP(p,text){ $('bar').style.width=(Math.min(1,Math.max(0,p))*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtSize(b){ return b>1073741824?(b/1073741824).toFixed(2)+' GB':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtClock(s){ if(!isFinite(s)) return '0:00'; s=Math.max(0,s); return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+function fmtTime(s){ s=Math.round(s); if(s<60) return s+'s'; const m=Math.floor(s/60); return m<60 ? m+'m '+(s%60)+'s' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const baseName=()=>file ? file.name.replace(/\.[^.]+$/,'') : 'upscaled';
+function saveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+if(!('gpu' in navigator)) showNote('Tip: your browser has no graphics-card AI support (WebGPU), so AI upscaling will be slow. Google Chrome or Microsoft Edge on a computer is much faster.');
+
+/* ---------- AI model ---------- */
+async function fetchModel(name,onProg){
+  const urls=['models/'+name, HF+name];
+  let c=null; try{ c=await caches.open('forge-models-v1'); }catch{}
+  for(const u of urls){
+    try{
+      if(c){ const hit=await c.match(u); if(hit) return new Uint8Array(await hit.arrayBuffer()); }
+      const res=await fetch(u);
+      if(!res.ok || /text\/html/.test(res.headers.get('content-type')||'')) continue;
+      const total=+res.headers.get('content-length')||0, reader=res.body.getReader(), parts=[]; let got=0;
+      for(;;){ const { done, value }=await reader.read(); if(done) break; parts.push(value); got+=value.length; if(total) onProg(got/total); }
+      const blob=new Blob(parts); if(blob.size<100000) continue;
+      if(c){ try{ await c.put(u,new Response(blob)); }catch{} }
+      return new Uint8Array(await blob.arrayBuffer());
+    }catch{}
+  }
+  throw new Error('the AI model could not be downloaded. Check your internet connection');
+}
+async function getSession(key,forceWasm){
+  if(!ort) throw new Error('the AI engine did not load. Check your internet and refresh the page');
+  if(sess && sessKey===key && !(forceWasm && sessEP!=='wasm')) return sess;
+  const bytes=await fetchModel(MODELS[key].file,p=>setP(p,'Downloading the '+MODELS[key].label+' (first time only)… '+Math.round(p*100)+'%'));
+  setP(0,'Starting the AI engine…');
+  if(sess){ try{ await sess.release(); }catch{} sess=null; }
+  const eps=(!forceWasm && 'gpu' in navigator) ? ['webgpu','wasm'] : ['wasm'];
+  let err=null;
+  for(const ep of eps){ try{ sess=await ort.InferenceSession.create(bytes,{ executionProviders:[ep], graphOptimizationLevel:'all' }); sessEP=ep; break; }catch(e){ err=e; } }
+  if(!sess) throw err || new Error('the AI engine could not start');
+  sessKey=key; return sess;
+}
+
+/* ---------- AI upscale in tiles ---------- */
+async function aiUpscale(src,onTile){
+  const sw=src.width, sh=src.height, px=src.getContext('2d',{willReadFrequently:true}).getImageData(0,0,sw,sh).data;
+  const T=sessEP==='webgpu' ? 256 : 128, step=T-2*OVER, plane=T*T, inp=new Float32Array(3*plane);
+  const cols=Math.ceil(sw/step), rows=Math.ceil(sh/step), total=cols*rows;
+  let out=null, octx=null, n=0;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    if(cancelled) throw new Error('cancelled');
+    const tx=c*step, ty=r*step;
+    for(let y=0;y<T;y++){
+      const sy=Math.min(sh-1,Math.max(0,ty-OVER+y));
+      for(let x=0;x<T;x++){ const sx=Math.min(sw-1,Math.max(0,tx-OVER+x)), k=(sy*sw+sx)*4, i=y*T+x; inp[i]=px[k]/255; inp[plane+i]=px[k+1]/255; inp[2*plane+i]=px[k+2]/255; }
+    }
+    const res=await sess.run({ [sess.inputNames[0]]:new ort.Tensor('float32',inp,[1,3,T,T]) });
+    const ot=res[sess.outputNames[0]], od=ot.data, OT=ot.dims[3], S=OT/T, op=OT*ot.dims[2];
+    if(!out){ out=new OffscreenCanvas(sw*S,sh*S); octx=out.getContext('2d'); }
+    const W2=Math.min(step,sw-tx)*S, H2=Math.min(step,sh-ty)*S, off=OVER*S, img=new ImageData(W2,H2), d=img.data;
+    for(let y=0;y<H2;y++){ const row=(y+off)*OT+off; for(let x=0;x<W2;x++){ const i=row+x, j=(y*W2+x)*4; d[j]=od[i]*255; d[j+1]=od[op+i]*255; d[j+2]=od[2*op+i]*255; d[j+3]=255; } }
+    octx.putImageData(img,tx*S,ty*S);
+    if(ot.dispose) ot.dispose();
+    if(onTile) onTile(++n/total);
+  }
+  return out;
+}
+function resizeTo(src,w,h){ const c=new OffscreenCanvas(w,h), g=c.getContext('2d',{willReadFrequently:true}); g.imageSmoothingQuality='high'; g.drawImage(src,0,0,w,h); return c; }
+async function aiStep(src,W,H,engine,onTile){
+  if(engine==='fast') return null;
+  const sLong=Math.max(src.width,src.height), inLong=Math.min(sLong,Math.ceil(Math.max(W,H)/2),MAX_AI_IN);
+  const ai=inLong<sLong ? resizeTo(src,Math.round(src.width*inLong/sLong),Math.round(src.height*inLong/sLong)) : src;
+  try{ return await aiUpscale(ai,onTile); }
+  catch(e){
+    if(cancelled || sessEP!=='webgpu') throw e;
+    console.warn('Graphics card failed, switching to processor',e);
+    await getSession(engine,true); return await aiUpscale(ai,onTile);
+  }
+}
+
+/* ---------- GPU sharpening ---------- */
+function getSharpener(){
+  if(sharpener!==undefined) return sharpener;
+  sharpener=null;
+  try{
+    const c=new OffscreenCanvas(16,16), gl=c.getContext('webgl2',{ premultipliedAlpha:false, preserveDrawingBuffer:true, antialias:false });
+    if(!gl) return null;
+    const sh=(t,s)=>{ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+    const p=gl.createProgram();
+    gl.attachShader(p,sh(gl.VERTEX_SHADER,`#version 300 es
+in vec2 a;out vec2 uv;void main(){uv=vec2(a.x+1.,1.-a.y)*.5;gl_Position=vec4(a,0.,1.);}`));
+    gl.attachShader(p,sh(gl.FRAGMENT_SHADER,`#version 300 es
+precision highp float;uniform sampler2D t;uniform vec2 px;uniform float amt;in vec2 uv;out vec4 o;
+void main(){vec4 c=texture(t,uv);
+vec3 b=(texture(t,uv+vec2(px.x,0.)).rgb+texture(t,uv-vec2(px.x,0.)).rgb+texture(t,uv+vec2(0.,px.y)).rgb+texture(t,uv-vec2(0.,px.y)).rgb
++texture(t,uv+px).rgb+texture(t,uv-px).rgb+texture(t,uv+vec2(px.x,-px.y)).rgb+texture(t,uv+vec2(-px.x,px.y)).rgb)*.125;
+o=vec4(clamp(c.rgb+(c.rgb-b)*amt,0.,1.),c.a);}`));
+    gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error('link failed');
+    gl.useProgram(p);
+    gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(p,'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    gl.bindTexture(gl.TEXTURE_2D,gl.createTexture());
+    [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]].forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v));
+    const uPx=gl.getUniformLocation(p,'px'), uAmt=gl.getUniformLocation(p,'amt');
+    sharpener={ max:gl.getParameter(gl.MAX_TEXTURE_SIZE), run(src,W,H,amt){
+      if(c.width!==W || c.height!==H){ c.width=W; c.height=H; }
+      gl.viewport(0,0,W,H); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
+      gl.uniform2f(uPx,1/W,1/H); gl.uniform1f(uAmt,amt); gl.drawArrays(gl.TRIANGLES,0,3);
+      return c;
+    }};
+  }catch(e){ console.warn('Sharpening unavailable',e); sharpener=null; }
+  return sharpener;
+}
+
+/* ---------- final look (instant, used by the live sliders) ---------- */
+function finish(src,up,W,H,o,target){
+  const f=target || new OffscreenCanvas(W,H);
+  if(f.width!==W || f.height!==H){ f.width=W; f.height=H; }
+  const g=f.getContext('2d');
+  g.clearRect(0,0,W,H); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  const fl=[];
+  if(o.bright) fl.push('brightness('+(1+o.bright).toFixed(3)+')');
+  if(o.contrast) fl.push('contrast('+(1+o.contrast).toFixed(3)+')');
+  if(o.sat) fl.push('saturate('+(1+o.sat).toFixed(3)+')');
+  g.filter=fl.length ? fl.join(' ') : 'none';
+  if(!up || o.blend<1) g.drawImage(src,0,0,W,H);
+  if(up && o.blend>0){ g.globalAlpha=o.blend; g.drawImage(up,0,0,W,H); g.globalAlpha=1; }
+  g.filter='none';
+  if(o.alpha){ g.globalCompositeOperation='destination-in'; g.drawImage(src,0,0,W,H); g.globalCompositeOperation='source-over'; }
+  if(o.sharpen>0){ const s=getSharpener(); if(s && Math.max(W,H)<=s.max) return s.run(f,W,H,o.sharpen); }
+  return f;
+}
+const opts=()=>({ engine:$('engine').value, blend:+$('blend').value/100, sharpen:+$('sharpen').value/100*1.2, bright:+$('bright').value/100, contrast:+$('contrast').value/100, sat:+$('sat').value/100, alpha:kind==='image' && hasAlpha });
+
+/* ---------- live sliders ---------- */
+const signed=v=>(v>0?'+':'')+v;
+const LABELS={ blend:v=>v+'%', sharpen:v=>v, bright:signed, contrast:signed, sat:signed };
+for(const id of Object.keys(LABELS)){
+  $(id).addEventListener('input',()=>{ $(id+'Val').textContent=LABELS[id](+$(id).value); queueRecompose(); });
+  $(id).addEventListener('dblclick',()=>{ $(id).value=DEFAULTS[id]; $(id).dispatchEvent(new Event('input')); });
+}
+$('resetBtn').onclick=()=>{ for(const id of Object.keys(DEFAULTS)){ $(id).value=DEFAULTS[id]; $(id+'Val').textContent=LABELS[id](DEFAULTS[id]); } queueRecompose(); };
+function queueRecompose(){
+  if(!cache || recQueued) return;
+  recQueued=true;
+  requestAnimationFrame(()=>{
+    recQueued=false; if(!cache) return;
+    const out=finish(cache.src,cache.up,cache.W,cache.H,opts(),liveFin || (liveFin=new OffscreenCanvas(cache.W,cache.H)));
+    if(after.width!==cache.W || after.height!==cache.H){ after.width=cache.W; after.height=cache.H; }
+    after.getContext('2d').drawImage(out,0,0);
+  });
+}
+function setCache(src,up,W,H){
+  cache={ src, up, W, H, key:currentKey() };
+  $('adj').classList.remove('locked');
+  $('adjHint').textContent='Drag any slider. The picture changes instantly. Double-click a slider to reset it.';
+}
+const currentKey=()=>token+'|'+$('engine').value+'|'+$('size').value;
+function checkStale(){ if(cache && cache.key!==currentKey()) showNote('You changed the method or size. Click '+(kind==='video'?'"Preview the current frame"':'Upscale')+' again to apply it. The sliders still work on the current result.'); }
+
+/* ---------- sizes ---------- */
+function fillSizes(){
+  const list=kind==='video'
+    ? [['2','2× bigger'],['1080','1080p (Full HD)'],['1440','1440p (2K)'],['2160','2160p (4K)']]
+    : [['2','2× bigger'],['3','3× bigger'],['4','4× bigger']];
+  $('size').innerHTML=list.map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('');
+  if(kind==='video'){ const s=Math.min(video.videoWidth,video.videoHeight)||720; $('size').value=s<720?'1080':s<1080?'1440':'2160'; }
+  updateSizeInfo();
+}
+function srcDims(){ return kind==='image' ? [srcBmp.width,srcBmp.height] : [video.videoWidth,video.videoHeight]; }
+function targetDims(sw,sh){
+  const v=$('size').value; let k;
+  if(kind==='image') k=Math.min(+v,MAX_OUT_IMG/Math.max(sw,sh));
+  else k=Math.min(v==='2' ? 2 : +v/Math.min(sw,sh), MAX_OUT_VID/Math.max(sw,sh));
+  return { W:Math.round(sw*k/2)*2, H:Math.round(sh*k/2)*2, k };
+}
+function updateSizeInfo(){
+  if(!kind){ $('sizeInfo').textContent=''; return; }
+  const [sw,sh]=srcDims(); if(!sw) return;
+  const { W, H, k }=targetDims(sw,sh);
+  $('sizeInfo').textContent=sw+'×'+sh+' → '+W+'×'+H+(k<=1.01 ? ' · already this size or bigger' : '');
+}
+$('size').onchange=()=>{ updateSizeInfo(); checkStale(); };
+$('engine').onchange=()=>{ checkStale(); if(kind==='video' && $('engine').value==='ai-max') toast('"Maximum detail" is for photos. For videos choose "AI upscale: fast".'); };
+
+/* ---------- loading ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+async function loadFile(f){
+  if(!f || busy) return;
+  const isVid=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name), isImg=f.type.startsWith('image/');
+  if(!isVid && !isImg) return toast('Please choose a photo or a video');
+  file=f; token++; cache=null; $('adj').classList.add('locked'); $('adjHint').textContent='Upscale first, then drag any slider. The picture updates instantly.';
+  ['note','prog','doneBox','backBtn'].forEach(hide); resetCompare();
+  if(srcBmp){ srcBmp.close(); srcBmp=null; }
+  if(url){ URL.revokeObjectURL(url); url=null; }
+  if(isImg){
+    try{ srcBmp=await createImageBitmap(f); }catch{ return toast('Could not open '+f.name+' (iPhone HEIC photos must be converted to JPG first)'); }
+    kind='image'; hasAlpha=detectAlpha(srcBmp);
+    video.removeAttribute('src'); hide('video'); hide('empty'); show('cmp'); show('zoomBtn');
+    after.width=srcBmp.width; after.height=srcBmp.height; after.getContext('2d').drawImage(srcBmp,0,0);
+    $('fileInfo').textContent=f.name+' · '+fmtSize(f.size)+' · '+srcBmp.width+'×'+srcBmp.height+(hasAlpha?' · transparent':'');
+    $('hint').textContent='Choose the method and size, then click Upscale';
+    show('imgOpts'); hide('videoOpts'); $('runBtn').textContent='✨ Upscale photo'; $('runBtn').disabled=false;
+    fillSizes();
+  }else{
+    kind='video'; url=URL.createObjectURL(f);
+    $('fileInfo').textContent='Opening '+f.name+'…'; video.src=url;
+    hide('imgOpts'); show('videoOpts'); hide('zoomBtn'); $('runBtn').textContent='✨ 2. Upscale video';
+    $('diskWrap').classList.toggle('hidden',!('showSaveFilePicker' in window));
+    $('toDisk').checked=f.size>300*1048576 && 'showSaveFilePicker' in window;
+    loadMB().catch(()=>{});
+  }
+}
+function detectAlpha(bmp){
+  if(/jpe?g/i.test(file.type)) return false;
+  const k=Math.min(1,256/Math.max(bmp.width,bmp.height)), c=new OffscreenCanvas(Math.max(1,Math.round(bmp.width*k)),Math.max(1,Math.round(bmp.height*k)));
+  const g=c.getContext('2d'); g.drawImage(bmp,0,0,c.width,c.height);
+  const d=g.getImageData(0,0,c.width,c.height).data;
+  for(let i=3;i<d.length;i+=4) if(d[i]<250) return true;
+  return false;
+}
+video.addEventListener('loadedmetadata',()=>{
+  if(kind!=='video') return;
+  hide('empty'); hide('cmp'); show('video');
+  $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+video.videoWidth+'×'+video.videoHeight+' · '+fmtClock(video.duration);
+  $('hint').textContent='Pause on a moment with a face or fine detail, then click "Preview the current frame"';
+  $('runBtn').disabled=false; fillSizes();
+});
+video.addEventListener('error',()=>{ if(kind==='video') showNote('Your browser cannot open this video. Convert it to MP4 first with the Video Toolkit.'); });
+
+/* ---------- before / after line ---------- */
+let dragging=false;
+function setSplit(v){ v=Math.max(0,Math.min(100,v)); before.style.clipPath='inset(0 '+(100-v)+'% 0 0)'; $('divider').style.left=v+'%'; }
+function resetCompare(){ comparing=false; cmp.classList.remove('ready','zoom'); $('stage').classList.remove('zoomed'); ['before','divider','tagL','tagR'].forEach(hide); $('zoomBtn').textContent='🔍 Actual size'; }
+function showCompare(srcCanvas){
+  before.width=srcCanvas.width; before.height=srcCanvas.height; before.getContext('2d').drawImage(srcCanvas,0,0);
+  ['before','divider','tagL','tagR','cmp','zoomBtn'].forEach(show); hide('video'); hide('empty');
+  cmp.classList.add('ready'); comparing=true; setSplit(50);
+  $('hint').textContent='Drag the white line to compare. Drag the sliders on the left to fine-tune.';
+}
+cmp.addEventListener('pointerdown',e=>{ if(!comparing) return; dragging=true; cmp.setPointerCapture(e.pointerId); move(e); });
+cmp.addEventListener('pointermove',e=>{ if(dragging) move(e); });
+['pointerup','pointercancel'].forEach(ev=>cmp.addEventListener(ev,()=>dragging=false));
+function move(e){ const r=cmp.getBoundingClientRect(); setSplit((e.clientX-r.left)/r.width*100); }
+$('zoomBtn').onclick=()=>{ const z=cmp.classList.toggle('zoom'); $('stage').classList.toggle('zoomed',z); $('zoomBtn').textContent=z ? '🔍 Fit to screen' : '🔍 Actual size'; };
+$('backBtn').onclick=()=>{ resetCompare(); hide('cmp'); hide('backBtn'); hide('zoomBtn'); show('video'); $('hint').textContent='Pause on another moment and preview it, or click "Upscale video"'; };
+
+/* ---------- busy ---------- */
+function setBusy(on){
+  busy=on; $('runBtn').disabled=on || !kind; $('previewBtn').disabled=on;
+  on ? show('cancelBtn') : hide('cancelBtn');
+  ['engine','size','testRun','toDisk','imgFmt'].forEach(id=>$(id).disabled=on);
+  drop.style.pointerEvents=on?'none':''; keepAwake(on);
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(conv){ try{ await conv.cancel(); }catch{} } };
+const tileText=p=>'Upscaling… '+Math.round(p*100)+'%'+(sessEP==='webgpu' ? ' · using your graphics card' : sessEP==='wasm' ? ' · using your processor (slower)' : '');
+
+/* ---------- photo ---------- */
+async function runImage(){
+  const src=new OffscreenCanvas(srcBmp.width,srcBmp.height); src.getContext('2d',{willReadFrequently:true}).drawImage(srcBmp,0,0);
+  const { W, H }=targetDims(src.width,src.height), o=opts();
+  if(o.engine!=='fast') await getSession(o.engine);
+  setP(0,'Upscaling…'); const t0=performance.now();
+  const up=await aiStep(src,W,H,o.engine,p=>setP(p,tileText(p)));
+  setCache(src,up,W,H); showCompare(src); queueRecompose();
+  setP(1,'Finished in '+fmtTime((performance.now()-t0)/1000)+' · '+W+'×'+H);
+  hide('resultVideo'); show('doneBox');
+  showNote('Done! Drag the white line on the picture to compare. Fine-tune with the sliders (no waiting), then click Download.','ok');
+}
+$('downloadBtn').onclick=async()=>{
+  if(kind==='video'){ if(resultBlob) saveBlob(resultBlob,resultName); return; }
+  if(!cache) return toast('Upscale the photo first');
+  const fmt=$('imgFmt').value, type={ png:'image/png', jpg:'image/jpeg', webp:'image/webp' }[fmt];
+  let c=after;
+  if(fmt==='jpg' && hasAlpha){ c=document.createElement('canvas'); c.width=after.width; c.height=after.height; const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(after,0,0); }
+  const blob=await new Promise(res=>c.toBlob(res,type,0.95));
+  if(!blob) return toast('The picture is too large to save in this format. Try JPG.');
+  const name=baseName()+'-upscaled-'+after.width+'x'+after.height+'.'+fmt;
+  saveBlob(blob,name); toast('Downloaded '+name+' ('+fmtSize(blob.size)+')');
+};
+
+/* ---------- video ---------- */
+async function getFps(MB){
+  try{ const inp=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS }); const t=await inp.getPrimaryVideoTrack(); const s=await t.computePacketStats(60); return s.averagePacketRate || 30; }
+  catch{ return 30; }
+}
+$('previewBtn').onclick=async()=>{
+  if(busy || kind!=='video' || !video.videoWidth) return;
+  video.pause(); cancelled=false; setBusy(true); hide('note'); show('prog');
+  try{
+    const o=opts();
+    if(o.engine==='ai-max') throw new Error('"Maximum detail" is for photos only. Choose "AI upscale: fast" for videos');
+    const sw=video.videoWidth, sh=video.videoHeight, { W, H }=targetDims(sw,sh);
+    const src=new OffscreenCanvas(sw,sh); src.getContext('2d',{willReadFrequently:true}).drawImage(video,0,0,sw,sh);
+    if(o.engine!=='fast') await getSession(o.engine);
+    const t0=performance.now();
+    const up=await aiStep(src,W,H,o.engine,p=>setP(p,tileText(p)));
+    const secs=(performance.now()-t0)/1000;
+    setCache(src,up,W,H); showCompare(src); queueRecompose(); show('backBtn');
+    const MB=await loadMB(), fps=await getFps(MB), len=$('testRun').checked ? Math.min(10,video.duration) : video.duration;
+    setP(1,'This frame took '+secs.toFixed(1)+'s');
+    showNote('Preview ready. Fine-tune with the sliders; the video will use exactly these settings. This frame took '+secs.toFixed(1)+' s, so '+($('testRun').checked?'the 10-second test':'the whole video')+' will take about '+fmtTime(secs*fps*len*1.1)+' (the first frame is always the slowest).','ok');
+  }catch(err){ showNote(err.message==='cancelled' ? 'Cancelled.' : 'Preview failed: '+(err.message||err)+'.'); }
+  finally{ setBusy(false); }
+};
+async function runVideo(){
+  if(!('VideoEncoder' in window)) throw new Error('video upscaling needs Google Chrome or Microsoft Edge on a computer');
+  const o=opts();
+  if(o.engine==='ai-max') throw new Error('"Maximum detail" is for photos only. Choose "AI upscale: fast" for videos');
+  const MB=await loadMB(), sw=video.videoWidth, sh=video.videoHeight, { W, H }=targetDims(sw,sh);
+  if(o.engine!=='fast') await getSession(o.engine);
+  resultName=baseName()+'-upscaled-'+W+'x'+H+($('testRun').checked?'-test':'')+'.mp4';
+  const useDisk=$('toDisk').checked && 'showSaveFilePicker' in window;
+  let writable=null;
+  try{
+    if(useDisk){ const handle=await window.showSaveFilePicker({ suggestedName:resultName, types:[{ description:'MP4 video', accept:{ 'video/mp4':['.mp4'] } }] }); writable=await handle.createWritable(); }
+    const input=new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    const output=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:useDisk ? false : 'in-memory' }), target:useDisk ? new MB.StreamTarget(writable,{ chunked:true }) : new MB.BufferTarget() });
+    let fc=null, fx=null; const vidFin=new OffscreenCanvas(W,H);
+    const convOpts={ input, output, video:{
+      forceTranscode:true, allowTransformationMetadata:false, quality:new MB.Quality('very-high'), processedWidth:W, processedHeight:H,
+      process:async(sample)=>{
+        const w=sample.displayWidth, h=sample.displayHeight;
+        if(!fc){ fc=new OffscreenCanvas(w,h); fx=fc.getContext('2d',{willReadFrequently:true}); }
+        else if(fc.width!==w || fc.height!==h){ fc.width=w; fc.height=h; }
+        sample.draw(fx,0,0);
+        const up=await aiStep(fc,W,H,o.engine,null);
+        return finish(fc,up,W,H,o,vidFin);
+      }
+    }};
+    if($('testRun').checked && video.duration>10) convOpts.trim={ end:10 };
+    conv=await MB.Conversion.init(convOpts);
+    if(!conv.isValid) throw new Error('this video cannot be processed here ('+(conv.discardedTracks||[]).map(d=>d.reason).join(', ')+'). Try a smaller size, or convert to MP4 first');
+    const t0=performance.now();
+    conv.onProgress=p=>{ const secs=(performance.now()-t0)/1000; setP(p,'Upscaling video… '+Math.round(p*100)+'%'+(p>0.01 ? ' · about '+fmtTime(secs/p*(1-p))+' left' : ' · starting (first frames are slowest)')); };
+    setP(0,'Upscaling video… starting');
+    await conv.execute();
+    const took=fmtTime((performance.now()-t0)/1000);
+    if(useDisk){
+      try{ await writable.close(); }catch{}
+      setP(1,'Finished in '+took); hide('doneBox');
+      showNote('Done! Your upscaled video ('+W+'×'+H+') was saved to the file you chose.','ok');
+    }else{
+      resultBlob=new Blob([output.target.buffer],{type:'video/mp4'});
+      if(resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl=URL.createObjectURL(resultBlob); $('resultVideo').src=resultUrl;
+      setP(1,'Finished in '+took+' · '+W+'×'+H+' · '+fmtSize(resultBlob.size));
+      show('resultVideo'); show('doneBox');
+      showNote($('testRun').checked ? 'Test done! If you like it, untick "Quick test" and run the whole video.' : 'Done! Play it below, then click Download.','ok');
+    }
+  }catch(err){ if(writable){ try{ await writable.abort(); }catch{} } throw err; }
+}
+
+$('runBtn').onclick=async()=>{
+  if(busy || !kind) return;
+  cancelled=false; setBusy(true); hide('note'); show('prog'); setP(0,'Starting…');
+  if(kind==='video'){ video.pause(); hide('doneBox'); }
+  try{ kind==='image' ? await runImage() : await runVideo(); }
+  catch(err){
+    console.error(err);
+    const c=err && (err.message==='cancelled' || err.name==='AbortError' || err.name==='ConversionCanceledError' || /cancel/i.test(err.message||''));
+    showNote(c ? 'Cancelled.' : 'Something went wrong: '+(err.message||err)+'. If this keeps happening, choose a smaller size.');
+  }finally{ conv=null; setBusy(false); }
+};
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<!-- avatar-narrator-hf.html — Avatar Narrator v7.2. Two steps: (1) voice cloning speaks the script, (2) a talking-face Space animates the photo to that voice. Fast mode (Wav2Lip on GPU) by default, 2 beats in parallel, time limits, live timers. Then moving Pixabay b-roll. Everything is saved automatically in IndexedDB (store name 'avatar-narrator-store', never renamed). Closing page tags are never written whole inside the script. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Avatar Narrator v7.2</title>
+<style>
+:root{--bg:#0d121b;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--mut:#93a1b8;--gold:#d4b030;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:18px 14px 60px}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:24px;font-weight:800}
+h1 small{font-size:13px;color:var(--mut);font-weight:600}
+h2{font-size:17px;margin-bottom:6px}
+h3{font-size:16px;color:var(--gold);margin-bottom:4px}
+.mut{color:var(--mut);font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+label{display:block;font-size:13px;font-weight:700;color:var(--mut);margin:12px 0 4px}
+input[type=text],input[type=password],textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;color:var(--text);outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--gold)}
+textarea{min-height:150px;resize:vertical;line-height:1.45}
+textarea.small{min-height:60px}
+input[type=file]{font-size:13px;color:var(--mut);max-width:100%}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font:inherit;font-weight:700;font-size:14px;color:var(--text);cursor:pointer;text-decoration:none;display:inline-block}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#16130a}
+.btn.ghost{background:transparent}
+.btn.red{background:#5c1f1f;border-color:#8a2f2f}
+.gen{width:100%;padding:15px;font-size:17px;font-weight:800;border-radius:12px;margin-top:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.row input[type=text]{flex:1;min-width:150px;width:auto}
+.beat{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
+.th{width:96px;height:64px;border-radius:8px;background:#0d121b;border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:11px;text-align:center;flex:none}
+.th img,.th video{width:100%;height:100%;object-fit:cover}
+.stat{margin-top:8px;font-size:13.5px;font-weight:600;color:var(--mut);overflow-wrap:anywhere}
+.stat.ok{color:var(--ok)}.stat.bad{color:var(--bad)}
+.cv{margin-top:8px;max-height:260px;border-radius:10px}
+.ca{margin-top:8px;width:100%;height:36px}
+.status{margin-top:10px;font-size:14px;font-weight:600;min-height:20px;overflow-wrap:anywhere}
+.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}
+.bar{height:8px;background:#1e2736;border-radius:99px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .3s}
+.bar.ind i{width:40%;animation:ind 1.4s ease-in-out infinite}
+@keyframes ind{0%{margin-left:-40%}100%{margin-left:100%}}
+.chk{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px;font-weight:600;color:var(--text)}
+.chk input{width:18px;height:18px;accent-color:var(--gold)}
+video,canvas{max-width:100%;border-radius:12px;background:#000}
+#prev{max-width:200px;border-radius:12px;margin-top:10px;display:none}
+#live canvas{max-height:480px}
+.saved{font-size:13px;color:var(--ok);margin-top:6px;min-height:18px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1>🗣️ Avatar Narrator <small>v7.2 · cloned voice + talking face + b-roll video</small></h1>
+ <p class="mut">Your photo talks, in your cloned voice, reading your script. Moving b-roll videos appear while it speaks.</p>
+
+ <div class="card">
+  <div class="mut">💾 Everything you add is saved automatically in this browser: photo, voice sample, script, keys, settings, and the voices and clips already made. Refreshing or opening a new version keeps it. Saved at this address: <b id="origin"></b>. Always open the page from the same address, or the saved data will not be found.</div>
+  <div class="status" id="savedAt"></div>
+  <div class="row">
+   <button class="btn" id="backup">Save a backup file</button>
+   <label class="btn" style="margin:0;cursor:pointer;color:var(--text)">Restore backup<input type="file" id="restoreFile" accept=".json,application/json" hidden></label>
+   <button class="btn red" id="wipe">Clear all saved data</button>
+  </div>
+ </div>
+
+ <div class="card">
+  <h2>1. Your voice sample</h2>
+  <p class="mut">A clear recording of you speaking, 5 to 12 seconds is ideal. The AI copies your voice from it. Only the first 12 seconds are used, so start speaking right away and avoid music or noise.</p>
+  <input type="file" id="voiceFile" accept="audio/*,.m4a,.mp3,.wav,.ogg,.aac">
+  <div class="saved" id="voiceSaved"></div>
+  <label for="refText">What do you say in the sample? (optional, but it makes the cloning more accurate)</label>
+  <textarea id="refText" class="small" placeholder="Type the exact words you speak in the sample, or leave empty"></textarea>
+ </div>
+
+ <div class="card">
+  <h2>2. The photo</h2>
+  <p class="mut">A clear, front-facing photo with the face large in the picture works best.</p>
+  <input type="file" id="photoFile" accept="image/*">
+  <div class="saved" id="photoSaved"></div>
+  <img id="prev" alt="Photo preview">
+ </div>
+
+ <div class="card">
+  <h2>3. What the avatar will say</h2>
+  <p class="mut">Type the script in English (the free voice-cloning Space handles English and Chinese). Leave a blank line between parts. Each part becomes one talking clip, and long parts are split automatically (about 40 words per clip is best).</p>
+  <label for="script">Script</label>
+  <textarea id="script" placeholder="Peace be upon you. Today I want to talk about patience..."></textarea>
+  <div class="row"><button class="btn" id="split">Split into beats and find b-roll</button></div>
+  <label for="pixKey">Pixabay key (used to find the b-roll videos)</label>
+  <input type="password" id="pixKey" autocomplete="off" placeholder="Paste your Pixabay key">
+  <div class="status" id="bstatus"></div>
+  <div id="beats"></div>
+ </div>
+
+ <div class="card">
+  <h2>4. Settings</h2>
+  <label for="fmode">Speed / look</label>
+  <select id="fmode">
+   <option value="fast">Fast: lips move in sync with the voice (Wav2Lip, usually a few minutes per clip)</option>
+   <option value="natural">Natural: head and eye movement too (SadTalker, can take 10 to 25 minutes per clip on the free server)</option>
+  </select>
+  <label for="vspace">Step A: Space that clones your voice and speaks the script</label>
+  <input type="text" id="vspace" value="mrfakename/E2-F5-TTS" autocomplete="off" spellcheck="false">
+  <div class="row"><button class="btn" id="chkV">Check voice Space</button></div>
+  <div class="status" id="chkVOut"></div>
+  <label for="space">Step B: Space that makes the photo talk (Natural mode, and the backup in Fast mode)</label>
+  <input type="text" id="space" value="John6666/SadTalker" autocomplete="off" spellcheck="false">
+  <div class="row"><button class="btn" id="chk">Check face Space</button></div>
+  <div class="status" id="chkOut"></div>
+  <div class="mut" style="margin-top:6px">Fast mode uses pragnakalp/Wav2lip-ZeroGPU first and falls back to the Space above. Natural mode does the opposite.</div>
+  <label for="hfToken">Hugging Face token (optional, but it gives you more free GPU time)</label>
+  <input type="password" id="hfToken" autocomplete="off" placeholder="hf_...">
+  <label for="shape">Output shape (square matches these talking faces best)</label>
+  <select id="shape"><option value="square">Square 1:1</option><option value="tall">Tall 9:16 (dark bands above and below the face)</option><option value="wide">Wide 16:9 (dark bands left and right)</option></select>
+  <label class="chk"><input type="checkbox" id="caps" checked> Show captions on screen</label>
+ </div>
+
+ <button class="btn gold gen" id="go">🗣️ Make the talking clips</button>
+ <div class="row"><button class="btn red" id="stopHF" hidden>■ Stop</button></div>
+ <div class="status" id="status"></div>
+ <div class="bar" id="bar" hidden><i></i></div>
+
+ <div class="card" id="compCard" hidden>
+  <h2>5. Join everything into the final video</h2>
+  <p class="mut">This records the finished video in real time. Keep this tab open and in front until it finishes. Pixabay videos are credited to their creators.</p>
+  <div class="row"><button class="btn gold" id="compose">🎬 Make final video</button><button class="btn red" id="stopC" hidden>■ Stop</button></div>
+  <div class="status" id="cstatus"></div>
+  <div class="bar" id="cbar" hidden><i></i></div>
+  <div id="live" style="margin-top:10px"></div>
+  <div id="final" hidden style="margin-top:10px"><video id="finalV" controls playsinline></video><div class="row"><a class="btn" id="dlFinal">⬇ Download final video</a></div></div>
+ </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+function lsGet(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
+function setS(m,cls){var s=$('#status');s.textContent=m;s.className='status'+(cls?' '+cls:'')}
+function setB(m,cls){var s=$('#bstatus');s.textContent=m;s.className='status'+(cls?' '+cls:'')}
+function setC(m,cls){var s=$('#cstatus');s.textContent=m;s.className='status'+(cls?' '+cls:'')}
+function withTimeout(p,ms,msg){return new Promise(function(res,rej){var t=setTimeout(function(){rej(new Error(msg))},ms);p.then(function(v){clearTimeout(t);res(v)},function(e){clearTimeout(t);rej(e)})})}
+function mmss(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2)}
+var SHAPES={tall:[720,1280],square:[720,720],wide:[1280,720]};
+var FACE_FAST='pragnakalp/Wav2lip-ZeroGPU';
+
+/* ---------- permanent storage (IndexedDB). The store name below must never change. ---------- */
+var DB=null,PHOTO=null,VOICE=null;
+function dbOpen(){
+  return new Promise(function(res){
+    try{
+      var r=indexedDB.open('avatar-narrator-store',1);
+      r.onupgradeneeded=function(){r.result.createObjectStore('kv')};
+      r.onsuccess=function(){DB=r.result;res(DB)};
+      r.onerror=function(){res(null)};
+      r.onblocked=function(){res(null)}}
+    catch(e){res(null)}})}
+function dbGet(k){
+  return new Promise(function(res){
+    if(!DB)return res(undefined);
+    try{var q=DB.transaction('kv','readonly').objectStore('kv').get(k);q.onsuccess=function(){res(q.result)};q.onerror=function(){res(undefined)}}
+    catch(e){res(undefined)}})}
+function dbSet(k,v){
+  return new Promise(function(res){
+    if(!DB)return res(false);
+    try{
+      var tx=DB.transaction('kv','readwrite');
+      tx.objectStore('kv').put(v,k);
+      tx.oncomplete=function(){res(true)};
+      tx.onerror=function(){res(false)};
+      tx.onabort=function(){res(false)}}
+    catch(e){res(false)}})}
+function dbClear(){
+  return new Promise(function(res){
+    if(!DB)return res(false);
+    try{var tx=DB.transaction('kv','readwrite');tx.objectStore('kv').clear();tx.oncomplete=function(){res(true)};tx.onerror=function(){res(false)}}
+    catch(e){res(false)}})}
+function markSaved(ok){
+  var s=$('#savedAt');
+  if(!DB){s.textContent='⚠ This browser is not allowing saved data (private window?). Nothing will be kept after refresh. Use a normal window, or the backup file.';s.className='status bad';return}
+  if(ok===false){s.textContent='⚠ Saving failed (the browser storage may be full). Use "Save a backup file".';s.className='status bad';return}
+  s.textContent='✓ Saved automatically at '+new Date().toLocaleTimeString();s.className='status ok'}
+function getSettings(){
+  return {pix:$('#pixKey').value.trim(),hf:$('#hfToken').value.trim(),vspace:$('#vspace').value.trim(),space:$('#space').value.trim(),refText:$('#refText').value,script:$('#script').value,shape:$('#shape').value,caps:$('#caps').checked,fmode:$('#fmode').value}}
+function applySettings(s){
+  if(!s)return;
+  if(s.pix)$('#pixKey').value=s.pix;
+  if(s.hf)$('#hfToken').value=s.hf;
+  if(s.vspace)$('#vspace').value=s.vspace;
+  if(s.space)$('#space').value=s.space;
+  if(s.refText!=null)$('#refText').value=s.refText;
+  if(s.script!=null)$('#script').value=s.script;
+  if(s.shape&&SHAPES[s.shape])$('#shape').value=s.shape;
+  if(s.caps!=null)$('#caps').checked=!!s.caps;
+  if(s.fmode==='fast'||s.fmode==='natural')$('#fmode').value=s.fmode}
+var tSet=0,tBeats=0;
+function saveSettingsSoon(){clearTimeout(tSet);tSet=setTimeout(function(){dbSet('settings',getSettings()).then(markSaved)},400)}
+function serializeBeats(){
+  return BEATS.map(function(b){
+    var m=b.media;
+    return {text:b.text,words:b.words,q:b.q,by:b.by||'',
+      media:m?{kind:m.kind,id:m.id||0,url:m.file?'':m.url,thumb:m.thumb||'',credit:m.credit||'',file:!!m.file,blob:m.file?(m.blob||null):null}:null,
+      audio:b.audio||null,clipBlob:b.clip?b.clip.blob:null,clipDur:b.clip?b.clip.dur:0}})}
+function saveBeatsSoon(){clearTimeout(tBeats);tBeats=setTimeout(function(){dbSet('beats',serializeBeats()).then(markSaved)},500)}
+['#pixKey','#hfToken','#vspace','#space','#refText','#script'].forEach(function(id){$(id).addEventListener('input',saveSettingsSoon)});
+$('#shape').addEventListener('change',saveSettingsSoon);
+$('#fmode').addEventListener('change',saveSettingsSoon);
+$('#caps').addEventListener('change',saveSettingsSoon);
+
+function normSpace(s){
+  s=String(s||'').trim();
+  var m=s.match(/huggingface\.co\/spaces\/([\w.-]+\/[\w.-]+)/i);
+  if(m)s=m[1];
+  s=s.replace(/^\/+|\/+$/g,'');
+  return /^[\w.-]+\/[\w.-]+$/.test(s)?s:''}
+
+/* ---------- photo and voice sample (kept in storage) ---------- */
+var photoUrl='';
+function showPhoto(){
+  var p=$('#prev');
+  if(!PHOTO){p.style.display='none';$('#photoSaved').textContent='';return}
+  if(photoUrl)URL.revokeObjectURL(photoUrl);
+  photoUrl=URL.createObjectURL(PHOTO);p.src=photoUrl;p.style.display='block';
+  $('#photoSaved').textContent='✓ Saved: '+(PHOTO.name||'photo')}
+function showVoice(){$('#voiceSaved').textContent=VOICE?'✓ Saved: '+(VOICE.name||'voice sample'):''}
+function setFileInput(inp,file){try{var dt=new DataTransfer();dt.items.add(file);inp.files=dt.files}catch(e){}}
+$('#photoFile').addEventListener('change',function(){
+  var f=this.files&&this.files[0];if(!f)return;
+  PHOTO=f;showPhoto();dbSet('photo',f).then(markSaved)});
+$('#voiceFile').addEventListener('change',function(){
+  var f=this.files&&this.files[0];if(!f)return;
+  VOICE=f;showVoice();dbSet('voice',f).then(markSaved)});
+
+/* ---------- Gradio connection ---------- */
+var GR=null;
+async function gradio(){
+  if(!GR){
+    try{GR=await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js')}
+    catch(e){throw new Error('The connection library could not load. Check your internet.')}}
+  return GR}
+function classify(p,mode){
+  var c=String(p.component||'').toLowerCase(),nm=String(p.parameter_name||'').toLowerCase(),lb=String(p.label||'').toLowerCase(),s=nm||lb;
+  if(/^(radio|dropdown|number|slider|checkbox|checkboxgroup|colorpicker)$/.test(c))return '';
+  if(c==='video'||/video/.test(s))return '';
+  if(mode==='tts'){
+    if(c==='audio'||(!c&&/audio|voice|clone|sample|speaker/.test(s)))return 'voice';
+    if(c==='image')return '';
+    if(/ref.*text|text.*ref|transcri/.test(s))return 'reftext';
+    if(/gen|target|prompt|input_text/.test(s)||/^text/.test(s))return 'text';
+    if(c==='textbox')return 'textany';
+    return ''}
+  if(c==='audio'||(!c&&/audio|speech|wav/.test(s)))return 'audio';
+  if(c==='image'||(!c&&/portrait|photo|image/.test(s)))return 'photo';
+  return ''}
+function pickEndpoint(info,mode){
+  var ne=(info&&info.named_endpoints)||{},best=null,names=Object.keys(ne);
+  names.forEach(function(k){
+    var params=ne[k].parameters||[],kinds=params.map(function(p){return classify(p,mode)});
+    var ok=mode==='tts'?(kinds.indexOf('voice')>=0&&(kinds.indexOf('text')>=0||kinds.indexOf('textany')>=0)):(kinds.indexOf('photo')>=0&&kinds.indexOf('audio')>=0);
+    if(!ok)return;
+    var score=params.length;
+    if(!best||score>best.score)best={name:k,params:params,score:score}});
+  return {best:best,names:names}}
+function buildPayload(ep,mode,vals){
+  var kinds=ep.params.map(function(p){return classify(p,mode)});
+  var ti=kinds.indexOf('text');if(ti<0)ti=kinds.lastIndexOf('textany');
+  var used={},list=ep.params.map(function(p,i){
+    var k=kinds[i];
+    if(k==='photo'&&!used.photo){used.photo=1;return vals.photo}
+    if(k==='audio'&&!used.audio){used.audio=1;return vals.audio}
+    if(k==='voice'&&!used.voice){used.voice=1;return vals.voice}
+    if(k==='reftext')return vals.refText||'';
+    if((k==='text'||k==='textany')&&i===ti)return vals.text;
+    var c=String(p.component||'').toLowerCase(),nm=String(p.parameter_name||'').toLowerCase();
+    if(mode==='face'&&c==='checkbox'&&/enhanc|ref_video|idle/.test(nm))return false;
+    if(mode==='tts'&&c==='slider'&&/nfe/.test(nm))return 16;
+    return p.parameter_has_default?p.parameter_default:null});
+  var byName=ep.params.every(function(p){return p.parameter_name});
+  if(!byName)return list;
+  var o={};ep.params.forEach(function(p,i){o[p.parameter_name]=list[i]});return o}
+async function connectSpace(space,token,mode){
+  if(!space)throw new Error('Type the Space name like owner/space-name');
+  var g=await gradio(),opts={};
+  if(token&&/^hf_/.test(token)){opts.hf_token=token;opts.token=token}
+  var app;
+  try{app=await withTimeout(g.Client.connect(space,opts),90000,'did not answer within 90 seconds (the Space may be asleep, broken or busy)')}
+  catch(e){throw new Error('could not connect to '+space+': '+String((e&&e.message)||e).slice(0,160))}
+  var info;
+  try{info=await withTimeout(app.view_api(),60000,'did not describe its inputs within 60 seconds')}
+  catch(e){throw new Error('could not read the inputs of '+space+': '+String((e&&e.message)||e).slice(0,160))}
+  var pick=pickEndpoint(info,mode);
+  if(!pick.best)throw new Error(space+(mode==='tts'?' has no function that takes a voice sample and text':' has no function that takes a photo and audio')+' (it offers: '+(pick.names.join(', ')||'none')+')');
+  return {g:g,app:app,ep:pick.best,space:space,mode:mode}}
+function spaceRoot(c){
+  var r=(c.app&&c.app.config&&c.app.config.root)||'';
+  if(!r)r='https://'+c.space.toLowerCase().replace(/[\/_.]/g,'-')+'.hf.space';
+  return String(r).replace(/\/+$/,'')}
+async function checkSpace(mode,inId,outId,btn){
+  var o=$(outId);btn.disabled=true;o.textContent='Checking…';o.className='status';
+  try{
+    var c=await connectSpace(normSpace($(inId).value),$('#hfToken').value.trim(),mode);
+    var roles=c.ep.params.map(function(p){return (p.parameter_name||p.label||'input')+' → '+(classify(p,mode)||'default')});
+    o.textContent='✓ Reachable. Function: '+c.ep.name+'. Inputs: '+roles.join(', ')+'.';
+    o.className='status ok'}
+  catch(e){o.textContent=e.message;o.className='status bad'}
+  btn.disabled=false}
+$('#chkV').onclick=function(){checkSpace('tts','#vspace','#chkVOut',this)};
+$('#chk').onclick=function(){checkSpace('face','#space','#chkOut',this)};
+
+/* ---------- prepare photo and voice sample ---------- */
+async function prepPhoto(file){
+  try{
+    var bmp=await createImageBitmap(file),s=Math.min(1,1024/Math.max(bmp.width,bmp.height));
+    var c=document.createElement('canvas');c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    var blob=await new Promise(function(r){c.toBlob(r,'image/jpeg',0.92)});
+    return blob?new File([blob],'photo.jpg',{type:'image/jpeg'}):file}
+  catch(e){return file}}
+function wavBlob(data,sr){
+  var n=data.length,buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
+  function w(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}
+  w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+  for(var i=0;i<n;i++){var x=Math.max(-1,Math.min(1,data[i]));v.setInt16(44+i*2,x<0?x*0x8000:x*0x7FFF,true)}
+  return new Blob([buf],{type:'audio/wav'})}
+async function prepVoice(file){
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext,ac=new AC();
+    var buf=await ac.decodeAudioData(await file.arrayBuffer());ac.close();
+    var sr=24000,len=Math.max(1,Math.ceil(Math.min(buf.duration,12)*sr));
+    var oc=new OfflineAudioContext(1,len,sr),s=oc.createBufferSource();
+    s.buffer=buf;s.connect(oc.destination);s.start(0);
+    var r=await oc.startRendering();
+    return new File([wavBlob(r.getChannelData(0),sr)],'voice-sample.wav',{type:'audio/wav'})}
+  catch(e){return file}}
+
+/* ---------- find the output file in whatever a Space sent back ---------- */
+var VIDRE=/\.(mp4|webm|mov|m4v|avi|mkv)(\?|#|$)/i;
+var AUDRE=/\.(wav|mp3|flac|ogg|m4a|aac)(\?|#|$)/i;
+var PATHRE={video:/[\w@%+=:,.\/\\~-]+\.(?:mp4|webm|mov|m4v)\b/gi,audio:/[\w@%+=:,.\/\\~-]+\.(?:wav|mp3|flac|ogg|m4a|aac)\b/gi};
+function walkOut(x,acc,depth){
+  if(x==null||depth>7)return;
+  if(typeof x==='string'){
+    acc.strs.push(x);
+    var t=x.trim(),f=t.charAt(0);
+    if(f==='{'||f==='['){try{walkOut(JSON.parse(t),acc,depth+1)}catch(e){}}
+    return}
+  if(Array.isArray(x)){x.forEach(function(y){walkOut(y,acc,depth+1)});return}
+  if(typeof x==='object'){
+    if(typeof x.url==='string'&&x.url)acc.urls.push(x.url);
+    if(typeof x.path==='string'&&x.path)acc.paths.push(x.path);
+    Object.keys(x).forEach(function(k){if(k!=='url'&&k!=='path')walkOut(x[k],acc,depth+1)})}}
+function fileCandidates(datas,root,kind){
+  var extRe=kind==='audio'?AUDRE:VIDRE,acc={strs:[],urls:[],paths:[]};
+  for(var i=datas.length-1;i>=0;i--)walkOut(datas[i],acc,0);
+  var c=[],paths=acc.paths.slice();
+  acc.urls.forEach(function(u){if(/^https?:/i.test(u)||/^data:/i.test(u))c.push(u)});
+  acc.strs.forEach(function(s){
+    s=s.trim();
+    if(/^data:(audio|video)\//i.test(s))c.push(s);
+    (s.match(/https?:\/\/[^\s"'<>)]+/g)||[]).forEach(function(u){c.push(u.replace(/[.,;]+$/,''))});
+    (s.match(PATHRE[kind])||[]).forEach(function(p){if(!/^https?:/i.test(p))paths.push(p)})});
+  paths.forEach(function(p){
+    p=p.trim();var rel=p.replace(/^\/+/,'');
+    c.push(root+'/gradio_api/file='+p);
+    c.push(root+'/file='+p);
+    c.push(root+'/gradio_api/file='+rel);
+    c.push(root+'/'+rel)});
+  var seen={},out=[];
+  c.forEach(function(u){if(!seen[u]){seen[u]=1;out.push(u)}});
+  out.sort(function(a,b){return (extRe.test(b)?1:0)-(extRe.test(a)?1:0)});
+  var texts=acc.strs.map(function(s){return s.trim()}).filter(function(s){return s&&s.length<400&&!/^(https?|data):/i.test(s)&&/[A-Za-z]/.test(s)});
+  return {cands:out,texts:texts}}
+async function fetchFile(cands,kind){
+  for(var i=0;i<cands.length&&i<16;i++){
+    try{
+      var r=await fetch(cands[i]);
+      if(!r.ok)continue;
+      var b=await r.blob();
+      if(kind==='audio'){if(/^audio\//i.test(b.type)||(b.size>2000&&AUDRE.test(cands[i])))return b}
+      else{if(/^video\//i.test(b.type)||(b.size>5000&&(VIDRE.test(cands[i])||/octet-stream/i.test(b.type))))return b}}
+    catch(e){}}
+  return null}
+function hfErr(e){
+  var m=String((e&&e.message)||e||'failed');
+  if(/quota|gpu|zerogpu/i.test(m))return 'the free GPU time limit is used up for now ('+m.slice(0,140)+')';
+  if(/too many|rate|429/i.test(m))return 'too many requests right now';
+  return m.slice(0,320)}
+
+/* ---------- run one job on a Space (live timer, time limit, can be stopped) ---------- */
+var JOBS=new Set(),STOPALL=false,BUSY=false;
+async function runJob(c,payload,say,label,limitMs){
+  limitMs=limitMs||900000;
+  var t0=Date.now(),datas=[],timedOut=false,note='',job=c.app.submit(c.ep.name,payload);
+  JOBS.add(job);
+  var to=setTimeout(function(){timedOut=true;try{job.cancel()}catch(e){}},limitMs);
+  function line(){say(label+': working… '+mmss((Date.now()-t0)/1000)+(note?' · '+note:'')+' (limit '+Math.round(limitMs/60000)+' min)')}
+  var tick=setInterval(line,1000);line();
+  try{
+    for await(var msg of job){
+      if(msg.type==='status'){
+        if(msg.stage==='error')throw new Error(msg.message||'the Space reported an error');
+        if(msg.stage==='pending'&&msg.position!=null)note='queue place '+(msg.position+1)+(msg.size?' of '+msg.size:'');
+        else note=msg.eta?'Space estimate: about '+Math.round(msg.eta)+' s left':''}
+      else if(msg.type==='data'){datas.push(msg.data)}}}
+  catch(e){
+    if(STOPALL)throw new Error('Stopped.');
+    if(timedOut)throw new Error('took longer than '+Math.round(limitMs/60000)+' minutes, so it was stopped');
+    throw e}
+  finally{clearTimeout(to);clearInterval(tick);JOBS.delete(job)}
+  if(STOPALL)throw new Error('Stopped.');
+  if(timedOut)throw new Error('took longer than '+Math.round(limitMs/60000)+' minutes, so it was stopped');
+  return datas}
+function rawOf(datas){var raw='';try{raw=JSON.stringify(datas)}catch(e){raw=String(datas)}return raw.slice(0,200)}
+function clipDuration(url){return new Promise(function(res){var v=document.createElement('video');v.preload='metadata';v.onloadedmetadata=function(){res(isFinite(v.duration)?v.duration:0)};v.onerror=function(){res(0)};v.src=url})}
+async function ttsOne(c,text,voice,refText,say){
+  var g=c.g;
+  var payload=buildPayload(c.ep,'tts',{voice:g.handle_file(voice),text:text,refText:refText});
+  var datas=await runJob(c,payload,say,'Voice',420000);
+  var found=fileCandidates(datas,spaceRoot(c),'audio');
+  say('Voice: downloading the audio…');
+  var blob=await fetchFile(found.cands,'audio');
+  if(!blob){
+    var said=found.texts.length?' It said: "'+found.texts[0].slice(0,160)+'".':'';
+    throw new Error('the voice Space finished but returned no audio file.'+said+' Raw reply: '+rawOf(datas))}
+  return new File([blob],'speech.wav',{type:blob.type||'audio/wav'})}
+async function faceOne(c,photo,audio,say,limitMs){
+  var g=c.g;
+  var payload=buildPayload(c.ep,'face',{photo:g.handle_file(photo),audio:g.handle_file(audio)});
+  var datas=await runJob(c,payload,say,'Face',limitMs);
+  var found=fileCandidates(datas,spaceRoot(c),'video');
+  say('Face: downloading the video…');
+  var blob=await fetchFile(found.cands,'video');
+  if(!blob){
+    var said=found.texts.length?' It said: "'+found.texts[0].slice(0,160)+'".':'';
+    throw new Error('finished but returned no video file.'+said+' Raw reply: '+rawOf(datas))}
+  var url=URL.createObjectURL(blob),dur=await clipDuration(url);
+  return {blob:blob,url:url,dur:dur}}
+
+/* ---------- beats ---------- */
+var BEATS=[],PIXC={},AUTOTOK=0;
+function countWords(t){return t.split(/\s+/).filter(Boolean).length}
+function clean(x){return x.replace(/\s+/g,' ').trim()}
+function splitLong(t,max){
+  if(countWords(t)<=max)return [t];
+  var sents=t.match(/[^.!?\u061F]+[.!?\u061F]*\s*/g)||[t],out=[],cur='';
+  sents.forEach(function(s){
+    if(cur&&countWords(cur+s)>max){out.push(cur.trim());cur=''}
+    cur+=s});
+  if(cur.trim())out.push(cur.trim());
+  return out}
+function splitScript(){
+  var raw=$('#script').value.trim();
+  if(!raw)return [];
+  var out=[];
+  raw.split(/\n\s*\n/).map(clean).filter(Boolean).forEach(function(p){out=out.concat(splitLong(p,40))});
+  return out}
+function makeBeats(texts){
+  BEATS=texts.map(function(t){return {text:t,words:Math.max(1,countWords(t)),q:'',results:[],rq:'',idx:-1,media:null,audio:null,audioUrl:'',clip:null,by:''}});
+  AUTOTOK++;
+  renderBeats();
+  $('#compCard').hidden=true;
+  saveBeatsSoon()}
+$('#split').onclick=function(){
+  var t=splitScript();
+  if(!t.length)return setB('Type the script first.','bad');
+  if(BUSY)return setB('Wait until the current job finishes.','bad');
+  if(BEATS.some(function(b){return b.clip||b.audio})&&!confirm('Splitting again deletes the voice and talking clips already made, and making them again uses GPU time. Continue?'))return;
+  makeBeats(t);
+  setB(t.length+' beats made. Finding b-roll videos…');
+  autoAll(setB)};
+function renderBeats(){
+  $('#beats').innerHTML=BEATS.map(function(b,i){
+    return '<div class="beat" data-i="'+i+'"><h3>Beat '+(i+1)+' — '+b.words+' words</h3><div class="mut">'+esc(b.text.slice(0,140))+(b.text.length>140?'…':'')+'</div>'+
+    '<div class="stat">Not made yet</div><audio class="ca" controls hidden></audio><video class="cv" controls playsinline hidden></video>'+
+    '<div class="row"><input type="text" class="q" placeholder="B-roll search word (filled in automatically)" value="'+esc(b.q)+'"><button class="btn" data-a="search">Another video</button></div>'+
+    '<div class="row"><div class="th"></div><label class="btn" style="margin:0;cursor:pointer;color:var(--text)">Choose file<input type="file" accept="image/*,video/*" hidden></label><button class="btn ghost" data-a="remove">Remove b-roll</button><button class="btn ghost" data-a="redo">Redo this beat</button><span class="mut msg"></span></div></div>'}).join('');
+  BEATS.forEach(function(b,i){
+    paint(i);
+    if(b.media&&b.media.credit)msgOf(i,'By '+b.media.credit+' on Pixabay');
+    if(b.audio)showAudio(i);
+    if(b.clip)showClip(i)})}
+function card(i){return $('#beats [data-i="'+i+'"]')}
+function paint(i){
+  var c=card(i);if(!c)return;
+  var m=BEATS[i].media,th=c.querySelector('.th');
+  if(!m){th.textContent='no b-roll';return}
+  th.innerHTML=m.kind==='video'?'<video src="'+esc(m.url)+'" muted preload="metadata"></video>':'<img alt="" src="'+esc(m.thumb||m.url)+'">'}
+function msgOf(i,t){var c=card(i);if(c)c.querySelector('.msg').textContent=t}
+function bstat(i,t,cls){var c=card(i);if(!c)return;var s=c.querySelector('.stat');s.textContent=t;s.className='stat'+(cls?' '+cls:'')}
+function showAudio(i){
+  var c=card(i),b=BEATS[i];if(!c||!b.audio)return;
+  if(!b.audioUrl)b.audioUrl=URL.createObjectURL(b.audio);
+  var a=c.querySelector('.ca');a.src=b.audioUrl;a.hidden=false;
+  bstat(i,'✓ Voice ready (press play to hear it). Face video not made yet.','ok')}
+function showClip(i){
+  var c=card(i),b=BEATS[i];if(!c||!b.clip)return;
+  var v=c.querySelector('.cv');v.src=b.clip.url;v.hidden=false;
+  bstat(i,'✓ Talking clip ready ('+(b.clip.dur?b.clip.dur.toFixed(1)+' s':'length unknown')+(b.by?', made by '+b.by:'')+')','ok')}
+async function restoreBeats(arr){
+  BEATS=(arr||[]).map(function(x){
+    var b={text:x.text,words:x.words||countWords(x.text),q:x.q||'',results:[],rq:'',idx:-1,media:null,audio:x.audio||null,audioUrl:'',clip:null,by:x.by||''};
+    var m=x.media;
+    if(m){
+      if(m.file&&m.blob)b.media={kind:m.kind,id:m.id,url:URL.createObjectURL(m.blob),thumb:'',credit:'',file:true,blob:m.blob};
+      else if(!m.file&&m.url)b.media={kind:m.kind,id:m.id,url:m.url,thumb:m.thumb||'',credit:m.credit||'',file:false}}
+    if(x.clipBlob){b.clip={blob:x.clipBlob,url:URL.createObjectURL(x.clipBlob),dur:x.clipDur||0}}
+    return b});
+  renderBeats();
+  $('#compCard').hidden=!BEATS.some(function(b){return b.clip})}
+
+/* ---------- make all clips (each beat: voice, then face; several beats at once) ---------- */
+function toggleBusy(on){
+  BUSY=on;$('#go').disabled=on;$('#split').disabled=on;
+  $('#bar').hidden=!on;$('#bar').className='bar ind';$('#stopHF').hidden=!on}
+async function makeClips(only){
+  if(BUSY)return;
+  var photoF=PHOTO||$('#photoFile').files[0],voiceF=VOICE||$('#voiceFile').files[0];
+  if(!voiceF)return setS('Choose your voice sample first (step 1).','bad');
+  if(!photoF)return setS('Choose the photo first (step 2).','bad');
+  if(!BEATS.length){
+    var t=splitScript();
+    if(!t.length)return setS('Type the script first (step 3).','bad');
+    makeBeats(t);autoAll(setB)}
+  var vspace=normSpace($('#vspace').value),fspace=normSpace($('#space').value);
+  if(!vspace)return setS('Type the voice Space name like owner/space-name.','bad');
+  if(!fspace)return setS('Type the face Space name like owner/space-name.','bad');
+  var token=$('#hfToken').value.trim(),refText=$('#refText').value.trim(),fmode=$('#fmode').value;
+  saveSettingsSoon();
+  var faceList=fmode==='natural'?[fspace,FACE_FAST]:[FACE_FAST,fspace];
+  faceList=faceList.filter(function(x,k,a){return a.findIndex(function(y){return y.toLowerCase()===x.toLowerCase()})===k});
+  function limitFor(k){return fmode==='natural'?(k===0?1500000:600000):(k===0?480000:900000)}
+  var conc=fmode==='natural'?1:2;
+  toggleBusy(true);STOPALL=false;
+  var conns={};
+  function getConn(space,mode){
+    var key=mode+'|'+space;
+    if(!conns[key])conns[key]=connectSpace(space,token,mode);
+    return conns[key]}
+  var quota=false,fails=0,total=0,t0=Date.now();
+  function tally(){
+    var r=BEATS.filter(function(b){return b.clip}).length;
+    setS('Talking clips ready: '+r+' of '+BEATS.length+(STOPALL?'':'  ·  working for '+mmss((Date.now()-t0)/1000)+'. Each beat shows its own live timer.'))}
+  try{
+    setS('Preparing your photo and voice sample…');
+    var photo=await prepPhoto(photoF),voice=await prepVoice(voiceF);
+    var todo=[];
+    BEATS.forEach(function(b,i){if(only!=null?i===only:!b.clip)todo.push(i)});
+    if(!todo.length){setS('All clips are already made. Press Make final video below.','ok');$('#compCard').hidden=false;return}
+    total=todo.length;
+    var ticker=setInterval(tally,1000);
+    async function doBeat(i){
+      var b=BEATS[i];
+      if(!b.audio){
+        try{
+          bstat(i,'Voice: connecting to '+vspace+'…');
+          var tc=await getConn(vspace,'tts');
+          b.audio=await ttsOne(tc,b.text,voice,refText,function(m){bstat(i,m)});
+          b.audioUrl='';showAudio(i);saveBeatsSoon()}
+        catch(e){
+          if(STOPALL)return;
+          var mv=hfErr(e);if(/GPU time limit/.test(mv))quota=true;
+          fails++;bstat(i,'✕ Voice: '+mv,'bad');return}}
+      var clip=null,errs=[];
+      for(var f=0;f<faceList.length&&!clip&&!STOPALL;f++){
+        try{
+          bstat(i,'Face: connecting to '+faceList[f]+'…');
+          var fc=await getConn(faceList[f],'face');
+          clip=await faceOne(fc,photo,b.audio,function(m){bstat(i,m)},limitFor(f));
+          b.by=faceList[f]}
+        catch(e2){
+          if(STOPALL)return;
+          var m2=hfErr(e2);
+          if(/GPU time limit/.test(m2)){quota=true;errs.push(m2);break}
+          errs.push(faceList[f]+': '+m2)}}
+      if(clip){b.clip=clip;showClip(i);saveBeatsSoon()}
+      else if(!STOPALL){fails++;bstat(i,'✕ '+(errs.join('  |  ')||'no face Space worked')+'  (the voice is saved and will be reused)','bad')}}
+    var queue=todo.slice();
+    async function worker(){
+      while(queue.length&&!STOPALL&&!quota){var i=queue.shift();await doBeat(i)}}
+    var ws=[];for(var w=0;w<conc;w++)ws.push(worker());
+    await Promise.all(ws);
+    clearInterval(ticker);
+    var ready=BEATS.filter(function(b){return b.clip}).length;
+    $('#compCard').hidden=!ready;
+    if(STOPALL)setS('Stopped. '+ready+' of '+BEATS.length+' talking clips are ready.');
+    else if(quota)setS('The free GPU time is used up. '+ready+' of '+BEATS.length+' clips are ready and saved. Wait for it to reset (usually within a day), or paste a free Hugging Face token in step 4, then press the button again. It only makes what is missing.','bad');
+    else if(fails)setS(ready+' of '+BEATS.length+' clips are ready. The red text under each failed beat says why. Press the button again to retry the missing ones.','bad');
+    else setS('✓ All '+ready+' talking clips are ready. Press Make final video below.','ok')}
+  catch(e){setS('Failed: '+hfErr(e),'bad')}
+  finally{toggleBusy(false);saveBeatsSoon()}}
+$('#go').onclick=function(){makeClips(null)};
+$('#stopHF').onclick=function(){STOPALL=true;JOBS.forEach(function(j){try{j.cancel()}catch(e){}});setS('Stopping…')};
+
+/* ---------- automatic b-roll videos from Pixabay ---------- */
+var STOPW={};
+('the and but for with from that this these those there here not does did have has had will would can could should may might just very really about into over than then too also how what when where why who which while after before again more most some any all each one two get got make made take took say said know thought think see saw want wanted talk today years year days day way things thing every even still like come came going gone let because until only other another your you our they them their its his her him she was were been being are am myself yourself own same such don didn doesn isn wasn aren ain').split(' ').forEach(function(w){STOPW[w]=1});
+var CONCEPTS=[
+ [/bismillah|allah|islam\w*|muslim\w*|\biman\b|\bdeen\b|ummah|masjid|mosque/,'mosque'],
+ [/qur.?an|\bayah\b|\bayat\b|\bsurah\b|recit\w*/,'quran book'],
+ [/prayer\w*|pray\w*|salah|salat|\bdua\b|worship\w*|sujood|sajdah|tahajjud/,'praying hands'],
+ [/patien\w*|\bsabr\b|\bcalm\w*|peace\w*|serenity/,'calm lake sunrise'],
+ [/storm\w*|struggl\w*|trial\w*|hardship\w*|difficult\w*|hard times?|hard days?|\bpain\w*|\bsorrow\w*/,'storm clouds'],
+ [/\brain\w*|flood\w*|\btears?\b|\bcry\w*/,'rain window'],
+ [/wait\w*|\btime\b|clock|\bhours?\b/,'hourglass'],
+ [/\bheart\w*|\bsoul\b|emotion\w*|\bfeel\w*/,'peaceful sunset'],
+ [/\bhope\w*|\btrust\w*|tawakkul|\blight\b|\bdawn\b|tomorrow|better days/,'sunrise light'],
+ [/journey|\bpath\b|\broad\b|forward|moving|\bwalk\w*|\bsteps?\b|progress\w*/,'forest path'],
+ [/mountain\w*|climb\w*|\bstrong\w*|strength|resilien\w*|endur\w*/,'mountain peak'],
+ [/\bnight\b|\bdark\w*|midnight|\bsleep\w*/,'night sky stars'],
+ [/morning|\bfajr\b|sunrise/,'morning sunrise'],
+ [/family|mother|father|parent\w*|children|\bchild\b|\bkids?\b/,'family sunset'],
+ [/knowledge|\blearn\w*|\bstudy\b|student\w*|\bread\w*|lesson\w*|\bteach\w*|school/,'books library'],
+ [/zakat|charity|sadaqah|\bgive\b|giving|\bdonat\w*|\bhelp\w*|\bpoor\b/,'helping hands'],
+ [/ramadan|\bfast\w*|iftar|\beid\b/,'ramadan lantern'],
+ [/success\w*|\bgoals?\b|\bdreams?\b|achiev\w*|career|business|\bwork\b/,'business success'],
+ [/friend\w*|brother\w*|sister\w*|communit\w*|together|\bpeople\b/,'friends together'],
+ [/\bsea\b|ocean|\bwaves?\b|\briver\b|\blake\b/,'ocean waves'],
+ [/\btree\w*|garden|flower\w*|nature|forest/,'green forest']
+];
+var GENERIC=['calm nature','sky clouds','sunrise landscape','peaceful sunset'];
+function makeCands(text,i){
+  var low=text.toLowerCase().replace(/[\u2019]/g,"'"),found=[];
+  CONCEPTS.forEach(function(c){var m=c[0].exec(low);if(m)found.push({at:m.index,p:c[1]})});
+  found.sort(function(a,b){return a.at-b.at});
+  var out=[];found.forEach(function(f){if(out.indexOf(f.p)<0)out.push(f.p)});
+  var freq={},order=[];
+  (low.match(/[a-z]{4,}/g)||[]).forEach(function(w){if(STOPW[w])return;if(!freq[w]){freq[w]=0;order.push(w)}freq[w]++});
+  order.sort(function(a,b){return (freq[b]-freq[a])||(b.length-a.length)});
+  if(order.length>1)out.push(order[0]+' '+order[1]);
+  if(order.length)out.push(order[0]);
+  out.push(GENERIC[i%GENERIC.length]);
+  return out.slice(0,7)}
+async function pixVideo(q,key){
+  if(PIXC[q])return PIXC[q];
+  var r=await fetch('https://pixabay.com/api/videos/?key='+encodeURIComponent(key)+'&q='+encodeURIComponent(q.slice(0,100))+'&per_page=15&safesearch=true');
+  if(r.status===429)throw new Error('Pixabay limit reached. Wait a minute, then press Another video.');
+  if(r.status===400||r.status===401||r.status===403)throw new Error('Pixabay refused the key. Check it.');
+  if(!r.ok)throw new Error('Pixabay error '+r.status);
+  var j=await r.json();
+  PIXC[q]=(j.hits||[]).filter(function(h){return h.videos&&((h.videos.medium&&h.videos.medium.url)||(h.videos.small&&h.videos.small.url))});
+  return PIXC[q]}
+function setMedia(b,x){
+  var v=x.videos,u=(v.medium&&v.medium.url)||(v.small&&v.small.url);
+  b.media={kind:'video',id:x.id,url:u,thumb:'',credit:x.user||'',file:false}}
+async function autoBroll(i,used,key){
+  var b=BEATS[i],cands=makeCands(b.text,i);
+  for(var k=0;k<cands.length;k++){
+    var hits=await pixVideo(cands[k],key);
+    for(var h=0;h<hits.length;h++){
+      var x=hits[h];
+      if(used.has(x.id))continue;
+      used.add(x.id);b.q=cands[k];b.results=hits;b.rq=cands[k];b.idx=h;
+      setMedia(b,x);return true}}
+  return false}
+async function autoAll(say){
+  say=say||setB;
+  if(!BEATS.length)return;
+  var key=$('#pixKey').value.trim();
+  if(!key){say('Paste your Pixabay key above to get b-roll videos automatically, or press Choose file on each beat.','bad');return}
+  var tok=++AUTOTOK,used=new Set();
+  BEATS.forEach(function(b){if(b.media&&b.media.id)used.add(b.media.id)});
+  var todo=BEATS.filter(function(b){return !b.media}).length,n=0,got=0,err='';
+  if(!todo){say('All beats already have b-roll.','ok');return}
+  for(var i=0;i<BEATS.length;i++){
+    if(tok!==AUTOTOK)return;
+    var b=BEATS[i];if(b.media)continue;
+    n++;say('Finding b-roll videos… '+n+' of '+todo);
+    var ok=false;
+    try{ok=await autoBroll(i,used,key)}catch(e){err=String(e.message||e);break}
+    if(tok!==AUTOTOK)return;
+    var c=card(i);if(c)c.querySelector('.q').value=b.q;
+    paint(i);
+    if(ok){got++;msgOf(i,'Auto: "'+b.q+'" · by '+(b.media.credit||'unknown')+' on Pixabay')}
+    else msgOf(i,'No video found. Type another word, or choose a file.');
+    saveBeatsSoon();
+    await sleep(250)}
+  if(tok!==AUTOTOK)return;
+  if(err)say('Stopped: '+err+' ('+got+' of '+todo+' found)','bad');
+  else say('✓ B-roll found for '+got+' of '+todo+' beats. Not happy with one? Press its Another video button, or choose your own file.',got===todo?'ok':'')}
+async function anotherFor(i){
+  var b=BEATS[i],c=card(i),q=c.querySelector('.q').value.trim(),key=$('#pixKey').value.trim();
+  if(!key)return msgOf(i,'Paste your Pixabay key above first.');
+  try{
+    msgOf(i,'Searching…');
+    if(!q){
+      var used=new Set();BEATS.forEach(function(x){if(x.media&&x.media.id)used.add(x.media.id)});
+      b.media=null;
+      var ok=await autoBroll(i,used,key);
+      if(c)c.querySelector('.q').value=b.q;
+      paint(i);msgOf(i,ok?'Auto: "'+b.q+'" · by '+(b.media.credit||'unknown')+' on Pixabay':'No video found. Type a word.');saveBeatsSoon();return}
+    if(b.rq!==q||!b.results.length){b.results=await pixVideo(q,key);b.rq=q;b.idx=-1;b.q=q}
+    if(!b.results.length)return msgOf(i,'No videos found. Try another word.');
+    b.idx=(b.idx+1)%b.results.length;
+    var hx=b.results[b.idx];setMedia(b,hx);
+    paint(i);msgOf(i,'By '+(hx.user||'unknown')+' on Pixabay');saveBeatsSoon()}
+  catch(e){msgOf(i,String(e.message||e).slice(0,110))}}
+$('#beats').addEventListener('click',function(e){
+  var b=e.target.closest('[data-a]');if(!b)return;
+  var i=+b.closest('.beat').dataset.i,a=b.dataset.a;
+  if(a==='search')anotherFor(i);
+  else if(a==='remove'){var m=BEATS[i].media;if(m&&m.file)URL.revokeObjectURL(m.url);BEATS[i].media=null;paint(i);msgOf(i,'No b-roll for this beat (the avatar fills the screen).');saveBeatsSoon()}
+  else if(a==='redo'){
+    if(BUSY){msgOf(i,'Wait until the current job finishes.');return}
+    var bt=BEATS[i],cd=card(i);
+    bt.clip=null;bt.audio=null;bt.audioUrl='';bt.by='';
+    var cvv=cd.querySelector('.cv');cvv.hidden=true;cvv.removeAttribute('src');
+    var caa=cd.querySelector('.ca');caa.hidden=true;caa.removeAttribute('src');
+    bstat(i,'Not made yet');saveBeatsSoon();makeClips(i)}});
+$('#beats').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target.classList.contains('q')){e.preventDefault();anotherFor(+e.target.closest('.beat').dataset.i)}});
+$('#beats').addEventListener('change',function(e){
+  if(e.target.type!=='file')return;
+  var f=e.target.files&&e.target.files[0];if(!f)return;
+  var i=+e.target.closest('.beat').dataset.i,old=BEATS[i].media;
+  if(old&&old.file)URL.revokeObjectURL(old.url);
+  BEATS[i].media={kind:/^video/.test(f.type)?'video':'image',url:URL.createObjectURL(f),thumb:'',credit:'',file:true,blob:f};
+  paint(i);msgOf(i,f.name.slice(0,40));e.target.value='';saveBeatsSoon()});
+
+/* ---------- final video: avatar clips + b-roll videos + captions, recorded in real time ---------- */
+var STOPC=false;
+function pickMime(){
+  var L=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(var i=0;i<L.length;i++){try{if(MediaRecorder.isTypeSupported(L[i]))return L[i]}catch(e){}}
+  return ''}
+function loadImg(url,cors){return new Promise(function(res){var im=new Image();if(cors)im.crossOrigin='anonymous';im.onload=function(){res(im)};im.onerror=function(){res(null)};im.src=url})}
+function loadVid(url,cors){return new Promise(function(res){var v=document.createElement('video');if(cors)v.crossOrigin='anonymous';v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';v.onloadeddata=function(){res(v)};v.onerror=function(){res(null)};v.src=url})}
+async function loadBroll(m){
+  if(m.kind==='image'){var im=await loadImg(m.url,!m.file);return im?{kind:'image',el:im}:null}
+  var url=m.url,cors=false;
+  if(!m.file){
+    try{var r=await fetch(m.url);if(r.ok){var b=await r.blob();url=URL.createObjectURL(b)}else cors=true}
+    catch(e){cors=true}}
+  var v=await loadVid(url,cors);
+  return v?{kind:'video',el:v}:null}
+function drawCover(ctx,el,x,y,w,h,zoom,fy){
+  var sw=el.videoWidth||el.naturalWidth||el.width,sh=el.videoHeight||el.naturalHeight||el.height;
+  if(!sw||!sh)return;
+  var s=Math.max(w/sw,h/sh)*(zoom||1),dw=sw*s,dh=sh*s;
+  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+  ctx.drawImage(el,x+(w-dw)/2,y+(h-dh)*(fy==null?0.5:fy),dw,dh);ctx.restore()}
+function drawFit(ctx,el,W,H){
+  var sw=el.videoWidth||el.width,sh=el.videoHeight||el.height;
+  if(!sw||!sh)return;
+  var ca=W/H,ea=sw/sh;
+  if(Math.abs(ca-ea)/ca<0.08){drawCover(ctx,el,0,0,W,H,1,0.4);return}
+  var s=Math.min(W/sw,H/sh),dw=sw*s,dh=sh*s;
+  ctx.drawImage(el,(W-dw)/2,(H-dh)/2,dw,dh)}
+function wrapLines(ctx,text,maxW){
+  var words=text.split(' '),lines=[],cur='';
+  words.forEach(function(w){var t=cur?cur+' '+w:w;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w}else cur=t});
+  if(cur)lines.push(cur);return lines}
+function waitEnded(v,dur){
+  return new Promise(function(res){
+    var done=false,chk=0,to=0;
+    function fin(){if(done)return;done=true;clearInterval(chk);clearTimeout(to);res()}
+    chk=setInterval(function(){if(STOPC)fin()},250);
+    to=setTimeout(fin,dur*1000+15000);
+    v.onended=fin})}
+$('#stopC').onclick=function(){STOPC=true};
+$('#compose').onclick=async function(){
+  var list=BEATS.filter(function(b){return b.clip&&b.clip.blob});
+  if(!list.length)return setC('Make the talking clips first.','bad');
+  var btn=this,sh=SHAPES[$('#shape').value],W=sh[0],H=sh[1],caps=$('#caps').checked;
+  btn.disabled=true;STOPC=false;$('#stopC').hidden=false;$('#final').hidden=true;$('#cbar').hidden=false;$('#cbar').className='bar';$('#cbar i').style.width='0';
+  var ac=null,rec=null,raf=0,running=false,media=[];
+  try{
+    setC('Loading the b-roll videos…');
+    var failed=0;
+    for(var i=0;i<list.length;i++){
+      var m=list[i].media,x=null;
+      if(m){x=await loadBroll(m);if(!x||!x.el){x=null;failed++}}
+      media.push(x)}
+    var total=list.reduce(function(a,b){return a+(b.clip.dur||0)},0)||1;
+    var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    var ctx=cv.getContext('2d');
+    $('#live').innerHTML='';$('#live').appendChild(cv);
+    var stream=cv.captureStream(30);
+    var AC=window.AudioContext||window.webkitAudioContext;ac=new AC();await ac.resume();
+    var dest=ac.createMediaStreamDestination();
+    dest.stream.getAudioTracks().forEach(function(t){stream.addTrack(t)});
+    var mime=pickMime(),data=[];
+    rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:4000000}:{});
+    rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)data.push(ev.data)};
+    var done=new Promise(function(res){rec.onstop=res});
+    var pipD=Math.round(Math.min(W,H)*0.3),fs=Math.round(W*0.052),cur=null,elapsed=0;
+    function frame(){
+      if(!running)return;
+      if(cur){
+        var cv2=cur.v,bm=cur.m,t=cv2.currentTime,dur2=cur.dur;
+        ctx.fillStyle='#0d121b';ctx.fillRect(0,0,W,H);
+        var showB=bm&&t>=Math.min(3,dur2*0.35);
+        if(showB){
+          if(bm.kind==='video'&&bm.el.paused)bm.el.play().catch(function(){});
+          drawCover(ctx,bm.el,0,0,W,H,bm.kind==='image'?1+0.08*(t/dur2):1);
+          var cx=W-pipD/2-28,cy=pipD/2+28;
+          ctx.save();ctx.beginPath();ctx.arc(cx,cy,pipD/2,0,Math.PI*2);ctx.clip();
+          drawCover(ctx,cv2,cx-pipD/2,cy-pipD/2,pipD,pipD,1.15,0.25);ctx.restore();
+          ctx.lineWidth=5;ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(cx,cy,pipD/2,0,Math.PI*2);ctx.stroke()}
+        else drawFit(ctx,cv2,W,H);
+        if(caps&&cur.chunks.length){
+          var ci=Math.min(cur.chunks.length-1,Math.floor(Math.min(1,t/dur2)*cur.chunks.length));
+          ctx.font='800 '+fs+'px system-ui,Arial,sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+          var lines=wrapLines(ctx,cur.chunks[ci],W*0.86),lh=fs*1.25,y=H-H*0.08-(lines.length-1)*lh;
+          ctx.lineJoin='round';ctx.lineWidth=Math.round(fs*0.22);ctx.strokeStyle='rgba(0,0,0,.9)';ctx.fillStyle='#fff';
+          lines.forEach(function(l,k){ctx.strokeText(l,W/2,y+k*lh);ctx.fillText(l,W/2,y+k*lh)})}
+        $('#cbar i').style.width=Math.min(100,Math.round((elapsed+t)/total*100))+'%';
+        setC('Recording… part '+(cur.idx+1)+' of '+list.length+'. Keep this tab in front.')}
+      raf=requestAnimationFrame(frame)}
+    running=true;rec.start(500);frame();
+    for(var k=0;k<list.length&&!STOPC;k++){
+      var b=list[k],v=document.createElement('video');
+      v.src=b.clip.url;v.playsInline=true;v.preload='auto';
+      await new Promise(function(res,rej){v.onloadedmetadata=res;v.onerror=function(){rej(new Error('One talking clip could not be opened.'))}});
+      var dur=(isFinite(v.duration)&&v.duration>0)?v.duration:(b.clip.dur||5);
+      ac.createMediaElementSource(v).connect(dest);
+      var mk=media[k];
+      if(mk&&mk.kind==='video'){try{mk.el.currentTime=0}catch(e){}mk.el.play().catch(function(){})}
+      var words=b.text.split(/\s+/).filter(Boolean),chunks=[];
+      for(var q=0;q<words.length;q+=7)chunks.push(words.slice(q,q+7).join(' '));
+      cur={v:v,m:mk,dur:dur,chunks:chunks,idx:k};
+      await v.play();
+      await waitEnded(v,dur);
+      try{v.pause()}catch(e){}
+      if(mk&&mk.kind==='video'){try{mk.el.pause()}catch(e){}}
+      elapsed+=dur}
+    running=false;cancelAnimationFrame(raf);
+    if(rec.state!=='inactive')rec.stop();
+    await done;
+    var blob=new Blob(data,{type:rec.mimeType});
+    if(!blob.size)throw new Error('The recording came out empty. Try again in Chrome.');
+    var url=URL.createObjectURL(blob),ext=/mp4/.test(blob.type)?'mp4':'webm';
+    $('#finalV').src=url;var dl=$('#dlFinal');dl.href=url;dl.download='avatar-narration.'+ext;dl.textContent='⬇ Download final video (.'+ext+')';
+    $('#final').hidden=false;
+    var cr=list.map(function(b){return b.media&&b.media.credit}).filter(Boolean).filter(function(x,i,a){return a.indexOf(x)===i});
+    setC('✓ Done.'+(STOPC?' (stopped early)':'')+(failed?' '+failed+' b-roll video'+(failed>1?'s':'')+' could not load and '+(failed>1?'were':'was')+' skipped. Choose your own file for '+(failed>1?'those beats':'that beat')+'.':'')+(cr.length?' Videos by '+cr.join(', ')+' on Pixabay.':''),'ok')}
+  catch(e){setC('Failed: '+String((e&&e.message)||e).slice(0,250),'bad')}
+  finally{
+    running=false;cancelAnimationFrame(raf);
+    try{if(rec&&rec.state!=='inactive')rec.stop()}catch(e){}
+    media.forEach(function(m){if(m&&m.kind==='video'){try{m.el.pause()}catch(e){}}});
+    try{if(ac)ac.close()}catch(e){}
+    btn.disabled=false;$('#stopC').hidden=true;$('#cbar').hidden=true}};
+
+/* ---------- backup file, restore, clear ---------- */
+function fileToDataUrl(f){return new Promise(function(res){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=function(){res('')};r.readAsDataURL(f)})}
+async function dataUrlToFile(u,name,type){try{var b=await (await fetch(u)).blob();return new File([b],name||'file',{type:type||b.type})}catch(e){return null}}
+$('#backup').onclick=async function(){
+  var btn=this;btn.disabled=true;
+  try{
+    var o={app:'avatar-narrator',version:1,settings:getSettings(),
+      photo:PHOTO?{name:PHOTO.name,type:PHOTO.type,data:await fileToDataUrl(PHOTO)}:null,
+      voice:VOICE?{name:VOICE.name,type:VOICE.type,data:await fileToDataUrl(VOICE)}:null,
+      beats:BEATS.map(function(b){return {text:b.text,words:b.words,q:b.q,media:(b.media&&!b.media.file)?{kind:b.media.kind,id:b.media.id,url:b.media.url,credit:b.media.credit,file:false}:null}})};
+    var blob=new Blob([JSON.stringify(o)],{type:'application/json'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avatar-narrator-backup.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(a.href)},5000);
+    setS('Backup file downloaded. It holds your photo, voice sample, script, keys and settings (not the finished clips). Keep it private, because it contains your keys.','ok')}
+  catch(e){setS('Backup failed: '+String((e&&e.message)||e).slice(0,160),'bad')}
+  btn.disabled=false};
+$('#restoreFile').addEventListener('change',async function(){
+  var f=this.files&&this.files[0];this.value='';
+  if(!f)return;
+  if(BUSY)return setS('Wait until the current job finishes.','bad');
+  try{
+    var o=JSON.parse(await f.text());
+    if(!o||o.app!=='avatar-narrator')throw new Error('This is not an Avatar Narrator backup file.');
+    applySettings(o.settings);
+    if(o.photo&&o.photo.data){var p=await dataUrlToFile(o.photo.data,o.photo.name,o.photo.type);if(p){PHOTO=p;setFileInput($('#photoFile'),p);showPhoto();await dbSet('photo',p)}}
+    if(o.voice&&o.voice.data){var v=await dataUrlToFile(o.voice.data,o.voice.name,o.voice.type);if(v){VOICE=v;setFileInput($('#voiceFile'),v);showVoice();await dbSet('voice',v)}}
+    await dbSet('settings',getSettings());
+    BEATS=(o.beats||[]).map(function(x){
+      var b={text:x.text,words:x.words||countWords(x.text),q:x.q||'',results:[],rq:'',idx:-1,media:null,audio:null,audioUrl:'',clip:null,by:''};
+      if(x.media&&x.media.url)b.media={kind:x.media.kind,id:x.media.id,url:x.media.url,thumb:'',credit:x.media.credit||'',file:false};
+      return b});
+    renderBeats();$('#compCard').hidden=true;
+    await dbSet('beats',serializeBeats());
+    markSaved();
+    setS('✓ Backup restored: photo, voice sample, script, keys and settings are back.'+(BEATS.length?' The beats were rebuilt. The voices and clips must be made again.':''),'ok')}
+  catch(e){setS('Restore failed: '+String((e&&e.message)||e).slice(0,160),'bad')}});
+$('#wipe').onclick=async function(){
+  if(!confirm('This permanently deletes everything saved by this tool in this browser: photo, voice sample, script, keys, settings, voices and clips. Continue?'))return;
+  await dbClear();
+  try{['ab5:pix','ab6:hf','ab7:vspace','ab7:space','ab7:ref'].forEach(function(k){localStorage.removeItem(k)})}catch(e){}
+  location.reload()};
+
+window.addEventListener('unhandledrejection',function(e){var m=String((e.reason&&e.reason.message)||e.reason||'');if(m)setS('Something went wrong: '+m.slice(0,200),'bad')});
+
+/* ---------- start: load everything that was saved ---------- */
+(async function init(){
+  $('#origin').textContent=(location.origin&&location.origin!=='null')?location.origin:location.href;
+  await dbOpen();
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  if(!DB){markSaved();return}
+  var s=await dbGet('settings'),fresh=!s;
+  if(fresh){
+    s={pix:lsGet('ab5:pix'),hf:lsGet('ab6:hf'),vspace:lsGet('ab7:vspace'),space:lsGet('ab7:space'),refText:lsGet('ab7:ref')};
+    if(!s.pix&&!s.hf&&!s.vspace&&!s.space&&!s.refText)s=null}
+  applySettings(s);
+  var p=await dbGet('photo');if(p){PHOTO=p;setFileInput($('#photoFile'),p);showPhoto()}
+  var v=await dbGet('voice');if(v){VOICE=v;setFileInput($('#voiceFile'),v);showVoice()}
+  var bs=await dbGet('beats');if(bs&&bs.length)await restoreBeats(bs);
+  if(fresh&&s)await dbSet('settings',getSettings());
+  var got=[];
+  if(s&&s.pix)got.push('Pixabay key');if(s&&s.hf)got.push('Hugging Face token');if(PHOTO)got.push('photo');if(VOICE)got.push('voice sample');
+  if(s&&s.script)got.push('script');if(BEATS.length)got.push(BEATS.length+' beats');
+  var na=BEATS.filter(function(b){return b.audio}).length;if(na)got.push(na+' voices made');
+  var cl=BEATS.filter(function(b){return b.clip}).length;if(cl)got.push(cl+' finished clips');
+  var el=$('#savedAt');
+  if(got.length){el.textContent='✓ Loaded from saved data: '+got.join(', ')+'.';el.className='status ok'}
+  else{el.textContent='Nothing saved yet at this address. Everything you add from now on is saved automatically.';el.className='status'}})();
+})();
+</script>
+</body>
+</html>

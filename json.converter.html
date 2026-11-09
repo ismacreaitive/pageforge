@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<!-- code.html — PageForge v2.1 — Code & Text to HTML, plus n8n workflow JSON mode (finds, repairs, checks and exports import-ready n8n JSON). v2.1: fixed the page showing its own code under VS Code Live Server (a closing page tag was written whole inside the script). Closing page tags are written in pieces inside the script so that Live Server does not insert its reload code inside it. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageForge — Code, Text and n8n JSON</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root{--bg:#0e1116;--panel:#151a21;--panel-2:#1c222b;--line:#262d38;--text:#e6e9ef;--muted:#8a94a6;--accent:#5b8cff;--accent-2:#7c5cff;--warn:#f5b84a;--err:#ff6b6b;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;margin-right:auto}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font:600 12px var(--mono)}
+.brand small{color:var(--muted);font-weight:500}
+select,input[type=text]{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+input[type=text]{width:140px}
+button{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border:none;font-weight:600}
+label.toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
+main{flex:1;display:flex;min-height:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+#left{width:45%;border-right:1px solid var(--line)}
+#right{flex:1;background:#0b0d11}
+.pane-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+#editor{flex:1;width:100%;resize:none;border:none;outline:none;background:var(--bg);color:var(--text);font:13.5px/1.6 var(--mono);padding:16px;tab-size:2;white-space:pre;overflow:auto}
+#editor.dragover{outline:2px dashed var(--accent);outline-offset:-10px}
+.stage{flex:1;display:flex;justify-content:center;padding:14px;min-height:0;overflow:auto}
+iframe{width:100%;height:100%;border:none;background:#fff;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.45);transition:width .25s;flex:none}
+.devices{display:flex;gap:6px}
+.devices button{padding:5px 9px;font-size:12px}
+.devices button.active{border-color:var(--accent);color:var(--accent)}
+#console{height:130px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font:12px/1.5 var(--mono);padding:6px 14px}
+#console.hidden{display:none}
+#console div{padding:3px 0;border-bottom:1px solid #1d232c;white-space:pre-wrap}
+.c-error{color:var(--err)}.c-warn{color:var(--warn)}.c-log,.c-info{color:var(--muted)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+#sampleData,#sampleN8n{display:none}
+@media(max-width:860px){main{flex-direction:column}#left{width:100%;height:45%;border-right:none;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">&lt;/&gt;</div>PageForge <small>code → HTML · n8n JSON, free</small></div>
+  <select id="mode">
+    <option value="auto">Auto-detect</option>
+    <option value="html">HTML / CSS / JS</option>
+    <option value="markdown">Markdown</option>
+    <option value="text">Plain text</option>
+    <option value="n8n">n8n workflow JSON</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="autorun" checked> Live</label>
+  <button id="runBtn">▶ Run</button>
+  <button id="sampleBtn">Sample</button>
+  <button id="sampleN8nBtn">n8n sample</button>
+  <button id="clearBtn">Clear</button>
+  <input type="text" id="filename" value="index">
+  <button id="copyBtn">Copy HTML</button>
+  <button id="openBtn">Open tab</button>
+  <button id="downloadBtn" class="primary">⬇ Download .html</button>
+</header>
+<main>
+  <section class="pane" id="left">
+    <div class="pane-head"><span>INPUT · paste code, AI output, Markdown, text or an n8n workflow · drop a file</span><span id="stats"></span></div>
+    <textarea id="editor" spellcheck="false" placeholder="Paste your code, text or n8n workflow JSON here..."></textarea>
+  </section>
+  <section class="pane" id="right">
+    <div class="pane-head">
+      <span id="detected">Preview</span>
+      <div class="devices">
+        <button data-w="100%" class="active">Desktop</button>
+        <button data-w="768px">Tablet</button>
+        <button data-w="390px">Mobile</button>
+        <button id="consoleToggle">Console <span id="errCount"></span></button>
+      </div>
+    </div>
+    <div class="stage"><iframe id="preview" title="Preview" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"></iframe></div>
+    <div id="console" class="hidden"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<pre id="sampleData">Sure! Here is a simple landing page:
+
+&#96;&#96;&#96;html
+&lt;section class="hero"&gt;
+  &lt;h1&gt;Hello, PageForge&lt;/h1&gt;
+  &lt;p&gt;Paste code from Gemini, ChatGPT or anywhere. Preview it. Download it. Free.&lt;/p&gt;
+  &lt;button id="cta"&gt;Click me&lt;/button&gt;
+&lt;/section&gt;
+&#96;&#96;&#96;
+
+&#96;&#96;&#96;css
+body{margin:0;font-family:system-ui,sans-serif}
+.hero{min-height:100vh;display:grid;place-content:center;text-align:center;gap:16px;padding:24px;background:linear-gradient(135deg,#5b8cff,#7c5cff);color:#fff}
+.hero h1{font-size:clamp(2rem,6vw,3.5rem);margin:0}
+.hero button{justify-self:center;padding:12px 28px;border:0;border-radius:999px;font-size:1rem;font-weight:600;cursor:pointer}
+&#96;&#96;&#96;
+
+&#96;&#96;&#96;javascript
+document.getElementById('cta').onclick = function(){ alert('It works!'); };
+console.log('Page loaded');
+&#96;&#96;&#96;</pre>
+
+<pre id="sampleN8n">Here is your workflow, ready to import:
+
+&#96;&#96;&#96;json
+{
+  "name": "Demo - hello webhook",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [0, 300],
+      "parameters": { "httpMethod": "GET", "path": "hello", "responseMode": "responseNode" }
+    },
+    {
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, 300],
+      "parameters": { "jsCode": "return [{ json: { message: "Hello" } }];", }
+    },
+    {
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "parameters": { "respondWith": "firstIncomingItem" }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Code", "type": "main", "index": 0 }]] },
+    "Code": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  }
+}
+&#96;&#96;&#96;
+
+Import it from the workflow menu in n8n.</pre>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var editor = $('editor'), frame = $('preview'), modeSel = $('mode'), con = $('console');
+var STORE = 'pageforge:draft';
+var errors = 0, timer;
+var FENCE = /```([\w+-]*)[^\n]*\n([\s\S]*?)```/g;
+var SO = '<' + 'script>', SC = '<' + '/script>';
+var BC = '</bo' + 'dy>', HC = '</ht' + 'ml>', HDC = '</he' + 'ad>';
+
+var SAMPLE = $('sampleData').textContent;
+var SAMPLE_N8N = $('sampleN8n').textContent;
+
+var READABLE_CSS = ['body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.7;color:#1f2328;background:#fff;margin:0}',
+'main{max-width:760px;margin:0 auto;padding:48px 24px}',
+'h1,h2,h3,h4{line-height:1.25;margin:1.6em 0 .6em}',
+'h1{font-size:2.2em;margin-top:0}',
+'p,ul,ol,blockquote,pre,table{margin:0 0 1.1em}',
+'a{color:#2f6feb}',
+'code{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f3f4f6;padding:.15em .4em;border-radius:5px;font-size:.9em}',
+'pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:10px;overflow:auto}',
+'pre code{background:none;padding:0;color:inherit}',
+'blockquote{border-left:4px solid #d0d7de;padding-left:16px;color:#57606a}',
+'table{border-collapse:collapse;width:100%}',
+'th,td{border:1px solid #d0d7de;padding:8px 12px;text-align:left}',
+'img{max-width:100%}'].join('\n');
+
+var BRIDGE = SO + '(function(){function s(t,a){try{parent.postMessage({__pv:1,type:t,msg:[].map.call(a,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error"].forEach(function(k){var o=console[k];console[k]=function(){s(k,arguments);o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled promise: "+(e.reason&&e.reason.message||e.reason)])})})();' + SC;
+
+var EMPTY = '<html><body style="margin:0;display:grid;place-content:center;height:100vh;font-family:system-ui;color:#8a94a6;background:#fafbfc">Your preview will appear here' + BC + HC;
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function looksLikeHtml(s){ return /<(!doctype|html|head|body|div|section|main|p|h[1-6]|style|script|span|a|img|ul|ol|table|form|button|header|nav|footer|svg)\b/i.test(s); }
+function isFullDoc(s){ return /<html[\s>]|<!doctype/i.test(s); }
+
+function injectBefore(html, tag, chunk, prependIfMissing){
+  var i = html.toLowerCase().lastIndexOf(tag);
+  if(i === -1) return prependIfMissing ? chunk + html : html + chunk;
+  return html.slice(0, i) + chunk + html.slice(i);
+}
+
+function fullDoc(html, css, js){
+  css = css || ''; js = js || '';
+  var title = escapeHtml(($('filename').value || 'Page').trim());
+  if(!isFullDoc(html)){
+    var out = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + title + '</title>\n';
+    if(css) out += '<style>\n' + css.trim() + '\n</style>\n';
+    out += HDC + '\n<body>\n' + html.trim() + '\n';
+    if(js) out += SO + '\n' + js.trim() + '\n' + SC + '\n';
+    out += BC + '\n' + HC;
+    return out;
+  }
+  if(css) html = injectBefore(html, HDC, '<style>\n' + css.trim() + '\n</style>\n', true);
+  if(js) html = injectBefore(html, BC, SO + '\n' + js.trim() + '\n' + SC + '\n');
+  return html;
+}
+
+/* =====================================================================
+   n8n WORKFLOW JSON: find, repair, check, export
+   ===================================================================== */
+var TV = { webhook:2, googleSheets:4.5, merge:3, code:2, respondToWebhook:1.1, set:3.4, httpRequest:4.2, 'if':2.2, 'switch':3.2, gmail:2.1, scheduleTrigger:1.2, manualTrigger:1, wait:1.1, splitInBatches:3, noOp:1, stickyNote:1, filter:2.2 };
+var CRED = /^(google|gmail|slack|telegram|airtable|notion|openAi|lmChat|anthropic|microsoft|outlook|hubspot|stripe|twilio|whatsApp|discord|emailSend|emailReadImap|postgres|mysql|mongoDb|supabase|github|gitlab|dropbox|asana|trello|jira|salesforce|shopify|wordPress)/i;
+
+function looksLikeN8n(s){
+  return /["\u201C\u201D]nodes["\u201C\u201D]\s*:\s*\[/.test(s) && (/["\u201C\u201D]connections["\u201C\u201D]\s*:/.test(s) || /n8n-nodes-base|@n8n\//.test(s));
+}
+function slug(s){ return String(s || 'workflow').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workflow'; }
+function uuid(){
+  if(window.crypto && crypto.randomUUID){ try{ return crypto.randomUUID(); }catch(e){} }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){ var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
+}
+function prettify(s){ s = String(s || 'Node').replace(/([a-z])([A-Z])/g, '$1 $2'); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function matchEnd(t, a){
+  var depth = 0, inStr = false, esc = false, i, c;
+  for(i = a; i < t.length; i++){
+    c = t.charAt(i);
+    if(inStr){ if(esc){ esc = false; } else if(c === '\\'){ esc = true; } else if(c === '"'){ inStr = false; } continue; }
+    if(c === '"'){ inStr = true; continue; }
+    if(c === '{' || c === '['){ depth++; }
+    else if(c === '}' || c === ']'){ depth--; if(depth === 0) return i; }
+  }
+  return -1;
+}
+function extractJson(src){
+  var m, best = null;
+  FENCE.lastIndex = 0;
+  while((m = FENCE.exec(src)) !== null){ if(/["\u201C\u201D]nodes["\u201C\u201D]|n8n-nodes-base/.test(m[2])){ best = m[2]; break; } }
+  FENCE.lastIndex = 0;
+  var t = (best !== null ? best : src).trim();
+  var ni = t.search(/["\u201C\u201D]nodes["\u201C\u201D]\s*:/), a = -1;
+  if(ni >= 0) a = t.lastIndexOf('{', ni);
+  if(a < 0) a = t.search(/[{\[]/);
+  if(a < 0) return '';
+  var e = matchEnd(t, a);
+  var out = e >= 0 ? t.slice(a, e + 1) : t.slice(a).replace(/```\s*$/, '');
+  return out;
+}
+
+function repairJson(text){
+  var out = '', i = 0, n = text.length, stack = [], inStr = false, smart = false, c, cnt = {};
+  function bump(k){ cnt[k] = (cnt[k] || 0) + 1; }
+  function nextSig(from){ var j = from; while(j < n && /\s/.test(text.charAt(j))) j++; return j; }
+  function closesHere(q){
+    var j = nextSig(q + 1);
+    if(j >= n) return true;
+    if(',:}]'.indexOf(text.charAt(j)) < 0) return false;
+    while(j < n && (/\s/.test(text.charAt(j)) || ',:}]'.indexOf(text.charAt(j)) >= 0)) j++;
+    if(j >= n) return true;
+    return '"{[-0123456789tfn'.indexOf(text.charAt(j)) >= 0;
+  }
+  while(i < n){
+    c = text.charAt(i);
+    if(inStr){
+      if(c === '\\'){
+        var nx = text.charAt(i + 1);
+        if(nx === ''){ out += '\\\\'; i++; continue; }
+        if(nx === "'"){ out += "'"; bump('badesc'); }
+        else if('"\\/bfnrtu'.indexOf(nx) >= 0){ out += c + nx; }
+        else { out += '\\\\' + nx; bump('badesc'); }
+        i += 2; continue;
+      }
+      if(c === '"' || (smart && c === '\u201D')){
+        if(c === '\u201D' || closesHere(i)){ inStr = false; out += '"'; }
+        else { out += '\\"'; bump('innerq'); }
+        i++; continue;
+      }
+      if(c === '\n'){ out += '\\n'; bump('newlines'); i++; continue; }
+      if(c === '\r'){ i++; continue; }
+      if(c === '\t'){ out += '\\t'; i++; continue; }
+      if(c.charCodeAt(0) < 32){ out += '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4); i++; continue; }
+      out += c; i++; continue;
+    }
+    if(c === '"' || c === '\u201C' || c === '\u201D'){
+      inStr = true; smart = (c !== '"'); if(smart) bump('curly');
+      out += '"'; i++; continue;
+    }
+    if(c === '/' && text.charAt(i + 1) === '/'){ while(i < n && text.charAt(i) !== '\n') i++; bump('comments'); continue; }
+    if(c === '/' && text.charAt(i + 1) === '*'){ var e = text.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; bump('comments'); continue; }
+    if(c === ','){
+      var j = nextSig(i + 1), ch = text.charAt(j);
+      if(j >= n || ch === '}' || ch === ']'){ bump('trailing'); i++; continue; }
+      out += c; i++; continue;
+    }
+    if(c === '{' || c === '['){ stack.push(c); out += c; i++; continue; }
+    if(c === '}' || c === ']'){ stack.pop(); out += c; i++; continue; }
+    if(c === '\u00a0'){ out += ' '; i++; continue; }
+    if(c === '\uFEFF'){ i++; continue; }
+    out += c; i++;
+  }
+  if(inStr){ out += '"'; bump('closers'); }
+  out = out.replace(/,\s*$/, '');
+  while(stack.length){ var o = stack.pop(); out += (o === '{' ? '}' : ']'); bump('closers'); }
+  var M = {
+    curly: 'Replaced curly quotes with straight quotes',
+    trailing: 'Removed trailing commas',
+    comments: 'Removed comments (JSON does not allow them)',
+    newlines: 'Turned line breaks inside text into \\n',
+    innerq: 'Escaped quotes that were inside text',
+    badesc: 'Fixed invalid backslash escapes',
+    closers: 'Added missing closing brackets (the text may have been cut off, so check the end)'
+  };
+  var notes = [];
+  Object.keys(cnt).forEach(function(k){ notes.push(M[k] + ' (' + cnt[k] + 'x)'); });
+  return { text: out, notes: notes };
+}
+
+function analyseN8n(src){
+  var R = { errors: [], fixes: [], warns: [], infos: [], edges: [], wf: null, json: '', name: '', nconn: 0 };
+  var raw = extractJson(src), data;
+  if(!raw){ R.errors.push('No JSON found. Paste the workflow JSON (it starts with a { sign).'); return R; }
+  try{ data = JSON.parse(raw); }
+  catch(e1){
+    var rep = repairJson(raw);
+    try{ data = JSON.parse(rep.text); rep.notes.forEach(function(x){ R.fixes.push(x); }); }
+    catch(e2){
+      var msg = String(e2.message || e2), pm = msg.match(/position (\d+)/), snip = '';
+      if(pm){ var p = +pm[1]; snip = rep.text.slice(Math.max(0, p - 50), p) + ' <<< HERE >>> ' + rep.text.slice(p, p + 50); }
+      R.errors.push('The JSON cannot be read: ' + msg + (snip ? '. Near: ' + snip.replace(/\s+/g, ' ') : ''));
+      R.errors.push('Ask the AI again: "Give me the complete n8n workflow as ONE JSON code block and nothing else."');
+      return R;
+    }
+  }
+  if(Array.isArray(data)){
+    if(data.length && data[0] && Array.isArray(data[0].nodes)){
+      if(data.length > 1) R.warns.push('The file holds ' + data.length + ' workflows. Only the first one is used.');
+      data = data[0];
+    } else if(data.length && data[0] && typeof data[0] === 'object' && data[0].type){
+      data = { nodes: data, connections: {} };
+      R.fixes.push('Found only a list of nodes, so it was wrapped into a workflow');
+    }
+  }
+  if(data && typeof data === 'object' && !Array.isArray(data.nodes) && data.workflow && Array.isArray(data.workflow.nodes)){
+    data = data.workflow; R.fixes.push('Opened the "workflow" wrapper');
+  }
+  if(!data || typeof data !== 'object' || !Array.isArray(data.nodes)){ R.errors.push('This JSON has no "nodes" list, so it is not an n8n workflow.'); return R; }
+  if(!data.nodes.length){ R.errors.push('The "nodes" list is empty.'); return R; }
+
+  var nodes = data.nodes, seenN = {}, seenId = {}, cParams = 0, cIds = 0, cHooks = 0, cPos = 0, cVer = [], shorts = {};
+  nodes.forEach(function(nd, i){
+    if(!nd || typeof nd !== 'object' || Array.isArray(nd)){ R.errors.push('Node number ' + (i + 1) + ' is not a proper object.'); return; }
+    var short = '';
+    if(typeof nd.type !== 'string' || !nd.type.trim()){
+      R.errors.push('Node ' + (nd.name ? '"' + nd.name + '"' : 'number ' + (i + 1)) + ' has no "type" (for example n8n-nodes-base.webhook).');
+    } else {
+      nd.type = nd.type.trim();
+      if(nd.type.indexOf('.') < 0){
+        if(TV[nd.type] !== undefined){ R.fixes.push('Added the package name: "' + nd.type + '" is now "n8n-nodes-base.' + nd.type + '"'); nd.type = 'n8n-nodes-base.' + nd.type; }
+        else R.warns.push('Node type "' + nd.type + '" has no package name. Real n8n types look like n8n-nodes-base.webhook.');
+      }
+      short = nd.type.split('.').pop();
+    }
+    if(typeof nd.name !== 'string' || !nd.name.trim()){ nd.name = prettify(short || 'Node'); R.fixes.push('Gave node number ' + (i + 1) + ' the name "' + nd.name + '"'); }
+    var base = nd.name, k = 2;
+    if(seenN[nd.name]){
+      while(seenN[base + ' ' + k]) k++;
+      nd.name = base + ' ' + k;
+      R.warns.push('Two nodes were called "' + base + '". The second is now "' + nd.name + '". Check that its connections are right.');
+    }
+    seenN[nd.name] = nd; shorts[nd.name] = short;
+    if(typeof nd.typeVersion === 'string' && isFinite(nd.typeVersion)) nd.typeVersion = Number(nd.typeVersion);
+    if(typeof nd.typeVersion !== 'number' || !isFinite(nd.typeVersion)){
+      var dv = TV[short];
+      if(dv !== undefined){ nd.typeVersion = dv; cVer.push(nd.name + ' = ' + dv); }
+      else { nd.typeVersion = 1; R.warns.push('Node "' + nd.name + '" had no typeVersion. 1 was used, which may be too old. Check the node after importing.'); }
+    }
+    if(!nd.parameters || typeof nd.parameters !== 'object' || Array.isArray(nd.parameters)){ nd.parameters = {}; cParams++; }
+    if(typeof nd.id !== 'string' || !nd.id || seenId[nd.id]){ nd.id = uuid(); cIds++; }
+    seenId[nd.id] = 1;
+    if(/^(webhook|formTrigger|chatTrigger)$/.test(short) && !nd.webhookId){ nd.webhookId = uuid(); cHooks++; }
+    var ps = nd.position;
+    if(Array.isArray(ps) && ps.length === 2 && isFinite(ps[0]) && isFinite(ps[1])) nd.position = [Number(ps[0]), Number(ps[1])];
+    else { nd.position = null; cPos++; }
+  });
+  if(R.errors.length) return R;
+  if(cVer.length) R.fixes.push('Added a typeVersion (a common one, please check) to: ' + cVer.join(', '));
+  if(cParams) R.fixes.push('Added empty parameters to ' + cParams + ' node' + (cParams > 1 ? 's' : ''));
+  if(cIds) R.fixes.push('Added or replaced ' + cIds + ' node id' + (cIds > 1 ? 's' : ''));
+  if(cHooks) R.fixes.push('Added a webhookId to ' + cHooks + ' trigger node' + (cHooks > 1 ? 's' : ''));
+
+  /* connections */
+  var lower = {};
+  Object.keys(seenN).forEach(function(nm){ lower[nm.trim().toLowerCase()] = nm; });
+  function resolve(nm){
+    if(typeof nm !== 'string') return null;
+    if(seenN[nm]) return nm;
+    return lower[nm.trim().toLowerCase()] || null;
+  }
+  var conns = data.connections;
+  if(!conns || typeof conns !== 'object' || Array.isArray(conns)){
+    if(conns !== undefined && conns !== null) R.fixes.push('The "connections" part was not an object, so it was replaced by an empty one');
+    else R.fixes.push('Added an empty "connections" part');
+    conns = {};
+  }
+  var removed = [], renamed = [], addedTI = 0, wrapped = 0, newConns = {};
+  Object.keys(conns).forEach(function(srcName){
+    var real = resolve(srcName);
+    if(!real){ removed.push('from "' + srcName + '" (no such node)'); return; }
+    if(real !== srcName) renamed.push(srcName + ' → ' + real);
+    var outs = conns[srcName];
+    if(!outs || typeof outs !== 'object' || Array.isArray(outs)) return;
+    var res = newConns[real] || (newConns[real] = {});
+    Object.keys(outs).forEach(function(t){
+      var arr = outs[t];
+      if(!Array.isArray(arr)) return;
+      if(arr.length && arr.every(function(x){ return x && typeof x === 'object' && !Array.isArray(x); }) ){ arr = [arr]; wrapped++; }
+      res[t] = arr.map(function(branch, bi){
+        if(!Array.isArray(branch)) return [];
+        var keep = [];
+        branch.forEach(function(cn){
+          if(typeof cn === 'string') cn = { node: cn };
+          if(!cn || typeof cn !== 'object') return;
+          var to = resolve(cn.node);
+          if(!to){ removed.push('from "' + real + '" to "' + cn.node + '" (no such node)'); return; }
+          if(to !== cn.node) renamed.push(cn.node + ' → ' + to);
+          cn.node = to;
+          if(!cn.type){ cn.type = t || 'main'; addedTI++; }
+          if(typeof cn.index !== 'number'){ cn.index = 0; addedTI++; }
+          keep.push(cn);
+          R.edges.push({ from: real, to: to, idx: cn.index });
+        });
+        return keep;
+      });
+    });
+  });
+  if(wrapped) R.fixes.push('Fixed the format of ' + wrapped + ' connection list' + (wrapped > 1 ? 's' : ''));
+  if(renamed.length) R.fixes.push('Matched node names written with different capital letters or spaces: ' + renamed.join(', '));
+  if(addedTI) R.fixes.push('Added a missing "type" or "index" to ' + addedTI + ' connection' + (addedTI > 1 ? 's' : ''));
+  if(removed.length) R.fixes.push('Removed connections that pointed to nodes that do not exist: ' + removed.join('; '));
+  data.connections = newConns;
+  R.nconn = R.edges.length;
+
+  /* positions for nodes that had none */
+  var lvl = {};
+  nodes.forEach(function(n){ lvl[n.name] = 0; });
+  for(var pass = 0; pass < nodes.length; pass++){
+    var changed = false;
+    R.edges.forEach(function(e){ if(lvl[e.to] < lvl[e.from] + 1 && lvl[e.from] + 1 < nodes.length){ lvl[e.to] = lvl[e.from] + 1; changed = true; } });
+    if(!changed) break;
+  }
+  var slot = {};
+  nodes.forEach(function(n){
+    if(!n.position){ var L = lvl[n.name] || 0; slot[L] = slot[L] || 0; n.position = [L * 260, 300 + slot[L] * 160]; slot[L]++; }
+  });
+  if(cPos) R.fixes.push('Placed ' + cPos + ' node' + (cPos > 1 ? 's' : '') + ' on the canvas (they had no position)');
+
+  if(typeof data.name !== 'string' || !data.name.trim()){ data.name = 'Imported workflow'; R.fixes.push('Gave the workflow a name: "Imported workflow"'); }
+  if(!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)){ data.settings = { executionOrder: 'v1' }; R.fixes.push('Added settings (executionOrder v1)'); }
+
+  var out = { name: data.name, nodes: nodes, connections: data.connections, pinData: (data.pinData && typeof data.pinData === 'object') ? data.pinData : {}, settings: data.settings };
+  if(data.meta) out.meta = data.meta;
+  if(data.staticData) out.staticData = data.staticData;
+  var dropped = ['id', 'versionId', 'active', 'tags', 'shared', 'createdAt', 'updatedAt', 'isArchived'].filter(function(k){ return data[k] !== undefined; });
+  if(dropped.length) R.fixes.push('Left out fields that n8n sets by itself: ' + dropped.join(', '));
+
+  /* checks */
+  var hasIn = {}, hasOut = {}, maxIdx = {};
+  R.edges.forEach(function(e){ hasOut[e.from] = 1; hasIn[e.to] = 1; maxIdx[e.to] = Math.max(maxIdx[e.to] === undefined ? -1 : maxIdx[e.to], e.idx); });
+  var trig = nodes.some(function(n){ var s = shorts[n.name]; return /trigger/i.test(s) || /^(webhook|cron|start)$/i.test(s); });
+  if(!trig) R.warns.push('There is no trigger node (Webhook, Schedule, Manual trigger...). The workflow will not start by itself.');
+  var orphans = nodes.filter(function(n){ return nodes.length > 1 && !hasIn[n.name] && !hasOut[n.name] && shorts[n.name] !== 'stickyNote'; }).map(function(n){ return n.name; });
+  if(orphans.length) R.warns.push('Not connected to anything: ' + orphans.join(', '));
+  nodes.forEach(function(n){
+    if(shorts[n.name] === 'merge' && n.typeVersion >= 3){
+      var ni = Number(n.parameters.numberInputs) || 2;
+      if(maxIdx[n.name] !== undefined && maxIdx[n.name] >= ni) R.warns.push('Merge "' + n.name + '" receives data on input ' + (maxIdx[n.name] + 1) + ' but numberInputs is only ' + ni + '.');
+    }
+  });
+
+  var AF = null;
+  try{ AF = new Function('return Object.getPrototypeOf(async function(){}).constructor')(); }catch(e){}
+  nodes.forEach(function(n){
+    if(shorts[n.name] !== 'code') return;
+    var p = n.parameters || {};
+    if(p.language === 'python' || p.language === 'pythonNative') return;
+    var code = typeof p.jsCode === 'string' ? p.jsCode : '';
+    if(!code.trim()) return;
+    if(AF){
+      try{ new AF('$', '$input', '$json', '$items', '$node', '$env', '$now', '$today', '$workflow', '$execution', '$prevNode', '$runIndex', '$itemIndex', '$binary', code); }
+      catch(e){ R.warns.push('The code in "' + n.name + '" has a JavaScript error: ' + e.message); return; }
+    }
+    if(!/\breturn\b/.test(code)) R.warns.push('The code in "' + n.name + '" has no return. A Code node must return its items.');
+  });
+
+  var rl = [];
+  function walk(o, depth, cnt){
+    if(!o || typeof o !== 'object' || depth > 8) return;
+    if(o.__rl === true && (o.value === '' || o.value === null || o.value === undefined)){ cnt.n++; return; }
+    Object.keys(o).forEach(function(k){ walk(o[k], depth + 1, cnt); });
+  }
+  nodes.forEach(function(n){ var c = { n: 0 }; walk(n.parameters, 0, c); if(c.n) rl.push(n.name); });
+  if(rl.length) R.warns.push('Pick the document, sheet or list again on: ' + rl.join(', ') + ' (they are empty in the file).');
+
+  var needCred = [];
+  nodes.forEach(function(n){
+    var s = shorts[n.name], p = n.parameters || {};
+    if(n.credentials || CRED.test(s) || (s === 'httpRequest' && p.authentication && p.authentication !== 'none')) needCred.push(n.name);
+  });
+  if(needCred.length) R.warns.push('Connect your own credentials on: ' + needCred.join(', ') + '. A JSON file cannot carry logins, and credentials from another n8n do not exist in yours.');
+
+  var sheets = nodes.filter(function(n){ return shorts[n.name] === 'googleSheets' && !n.alwaysOutputData; }).map(function(n){ return n.name; });
+  if(sheets.length) R.infos.push('Google Sheets nodes (' + sheets.join(', ') + '): a tab with no rows gives no output, and the rest of the workflow may not run. If a tab can be empty, turn on Always Output Data in that node settings.');
+
+  var hooks = nodes.filter(function(n){ return shorts[n.name] === 'webhook'; });
+  var resp = nodes.filter(function(n){ return shorts[n.name] === 'respondToWebhook'; });
+  hooks.forEach(function(w){
+    var p = w.parameters || {};
+    if(!p.path) R.warns.push('Webhook "' + w.name + '" has no path.');
+    if(p.responseMode === 'responseNode' && !resp.length) R.warns.push('Webhook "' + w.name + '" waits for a Respond to Webhook node, but there is none.');
+    if(resp.length && p.responseMode !== 'responseNode') R.warns.push('There is a Respond to Webhook node, but webhook "' + w.name + '" is not set to respond using that node.');
+    var open = !p.authentication || p.authentication === 'none';
+    R.infos.push('Webhook "' + w.name + '": ' + (p.httpMethod || 'GET') + ' /' + (p.path || '') + '. The test URL works only while you listen for a test event. The production URL works only after the workflow is published.' + (open ? ' It has no authentication, so anyone with the URL can call it. That is fine for a demo, not for real data.' : ''));
+  });
+
+  R.json = JSON.stringify(out, null, 2);
+  R.name = out.name; R.wf = out;
+  return R;
+}
+
+function reportHtml(R){
+  var h = [], st = R.errors.length ? 'no' : (R.fixes.length ? 'fx' : 'ok');
+  var title = R.errors.length ? 'Cannot be imported yet' : (R.fixes.length ? 'Ready to import (after ' + R.fixes.length + ' automatic fix' + (R.fixes.length > 1 ? 'es' : '') + ')' : 'Ready to import');
+  function ul(arr, cls){ return '<div class="card ' + (cls || '') + '"><ul>' + arr.map(function(x){ return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul></div>'; }
+  h.push('<div class="w"><h1>n8n workflow check</h1>');
+  h.push('<div class="ban ' + st + '">' + escapeHtml(title) + '</div>');
+  if(R.wf){
+    h.push('<div class="chips"><span class="chip">' + escapeHtml(R.name) + '</span><span class="chip">' + R.wf.nodes.length + ' nodes</span><span class="chip">' + R.nconn + ' connections</span><span class="chip">' + R.fixes.length + ' fixes</span><span class="chip">' + R.warns.length + ' to check</span></div>');
+  }
+  if(R.errors.length){ h.push('<h2>Problems</h2>' + ul(R.errors, 'err')); }
+  if(R.fixes.length){ h.push('<h2>Fixed automatically</h2>' + ul(R.fixes)); }
+  if(R.warns.length){ h.push('<h2>Check after importing</h2>' + ul(R.warns, 'warn')); }
+  if(R.infos.length){ h.push('<h2>Good to know</h2>' + ul(R.infos)); }
+  if(R.wf){
+    var groups = {}, order = [];
+    R.edges.forEach(function(e){ if(!groups[e.from]){ groups[e.from] = []; order.push(e.from); } if(groups[e.from].indexOf(e.to) < 0) groups[e.from].push(e.to); });
+    h.push('<h2>How the nodes connect</h2>');
+    h.push(order.length ? ul(order.map(function(s){ return s + '  →  ' + groups[s].join(', '); })) : '<div class="card">No connections.</div>');
+    var rows = R.wf.nodes.map(function(n){ return '<tr><td>' + escapeHtml(n.name) + '</td><td><code>' + escapeHtml(n.type) + '</code></td><td>' + escapeHtml(n.typeVersion) + '</td><td>' + escapeHtml(n.position.join(', ')) + '</td></tr>'; }).join('');
+    h.push('<h2>Nodes</h2><div class="card"><table><tr><th>Name</th><th>Type</th><th>Version</th><th>Position</th></tr>' + rows + '</table></div>');
+    h.push('<h2>How to import</h2><div class="card"><ol><li><b>As a file:</b> press Download .json. In n8n open the workflow menu (the three dots) and choose Import from File.</li><li><b>Or paste:</b> press Copy JSON, click an empty spot on the n8n canvas and press Ctrl + V.</li><li>Then go through the check list above, save, and test the workflow.</li></ol></div>');
+    h.push('<h2>Clean JSON</h2><div class="card"><details><summary>Show the JSON that will be downloaded</summary><pre>' + escapeHtml(R.json) + '</pre></details></div>');
+  }
+  h.push('</div>');
+  var css = 'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:#f4f6fa;color:#1d2433;line-height:1.55}.w{max-width:900px;margin:0 auto;padding:22px 18px 60px}h1{font-size:22px;margin:0 0 10px}h2{font-size:16px;margin:24px 0 8px}.ban{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-weight:700}.ok{background:#dff5e8;color:#14532d}.fx{background:#e3f0ff;color:#1e3a8a}.no{background:#ffe3e6;color:#9f1239}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}.chip{background:#fff;border:1px solid #dde3ee;border-radius:99px;padding:3px 12px;font-size:13px;font-weight:600}ul,ol{margin:0;padding-left:20px}li{margin:5px 0;overflow-wrap:anywhere}.card{background:#fff;border:1px solid #dde3ee;border-radius:12px;padding:12px 16px}.err li{color:#9f1239}.warn li{color:#8a5200}table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{border-bottom:1px solid #e5e9f1;padding:6px 8px;text-align:left}th{background:#f1f4f9}code,pre{font-family:ui-monospace,Menlo,Consolas,monospace}pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;overflow:auto;font-size:12px;max-height:420px}details summary{cursor:pointer;font-weight:700}';
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>n8n workflow check</title><style>' + css + '</style>' + HDC + '<body>' + h.join('') + BC + HC;
+}
+
+/* =====================================================================
+   Build: auto-detect, HTML / Markdown / text, and n8n
+   ===================================================================== */
+function build(raw, mode){
+  var src = raw.trim();
+  if(!src) return { doc: '', kind: 'Empty' };
+  if(mode === 'n8n' || (mode === 'auto' && looksLikeN8n(src))){
+    var R = analyseN8n(src);
+    var bad = R.errors.length > 0;
+    return {
+      doc: reportHtml(R),
+      kind: bad ? 'n8n workflow · problems found' : 'n8n workflow JSON · ready' + (R.fixes.length ? ' (' + R.fixes.length + ' fixes)' : ''),
+      n8n: true,
+      file: bad ? null : { text: R.json, ext: 'json', mime: 'application/json;charset=utf-8', base: slug(R.name) }
+    };
+  }
+  if(mode === 'auto' || mode === 'html'){
+    var html = '', css = '', js = '', m;
+    FENCE.lastIndex = 0;
+    while((m = FENCE.exec(src)) !== null){
+      var lang = (m[1] || '').toLowerCase(); var code = m[2];
+      if(lang === 'css') css += code + '\n';
+      else if(/^(js|javascript|jsx)$/.test(lang)) js += code + '\n';
+      else if(/^(html|htm|xml|svg)?$/.test(lang) || looksLikeHtml(code)) html += code + '\n';
+    }
+    if(html || css || js) return { doc: fullDoc(html, css, js), kind: 'AI code blocks merged' };
+  }
+  if(mode === 'html' || (mode === 'auto' && looksLikeHtml(src))){
+    var start = src.search(/<!doctype|<html/i);
+    if(start > 0){
+      var end = src.toLowerCase().lastIndexOf(HC);
+      src = src.slice(start, end > -1 ? end + 7 : undefined);
+    }
+    return { doc: fullDoc(src), kind: isFullDoc(src) ? 'Full HTML document' : 'HTML snippet wrapped' };
+  }
+  if(mode === 'text'){
+    var body = src.split(/\n{2,}/).map(function(p){ return '<p>' + escapeHtml(p).replace(/\n/g, '<br>') + '</p>'; }).join('\n');
+    return { doc: fullDoc('<main>\n' + body + '\n</main>', READABLE_CSS), kind: 'Plain text to HTML' };
+  }
+  var mdBody = window.marked ? marked.parse(src) : '<pre>' + escapeHtml(src) + '</pre>';
+  return { doc: fullDoc('<main>\n' + mdBody + '\n</main>', READABLE_CSS), kind: 'Markdown to HTML' };
+}
+
+function current(){ return build(editor.value, modeSel.value); }
+function withBridge(doc){ var m = doc.match(/<head[^>]*>/i); return m ? doc.replace(m[0], m[0] + BRIDGE) : BRIDGE + doc; }
+function clearConsole(){ errors = 0; con.innerHTML = ''; $('errCount').textContent = ''; }
+function syncButtons(r){
+  $('downloadBtn').textContent = r.n8n ? '⬇ Download .json' : '⬇ Download .html';
+  $('copyBtn').textContent = r.n8n ? 'Copy JSON' : 'Copy HTML';
+}
+
+function render(){
+  var r = current();
+  clearConsole();
+  frame.srcdoc = r.doc ? withBridge(r.doc) : EMPTY;
+  $('detected').textContent = 'Preview · ' + r.kind;
+  syncButtons(r);
+  try { localStorage.setItem(STORE, editor.value); } catch(e){}
+  updateStats();
+}
+function updateStats(){ var v = editor.value; $('stats').textContent = (v ? v.split('\n').length : 0) + ' lines · ' + v.length + ' chars'; }
+function schedule(){ updateStats(); if(!$('autorun').checked) return; clearTimeout(timer); timer = setTimeout(render, 400); }
+function fileName(r){
+  var n = ($('filename').value || 'index').trim().replace(/[^\w.-]+/g, '-');
+  if(r && r.file){
+    if(!n || n === 'index') n = r.file.base || 'workflow';
+    return n.replace(/\.(html?|json)$/i, '') + '.json';
+  }
+  return /\.html?$/i.test(n) ? n : n + '.html';
+}
+function toast(msg){ var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 2200); }
+
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d || !d.__pv || e.source !== frame.contentWindow) return;
+  var row = document.createElement('div');
+  row.className = 'c-' + d.type;
+  row.textContent = (d.type === 'error' ? '✖ ' : d.type === 'warn' ? '⚠ ' : '› ') + d.msg;
+  con.appendChild(row); con.scrollTop = con.scrollHeight;
+  if(d.type === 'error'){ errors++; $('errCount').textContent = '(' + errors + ')'; con.classList.remove('hidden'); }
+});
+
+editor.addEventListener('input', schedule);
+editor.addEventListener('keydown', function(e){
+  if(e.key === 'Tab'){ e.preventDefault(); editor.setRangeText('  ', editor.selectionStart, editor.selectionEnd, 'end'); schedule(); }
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); render(); }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); $('downloadBtn').click(); }
+});
+editor.addEventListener('dragover', function(e){ e.preventDefault(); editor.classList.add('dragover'); });
+editor.addEventListener('dragleave', function(){ editor.classList.remove('dragover'); });
+editor.addEventListener('drop', function(e){
+  e.preventDefault(); editor.classList.remove('dragover');
+  var f = e.dataTransfer.files[0]; if(!f) return;
+  f.text().then(function(txt){
+    editor.value = txt;
+    $('filename').value = f.name.replace(/\.[^.]+$/, '');
+    if(/\.md$/i.test(f.name)) modeSel.value = 'markdown';
+    else if(/\.json$/i.test(f.name)) modeSel.value = 'auto';
+    render(); toast('Loaded ' + f.name);
+  });
+});
+
+modeSel.onchange = render;
+$('autorun').onchange = function(){ if($('autorun').checked) render(); };
+$('runBtn').onclick = render;
+$('sampleBtn').onclick = function(){ editor.value = SAMPLE; modeSel.value = 'auto'; render(); };
+$('sampleN8nBtn').onclick = function(){ editor.value = SAMPLE_N8N; modeSel.value = 'auto'; render(); };
+$('clearBtn').onclick = function(){ editor.value = ''; render(); editor.focus(); };
+$('consoleToggle').onclick = function(){ con.classList.toggle('hidden'); };
+
+$('downloadBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to download yet');
+  if(r.n8n && !r.file) return toast('Fix the problems in the report first');
+  var text = r.file ? r.file.text : r.doc, mime = r.file ? r.file.mime : 'text/html;charset=utf-8';
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = fileName(r);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  toast('Downloaded ' + fileName(r));
+};
+$('copyBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to copy yet');
+  if(r.n8n && !r.file) return toast('Fix the problems in the report first');
+  var text = r.file ? r.file.text : r.doc;
+  if(navigator.clipboard){ navigator.clipboard.writeText(text).then(function(){ toast(r.file ? 'JSON copied. In n8n click the canvas and press Ctrl + V' : 'HTML copied'); }, function(){ toast('Copy blocked'); }); }
+  else toast('Copy not supported');
+};
+$('openBtn').onclick = function(){
+  var r = current(); if(!r.doc) return toast('Nothing to open yet');
+  window.open(URL.createObjectURL(new Blob([r.doc], { type: 'text/html' })), '_blank');
+};
+
+var btns = document.querySelectorAll('.devices button[data-w]');
+for(var i = 0; i < btns.length; i++){
+  (function(b){ b.onclick = function(){ for(var j = 0; j < btns.length; j++) btns[j].classList.remove('active'); b.classList.add('active'); frame.style.width = b.dataset.w; }; })(btns[i]);
+}
+
+var saved = null;
+try { saved = localStorage.getItem(STORE); } catch(e){}
+editor.value = saved || SAMPLE;
+render();
+})();
+</script>
+</body>
+</html>

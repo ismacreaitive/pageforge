@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThumbForge — Thumbnails, Titles, Descriptions & Tags</title>
+<link rel="stylesheet" href="forge.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Montserrat:wght@900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+.tabs{display:flex;gap:6px}
+.tabs button.on{border-color:var(--accent);color:var(--accent);background:#1f2633}
+.view{flex:1;min-height:0;display:flex}
+#viewVideo,#viewThumb{flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;overflow:auto;background:#0b0d11}
+#video{display:block;max-width:100%;max-height:calc(100vh - 320px);border-radius:8px;background:#000}
+#thumb{max-width:100%;max-height:calc(100vh - 200px);border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:grab;touch-action:none}
+#grabRow{flex:none;width:min(560px,100%)}
+.strip{display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px;flex:none}
+.strip img{height:72px;border-radius:6px;border:2px solid transparent;cursor:pointer;flex:none}
+.strip img:hover{border-color:var(--accent)}
+#viewText{flex-direction:column;gap:12px;padding:18px;overflow:auto}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:8px;flex:none}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.card-head span{display:flex;align-items:center;gap:8px}
+.card-head small{color:var(--muted);font-weight:400}
+.card-head small.over{color:var(--warn)}
+.card textarea{line-height:1.55}
+.muted{color:var(--muted);font-size:13px;line-height:1.6}
+.sec{font-size:13px;font-weight:700;margin-top:4px}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">🖼️</div>ThumbForge <small>thumbnails · titles · descriptions · tags · hashtags</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,image/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🖼️</div><strong>Drop your video (or a photo) here</strong><span>or click to choose</span></label>
+  <div class="file-info" id="fileInfo">Nothing selected</div>
+
+  <div class="sec">1 · Thumbnail</div>
+  <div><div class="label">Size</div>
+    <select id="format"><option value="yt">YouTube (1280×720)</option><option value="vert">TikTok / Reels / Shorts cover (1080×1920)</option><option value="ig">Instagram post (1080×1350)</option><option value="sq">Square (1080×1080)</option><option value="wide">X / Facebook (1200×675)</option></select>
+  </div>
+  <div><div class="label">Headline</div><input type="text" id="line1" placeholder="e.g. I TRIED THIS FOR 30 DAYS"></div>
+  <div><div class="label">Highlight line (optional)</div><input type="text" id="line2" placeholder="e.g. AND THIS HAPPENED"></div>
+  <div class="row">
+    <div><div class="label">Font</div><select id="font"><option value="anton">Anton (bold)</option><option value="bebas">Bebas Neue (tall)</option><option value="mont">Montserrat Black</option><option value="impact">Impact (classic)</option></select></div>
+    <div><div class="label">Text style</div><select id="scheme"><option value="wy">White + yellow</option><option value="red">White + red box</option><option value="yw">Yellow + white</option><option value="box">Black on yellow boxes</option></select></div>
+  </div>
+  <div class="row">
+    <div><div class="label">Text position</div><select id="pos"><option value="left">Left</option><option value="right">Right</option><option value="center">Centre</option><option value="top">Top</option><option value="bottom">Bottom</option></select></div>
+    <div><div class="label">Badge (optional)</div><input type="text" id="badge" placeholder="e.g. NEW!" maxlength="14"></div>
+  </div>
+  <label class="slider">Text size <input type="range" id="tsize" min="6" max="22" value="13"></label>
+  <label class="slider">Zoom <input type="range" id="zoom" min="100" max="250" value="100"></label>
+  <label class="check"><input type="checkbox" id="boost" checked> Make the picture pop (contrast and colour)</label>
+  <label class="check"><input type="checkbox" id="fade" checked> Dark fade behind the text</label>
+  <div class="row"><button class="primary" id="pngBtn">⬇ PNG</button><button class="primary" id="jpgBtn">⬇ JPG</button><button id="zipBtn">⬇ All sizes</button></div>
+
+  <div class="sec">2 · Title, description &amp; tags</div>
+  <div class="row">
+    <div><div class="label">Channel / brand</div><input type="text" id="channel" placeholder="e.g. Forge Tips"></div>
+    <div><div class="label">Main topic (optional)</div><input type="text" id="topic" placeholder="e.g. solar panels"></div>
+  </div>
+  <div><div class="label">Or paste your script / summary (optional)</div><textarea id="script" rows="3" placeholder="If you paste text here, the video is not listened to (faster)."></textarea></div>
+  <div class="row">
+    <div><div class="label">Language spoken</div><select id="lang"><option value="english" selected>English</option><option value="auto">Detect</option><option value="french">French</option><option value="spanish">Spanish</option><option value="portuguese">Portuguese</option><option value="german">German</option><option value="arabic">Arabic</option><option value="yoruba">Yoruba</option><option value="hausa">Hausa</option><option value="swahili">Swahili</option><option value="hindi">Hindi</option><option value="chinese">Chinese</option></select></div>
+    <div><div class="label">Accuracy</div><select id="model"><option value="Xenova/whisper-tiny">Fast</option><option value="Xenova/whisper-base" selected>Balanced</option><option value="Xenova/whisper-small">Best (250 MB)</option></select></div>
+  </div>
+  <button class="primary big" id="writeBtn">📝 Write my title, description &amp; tags</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+</aside>
+<section class="out">
+  <div class="out-head"><div class="tabs" id="tabs"><button data-v="video" class="on">🎬 Video</button><button data-v="thumb">🖼️ Thumbnail</button><button data-v="text">📝 Text</button></div><span id="hint">Open a video to start</span></div>
+  <div class="view" id="viewVideo">
+    <div class="empty" id="empty">🖼️<br>Open a video to start</div>
+    <video id="video" class="hidden" controls playsinline preload="auto"></video>
+    <div class="row hidden" id="grabRow"><button class="primary" id="grabBtn">📸 Use this moment (S)</button><button id="bestBtn">✨ Find the best moments</button></div>
+    <div class="strip" id="strip"></div>
+  </div>
+  <div class="view hidden" id="viewThumb"><canvas id="thumb" width="1280" height="720"></canvas><div class="muted">Drag the picture to move it · use Zoom to get closer · type your headline on the left</div></div>
+  <div class="view hidden" id="viewText"><div class="muted">Click "Write my title, description &amp; tags" on the left. Everything appears here, ready to copy.</div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import * as Bridge from './forge-bridge.js';
+Bridge.dock('thumbs');
+const $=id=>document.getElementById(id);
+const video=$('video'), thumb=$('thumb'), tctx=thumb.getContext('2d');
+let TFP=null;
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const FORMATS={ yt:[1280,720], vert:[1080,1920], ig:[1080,1350], sq:[1080,1080], wide:[1200,675] };
+const FONTS={ anton:'Anton', bebas:'"Bebas Neue"', mont:'Montserrat', impact:'Impact, "Arial Black", sans-serif' };
+let file=null, kind='', url=null, frame=null, panX=0, panY=0, busy=false, cancelled=false, token=0;
+let asr=null, asrModel='', segs=[], segsKey='', wakeLock=null;
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtClock(s){ s=Math.max(0,Math.floor(s||0)); const h=Math.floor(s/3600), m=Math.floor(s/60)%60, x=String(s%60).padStart(2,'0'); return h ? h+':'+String(m).padStart(2,'0')+':'+x : m+':'+x; }
+function fmtTime(s){ s=Math.round(s); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toBlob=(c,type,q)=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('could not create the picture')),type,q));
+function saveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+const baseName=()=>file ? file.name.replace(/\.[^.]+$/,'') : 'thumbnail';
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+function seekTo(t){ return new Promise(res=>{ let d=false; const fin=()=>{ if(!d){ d=true; res(); } }; video.addEventListener('seeked',fin,{once:true}); setTimeout(fin,4000); video.currentTime=clamp(t,0,Math.max(0,(video.duration||t)-0.05)); }); }
+
+/* ---------- views ---------- */
+function setView(v){
+  $('viewVideo').classList.toggle('hidden',v!=='video');
+  $('viewThumb').classList.toggle('hidden',v!=='thumb');
+  $('viewText').classList.toggle('hidden',v!=='text');
+  $('tabs').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='thumb') renderThumb();
+}
+$('tabs').onclick=e=>{ const b=e.target.closest('button'); if(b) setView(b.dataset.v); };
+
+/* ---------- loading ---------- */
+const drop=$('drop');
+$('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+async function loadFile(f){
+  if(!f || busy) return;
+  const isVid=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name), isImg=f.type.startsWith('image/');
+  if(!isVid && !isImg) return toast('Please choose a video or a photo');
+  file=f; token++; segs=[]; segsKey=''; $('strip').innerHTML=''; hide('note');
+  if(url){ URL.revokeObjectURL(url); url=null; }
+  if(isImg){
+    try{ const b=await createImageBitmap(f); const c=document.createElement('canvas'); c.width=b.width; c.height=b.height; c.getContext('2d').drawImage(b,0,0); b.close(); frame=c; }
+    catch{ return toast('Could not open this photo (iPhone HEIC must be converted to JPG first)'); }
+    kind='image'; panX=panY=0; video.removeAttribute('src'); hide('video'); hide('grabRow'); show('empty');
+    $('fileInfo').textContent=f.name+' · '+frame.width+'×'+frame.height;
+    $('hint').textContent='Type your headline on the left. For titles and tags, paste your script.';
+    setView('thumb');
+  }else{
+    kind='video'; url=URL.createObjectURL(f); video.src=url;
+    $('fileInfo').textContent='Opening '+f.name+'…';
+  }
+}
+video.addEventListener('loadedmetadata',()=>{
+  if(kind!=='video') return;
+  hide('empty'); show('video'); show('grabRow'); setView('video');
+  $('fileInfo').textContent=file.name+' · '+video.videoWidth+'×'+video.videoHeight+' · '+fmtClock(video.duration);
+  $('hint').textContent='Pause on any moment and click "Use this moment", or let it find the best ones';
+});
+
+/* ---------- picking a frame ---------- */
+function grab(){
+  if(!video.videoWidth) return;
+  const c=document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
+  c.getContext('2d').drawImage(video,0,0); frame=c; panX=panY=0;
+  video.pause(); setView('thumb'); toast('Moment at '+fmtClock(video.currentTime)+' captured');
+}
+$('grabBtn').onclick=grab;
+document.addEventListener('keydown',e=>{ if(e.key.toLowerCase()==='s' && kind==='video' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) grab(); });
+function frameScore(d,w,h){
+  const n=w*h, L=new Float32Array(n); let sr=0,sy=0,sr2=0,sy2=0,mu=0;
+  for(let i=0;i<n;i++){ const r=d[i*4], g=d[i*4+1], b=d[i*4+2], rg=r-g, yb=(r+g)/2-b; L[i]=(r*2+g*5+b)/8; mu+=L[i]; sr+=rg; sy+=yb; sr2+=rg*rg; sy2+=yb*yb; }
+  mu/=n; const mr=sr/n, my=sy/n, color=Math.sqrt(sr2/n-mr*mr+sy2/n-my*my)+0.3*Math.sqrt(mr*mr+my*my);
+  let s=0,s2=0,c=0;
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){ const i=y*w+x, v=4*L[i]-L[i-1]-L[i+1]-L[i-w]-L[i+w]; s+=v; s2+=v*v; c++; }
+  const sharp=s2/c-(s/c)**2;
+  let score=Math.log(1+sharp)+color/40;
+  if(mu<45 || mu>215) score*=0.5;
+  return score;
+}
+$('bestBtn').onclick=async()=>{
+  if(busy || !video.duration) return;
+  busy=true; video.pause(); const back=video.currentTime, dur=video.duration, N=Math.round(clamp(dur*2,12,48));
+  const w=160, h=Math.max(1,Math.round(160*video.videoHeight/video.videoWidth));
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d',{willReadFrequently:true});
+  show('prog'); hide('note'); const cands=[];
+  try{
+    for(let k=0;k<N;k++){
+      setP(k/N,'Looking for the best moments… '+Math.round(k/N*100)+'%');
+      const t=dur*(0.02+0.96*(k+0.5)/N); await seekTo(t);
+      g.drawImage(video,0,0,w,h);
+      cands.push({ t, score:frameScore(g.getImageData(0,0,w,h).data,w,h), img:c.toDataURL('image/jpeg',0.75) });
+    }
+    cands.sort((a,b)=>b.score-a.score);
+    const picked=[];
+    for(const cd of cands){ if(picked.every(p=>Math.abs(p.t-cd.t)>dur/12)) picked.push(cd); if(picked.length>=8) break; }
+    picked.sort((a,b)=>a.t-b.t);
+    $('strip').innerHTML=picked.map(p=>'<img src="'+p.img+'" data-t="'+p.t+'" title="'+fmtClock(p.t)+'">').join('');
+    setP(1,'Done'); showNote('Click any of the suggested moments below the video to use it.','ok');
+  }finally{ await seekTo(back); busy=false; }
+};
+$('strip').addEventListener('click',async e=>{ const im=e.target.closest('img'); if(!im || busy) return; await seekTo(+im.dataset.t); grab(); });
+
+/* ---------- drawing the thumbnail ---------- */
+function wrap(g,text,maxW){ const words=text.split(/\s+/).filter(Boolean), out=[]; let line=''; for(const w of words){ const t=line?line+' '+w:w; if(g.measureText(t).width>maxW && line){ out.push(line); line=w; } else line=t; } if(line) out.push(line); return out; }
+function rrect(g,x,y,w,h,r){ g.beginPath(); if(g.roundRect) g.roundRect(x,y,w,h,r); else g.rect(x,y,w,h); }
+function imgRect(W,H){
+  const z=+$('zoom').value/100, s=Math.max(W/frame.width,H/frame.height)*z, dw=frame.width*s, dh=frame.height*s;
+  return { dw, dh, x:(W-dw)/2+panX*Math.max(0,(dw-W)/2), y:(H-dh)/2+panY*Math.max(0,(dh-H)/2) };
+}
+function drawThumb(g,W,H){
+  g.save(); g.fillStyle='#15181e'; g.fillRect(0,0,W,H);
+  if(frame){ const r=imgRect(W,H); if($('boost').checked) g.filter='contrast(1.12) saturate(1.3) brightness(1.04)'; g.drawImage(frame,r.x,r.y,r.dw,r.dh); g.filter='none'; }
+  const pos=$('pos').value, hasText=$('line1').value.trim() || $('line2').value.trim();
+  if($('fade').checked && hasText){
+    if(pos==='center'){ g.fillStyle='rgba(0,0,0,0.35)'; g.fillRect(0,0,W,H); }
+    else{
+      const gr = pos==='left' ? g.createLinearGradient(0,0,W*0.75,0) : pos==='right' ? g.createLinearGradient(W,0,W*0.25,0) : pos==='top' ? g.createLinearGradient(0,0,0,H*0.7) : g.createLinearGradient(0,H,0,H*0.3);
+      gr.addColorStop(0,'rgba(0,0,0,0.75)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(0,0,W,H);
+    }
+  }
+  drawText(g,W,H,pos); drawBadge(g,W,H,pos);
+  g.restore();
+}
+function drawText(g,W,H,pos){
+  const l1=$('line1').value.trim().toUpperCase(), l2=$('line2').value.trim().toUpperCase(); if(!l1 && !l2) return;
+  const fk=$('font').value, fam=FONTS[fk], weight=fk==='mont'?'900 ':'', side=pos==='left'||pos==='right', maxW=W*(side?0.58:0.9);
+  let fs=Math.min(W,H)*(+$('tsize').value/100), lines=[];
+  for(let k=0;k<14;k++){
+    g.font=weight+Math.round(fs)+'px '+fam; lines=[];
+    if(l1) wrap(g,l1,maxW).forEach(t=>lines.push({ t, hl:false }));
+    if(l2) wrap(g,l2,maxW).forEach(t=>lines.push({ t, hl:true }));
+    if(lines.length*fs*1.1<=H*0.82 && lines.every(l=>g.measureText(l.t).width<=maxW)) break;
+    fs*=0.9;
+  }
+  const lh=fs*1.1, total=lines.length*lh, pad=W*0.05, sc=$('scheme').value;
+  const y0=pos==='top' ? H*0.07 : pos==='bottom' ? H*0.93-total : (H-total)/2;
+  g.textBaseline='top'; g.lineJoin='round';
+  lines.forEach((ln,i)=>{
+    const tw=g.measureText(ln.t).width, x=pos==='left' ? pad : pos==='right' ? W-pad-tw : (W-tw)/2, y=y0+i*lh;
+    let fill='#ffffff', box=null;
+    if(sc==='wy') fill=ln.hl ? '#ffd60a' : '#ffffff';
+    if(sc==='yw') fill=ln.hl ? '#ffffff' : '#ffd60a';
+    if(sc==='red' && ln.hl) box='#e63946';
+    if(sc==='box'){ fill='#111111'; box='#ffd60a'; }
+    if(box){ const p=fs*0.14; g.fillStyle=box; rrect(g,x-p,y-p*0.5,tw+2*p,fs+p,fs*0.12); g.fill(); }
+    else{ g.shadowColor='rgba(0,0,0,0.65)'; g.shadowBlur=fs*0.14; g.shadowOffsetY=fs*0.05; g.lineWidth=fs*0.13; g.strokeStyle='#000'; g.strokeText(ln.t,x,y); g.shadowColor='transparent'; }
+    g.fillStyle=fill; g.fillText(ln.t,x,y);
+  });
+}
+function drawBadge(g,W,H,pos){
+  const t=$('badge').value.trim().toUpperCase(); if(!t) return;
+  const fs=Math.min(W,H)*0.07, p=fs*0.35; g.font='900 '+Math.round(fs)+'px Montserrat, "Arial Black", sans-serif'; g.textBaseline='top';
+  const tw=g.measureText(t).width, right=pos!=='right', x=right ? W-tw-2*p-W*0.04 : W*0.04, y=H*0.05;
+  g.shadowColor='rgba(0,0,0,.45)'; g.shadowBlur=fs*0.3; g.fillStyle='#e63946'; rrect(g,x,y,tw+2*p,fs+1.4*p,fs*0.25); g.fill(); g.shadowColor='transparent';
+  g.fillStyle='#fff'; g.fillText(t,x+p,y+p*0.8);
+}
+let rq=false;
+function renderThumb(){
+  if(rq) return; rq=true;
+  requestAnimationFrame(()=>{ rq=false; const [W,H]=FORMATS[$('format').value]; if(thumb.width!==W || thumb.height!==H){ thumb.width=W; thumb.height=H; } drawThumb(tctx,W,H); });
+}
+['format','line1','line2','font','scheme','pos','badge','tsize','zoom','boost','fade'].forEach(id=>$(id).addEventListener('input',()=>{ if($('viewThumb').classList.contains('hidden') && frame) setView('thumb'); else renderThumb(); }));
+Promise.all(['40px Anton','40px "Bebas Neue"','900 40px Montserrat'].map(f=>document.fonts.load(f).catch(()=>{}))).then(renderThumb);
+let drag=null;
+thumb.addEventListener('pointerdown',e=>{ if(!frame) return; drag={ x:e.clientX, y:e.clientY, px:panX, py:panY }; thumb.setPointerCapture(e.pointerId); thumb.style.cursor='grabbing'; });
+thumb.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const [W,H]=FORMATS[$('format').value], rc=thumb.getBoundingClientRect(), r=imgRect(W,H), k=W/rc.width;
+  if(r.dw>W) panX=clamp(drag.px+(e.clientX-drag.x)*k/((r.dw-W)/2),-1,1);
+  if(r.dh>H) panY=clamp(drag.py+(e.clientY-drag.y)*k/((r.dh-H)/2),-1,1);
+  renderThumb();
+});
+['pointerup','pointercancel'].forEach(ev=>thumb.addEventListener(ev,()=>{ drag=null; thumb.style.cursor='grab'; }));
+
+/* ---------- thumbnail downloads (JPG kept under 2 MB) ---------- */
+async function exportThumb(key,type){
+  const [W,H]=FORMATS[key], c=document.createElement('canvas'); c.width=W; c.height=H; drawThumb(c.getContext('2d'),W,H);
+  if(type==='png') return toBlob(c,'image/png');
+  let q=0.93, b; do{ b=await toBlob(c,'image/jpeg',q); q-=0.07; }while(b.size>2*1048576 && q>0.5);
+  return b;
+}
+$('pngBtn').onclick=async()=>{ if(!frame) return toast('Pick a moment from your video first'); const k=$('format').value, b=await exportThumb(k,'png'); saveBlob(b,baseName()+'-thumbnail-'+k+'.png'); if(b.size>2*1048576) toast('This PNG is over 2 MB. Use JPG if a platform rejects it.'); };
+$('jpgBtn').onclick=async()=>{ if(!frame) return toast('Pick a moment from your video first'); const k=$('format').value; saveBlob(await exportThumb(k,'jpg'),baseName()+'-thumbnail-'+k+'.jpg'); };
+$('zipBtn').onclick=async()=>{
+  if(!frame) return toast('Pick a moment from your video first');
+  if(!window.JSZip) return toast('The zip maker did not load. Check your internet.');
+  const zip=new JSZip(); for(const k of Object.keys(FORMATS)) zip.file(baseName()+'-thumbnail-'+k+'.jpg',await exportThumb(k,'jpg'));
+  saveBlob(await zip.generateAsync({type:'blob'}),baseName()+'-thumbnails.zip'); toast('All sizes downloaded');
+};
+
+/* ---------- listening (same engine as CaptionForge) ---------- */
+async function getAudio16k(f){
+  const buf=await f.arrayBuffer(), ctx=new AudioContext({sampleRate:16000});
+  try{ const ab=await ctx.decodeAudioData(buf), n=ab.length, ch=ab.numberOfChannels, out=new Float32Array(n); for(let c=0;c<ch;c++){ const d=ab.getChannelData(c); for(let i=0;i<n;i++) out[i]+=d[i]/ch; } return out; }
+  finally{ ctx.close(); }
+}
+async function getASR(model){
+  if(asr && asrModel===model) return asr;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  asr=await TF.pipeline('automatic-speech-recognition',model,{ progress_callback:p=>{ if(p.status==='progress' && typeof p.progress==='number') setP(p.progress/100,'Downloading the AI listener (first time only)… '+Math.round(p.progress)+'%'); } });
+  asrModel=model; return asr;
+}
+async function transcribe(){
+  const key=token+'|'+$('lang').value+'|'+$('model').value;
+  if(segsKey===key && segs.length) return segs;
+  setP(0,'Reading the sound from your video…');
+  const audio=await getAudio16k(file).catch(()=>{ throw new Error('could not read the sound in this video. Paste your script instead'); });
+  setP(0,'Loading the AI listener…');
+  const pipe=await getASR($('model').value), lang=$('lang').value, CH=30*16000, total=audio.length, t0=performance.now(), out=[];
+  for(let off=0;off<total;off+=CH){
+    if(cancelled) throw new Error('cancelled');
+    const chunk=audio.subarray(off,Math.min(total,off+CH)), o={ return_timestamps:true, task:lang==='english'?'transcribe':'translate' };
+    if(lang!=='auto') o.language=lang;
+    const r=await pipe(chunk,o), base=off/16000, dur=chunk.length/16000;
+    const parts=(r.chunks && r.chunks.length) ? r.chunks : [{ timestamp:[0,dur], text:r.text||'' }];
+    for(const c of parts){ const t=(c.text||'').trim(); if(!t || /^[\[(].*[\])]$/.test(t)) continue; const s=c.timestamp?.[0] ?? 0; out.push({ start:base+s, text:t }); }
+    const done=Math.min(1,(off+CH)/total), secs=(performance.now()-t0)/1000;
+    setP(done,'Listening… '+Math.round(done*100)+'%'+(done>0.05 && done<1 ? ' · about '+fmtTime(secs/done*(1-done))+' left' : ''));
+    await new Promise(r=>setTimeout(r,20));
+  }
+  if(!out.length) throw new Error('no speech was found. Paste your script or a short summary instead');
+  segs=out; segsKey=key; return segs;
+}
+
+/* ---------- writing titles, description, tags ---------- */
+const STOP=new Set(`a about above actually after again against ago ah all almost alone along already alright also although always am among an and another any anybody anyone anything anyway are aren't around as ask asked at away back bad basically be became because become been before being below best better between big bit both but by call called came can can't cannot come comes coming could couldn't day days did didn't do does doesn't doing don't done down during each easy either else end enough even ever every everybody everyone everything example exactly fact feel few find first for found from full further get gets getting give given go goes going gone gonna good got gotta great guess guy guys had hadn't happen happened has hasn't have haven't having he he'd he'll he's hear hello her here hey hi him himself his honestly hope how however huh i i'd i'll i'm i've idea if important in instead into is isn't it it's its itself just keep kind kinda know known last least left less let let's life like likely literally little long look looking lot lots made make makes making many matter may maybe me mean means meant might mind mine more most much must my myself need needs never new next nice no nobody none nor not nothing now number of off often oh ok okay old on once one ones only or other others our ours out over own part people per perhaps place point pretty probably put quite rather really reason right said same saw say saying says see seem seems seen several shall she should shouldn't show side since so some somebody someone something sometimes soon sort start started still stuff such super sure take taking talk talking tell than thank thanks that that's the their them themselves then there there's these they they'd they'll they're they've thing things think thinking this those though thought through time times to today together told too took top totally toward tried true try trying turn two um uh under understand until up upon us use used using very video videos want wanted wants was wasn't watch way ways we we'd we'll we're we've welcome well went were weren't what what's whatever when where which while who whole whom whose why will with within without won't wonder work works would wouldn't wow yeah year years yes yet you you'd you'll you're you've your yours yourself subscribe channel comment comments button link description episode`.split(/\s+/));
+const tokens=t=>t.toLowerCase().replace(/[’']s\b/g,'').replace(/[^a-z0-9\s'-]/g,' ').split(/\s+/).filter(Boolean);
+const good=w=>w && w.length>=3 && !STOP.has(w) && !/^\d+$/.test(w) && !/['-]$/.test(w);
+const tc=s=>s.replace(/\b[a-z]/g,c=>c.toUpperCase());
+const tag=s=>'#'+s.split(/\s+/).map(w=>w[0].toUpperCase()+w.slice(1)).join('').replace(/[^A-Za-z0-9]/g,'');
+function topPhrases(text,n){
+  const w=tokens(text), m=new Map(), add=(k,v)=>m.set(k,(m.get(k)||0)+v);
+  for(let i=0;i<w.length;i++){
+    if(!good(w[i])) continue;
+    add(w[i],1+Math.min(w[i].length,12)/24);
+    if(good(w[i+1])){ add(w[i]+' '+w[i+1],1.9); if(good(w[i+2])) add(w[i]+' '+w[i+1]+' '+w[i+2],2.3); }
+  }
+  const multiMin=w.length>120 ? 2 : 1;
+  const list=[...m].filter(([k,v])=>!k.includes(' ') || v>=multiMin*1.9).sort((a,b)=>b[1]-a[1]).map(x=>x[0]), out=[];
+  for(const k of list){
+    if(out.some(o=>o.includes(k) || (k.includes(' ') && k.split(' ').every(x=>o.includes(x))))) continue;
+    out.push(k); if(out.length>=n) break;
+  }
+  return out;
+}
+function hookOf(text,keys){
+  const sents=text.replace(/\s+/g,' ').split(/(?<=[.!?])\s+/).map(s=>s.trim()).filter(Boolean);
+  const kw=keys.join(' ').split(' ');
+  let s=sents.find(x=>x.split(' ').length>=6 && kw.some(k=>x.toLowerCase().includes(k))) || sents[0] || '';
+  if(s.length>150) s=s.slice(0,147).replace(/\s+\S*$/,'')+'…';
+  return s;
+}
+function buildText(text,list,dur){
+  const topic=$('topic').value.trim(), channel=$('channel').value.trim();
+  const ph=topPhrases(text,14); if(topic) ph.unshift(topic.toLowerCase());
+  const uniq=[...new Set(ph)], T=tc(uniq[0]||'This'), T2=tc(uniq[1]||''), short=dur>0 && dur<=60, mins=Math.max(1,Math.round(dur/60));
+  const titles=[
+    T+': Everything You Need to Know',
+    'The Truth About '+T,
+    short ? T+' in 60 Seconds' : T+' Explained in '+mins+' Minute'+(mins>1?'s':''),
+    T2 ? T+' and '+T2+': What You Should Know' : 'What Nobody Tells You About '+T,
+    'Watch This Before You Try '+T
+  ];
+  const hook=hookOf(text,uniq.slice(0,5)), cover=uniq.slice(0,3).join(', ').replace(/, ([^,]*)$/,' and $1');
+  const hs=uniq.slice(0,12).map(tag).filter(h=>h.length>2);
+  let chapters='';
+  if(list.length && dur>=60){
+    const parts=Math.round(clamp(dur/90,3,8)), used=new Set(uniq.slice(0,1)), ch=[{ t:0, label:'Intro' }];
+    for(let p=1;p<parts;p++){
+      const a=dur*p/parts, b=dur*(p+1)/parts, seg=list.filter(s=>s.start>=a && s.start<b);
+      const k=topPhrases(seg.map(s=>s.text).join(' '),4).find(x=>!used.has(x)); if(!k || !seg.length) continue;
+      used.add(k); const t=Math.floor(seg[0].start);
+      if(t-ch[ch.length-1].t>=10) ch.push({ t, label:tc(k) });
+    }
+    if(ch.length>=3) chapters='\n\n⏱️ Chapters\n'+ch.map(c=>fmtClock(c.t)+' '+c.label).join('\n');
+  }
+  const cta=channel ? '👉 Subscribe to '+channel+' for more videos like this.' : '👉 Subscribe for more videos like this.';
+  const desc=hook+'\n\nIn this video we cover '+cover+'.'+chapters+'\n\n'+cta+'\n\n'+hs.slice(0,3).join(' ');
+  let tagsArr=[...uniq]; if(channel) tagsArr.push(channel.toLowerCase());
+  let tags=''; for(const t of tagsArr){ const nx=tags ? tags+', '+t : t; if(nx.length>480) break; tags=nx; }
+  let x=hook+' '+hs.slice(0,2).join(' '); if(x.length>280) x=hook.slice(0,280-hs[0].length-4)+'… '+hs[0];
+  return [
+    { title:'YouTube title ideas (pick one)', text:titles.join('\n'), limit:0, note:'max 100 characters each' },
+    { title:'YouTube description', text:desc, limit:5000 },
+    { title:'YouTube tags', text:tags, limit:500 },
+    { title:'YouTube Shorts title', text:(T+' 🔥 #shorts').slice(0,100), limit:100 },
+    { title:'TikTok caption', text:hook+'\n\n'+hs.slice(0,5).join(' '), limit:0 },
+    { title:'Instagram caption', text:hook+'\n\nWe cover '+cover+'.\n\nSave this for later 📌 '+(channel?'Follow '+channel+' for more.':'Follow for more.')+'\n\n'+hs.slice(0,12).join(' '), limit:2200 },
+    { title:'Facebook post', text:hook+'\n\nWe cover '+cover+'. What do you think? Tell me in the comments 👇\n\n'+hs.slice(0,3).join(' '), limit:0 },
+    { title:'X (Twitter) post', text:x, limit:280 },
+    { title:'Hashtags', text:hs.join(' '), limit:0 }
+  ];
+}
+function renderCards(cards){
+  $('viewText').innerHTML='<div class="muted">These are written from what is said in your video. Read them and adjust anything before posting.</div>'
+    +cards.map((c,i)=>'<div class="card"><div class="card-head"><span>'+esc(c.title)+'</span><span><small data-i="'+i+'"></small><button class="mini cp" data-i="'+i+'">📋 Copy</button></span></div><textarea rows="'+Math.min(14,Math.max(2,c.text.split('\n').length+1))+'" data-i="'+i+'">'+esc(c.text)+'</textarea></div>').join('');
+  const count=i=>{ const ta=$('viewText').querySelector('textarea[data-i="'+i+'"]'), sm=$('viewText').querySelector('small[data-i="'+i+'"]'), c=cards[i], n=ta.value.length;
+    sm.textContent=c.limit ? n+' / '+c.limit : (c.note || n+' characters'); sm.classList.toggle('over',!!c.limit && n>c.limit); };
+  cards.forEach((_,i)=>count(i));
+  $('viewText').oninput=e=>{ if(e.target.dataset.i!==undefined) count(+e.target.dataset.i); };
+  $('viewText').onclick=async e=>{
+    const b=e.target.closest('.cp'); if(!b) return;
+    const ta=$('viewText').querySelector('textarea[data-i="'+b.dataset.i+'"]');
+    try{ await navigator.clipboard.writeText(ta.value); b.textContent='✓ Copied'; setTimeout(()=>b.textContent='📋 Copy',1500); }
+    catch{ ta.select(); toast('Press Ctrl + C to copy'); }
+  };
+}
+$('writeBtn').onclick=async()=>{
+  if(busy) return;
+  const pasted=$('script').value.trim();
+  if(!pasted && kind!=='video') return showNote('Add a video, or paste your script or a short summary, first.');
+  busy=true; cancelled=false; $('writeBtn').disabled=true; show('cancelBtn'); hide('note'); show('prog'); keepAwake(true);
+  try{
+    let text=pasted, list=[];
+    if(!pasted){ list=await transcribe(); text=list.map(s=>s.text).join(' '); }
+    setP(1,'Writing…');
+    renderCards(buildText(text,list,kind==='video' ? video.duration||0 : 0));
+    setView('text'); setP(1,'Done');
+    showNote('Done! Everything is in the 📝 Text tab with Copy buttons.'+($('lang').value!=='english' && !pasted ? ' The texts are in English so they reach the widest audience.' : ''),'ok');
+  }catch(err){ showNote(err.message==='cancelled' ? 'Cancelled.' : 'Could not write the texts: '+(err.message||err)+'.'); }
+  finally{ busy=false; $('writeBtn').disabled=false; hide('cancelBtn'); keepAwake(false); }
+};
+$('cancelBtn').onclick=()=>{ cancelled=true; $('ptext').textContent='Stopping…'; };
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f) loadFile(f); });
+</script>
+</body>
+</html>

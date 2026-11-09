@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryForge — Idea or Voice to Video</title>
+<link rel="stylesheet" href="forge.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap">
+<style>
+.sec{font-size:13px;font-weight:700;margin-top:4px}
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg3 button{padding:8px 4px;font-size:12px}
+.seg3 button.on{border-color:var(--accent);color:var(--accent);background:#1f2633}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel-2);display:flex;flex-direction:column;gap:8px}
+.pick{display:block;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel-2);font-size:13px}
+.pick:hover{border-color:var(--accent)}
+.ptext a,.credit a{color:var(--accent)}
+.credit{font-size:12px;color:var(--muted)}
+#out{display:block;max-width:100%;max-height:calc(100vh - 480px);min-height:200px;border-radius:8px;background:#000}
+.scenes{height:330px;flex:none;overflow:auto;border-top:1px solid var(--line);background:var(--panel);padding:10px 16px;display:flex;flex-direction:column;gap:10px}
+.sc{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px;display:flex;flex-direction:column;gap:8px}
+.sc-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.sc-top b{color:var(--text)}
+.sc-top input.q{flex:1;min-width:140px;width:auto;padding:5px 8px}
+.sc textarea{min-height:46px;line-height:1.5}
+.clips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.clip{flex:none;width:110px;border:3px solid transparent;border-radius:9px;overflow:hidden;cursor:pointer;background:#000;position:relative}
+.clip img{display:block;width:100%;height:66px;object-fit:cover}
+.clip span{position:absolute;bottom:3px;right:4px;font-size:10px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px}
+.clip.on{border-color:var(--ok)}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.post .row button{flex:none}
+.keyrow .label{margin:0}
+textarea.keys{min-height:62px;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre;overflow-x:auto}
+.keystat{font-size:12px;color:var(--muted)}
+.keystat.warn{color:#ffb020}
+details textarea,details .mini,details input{margin-top:6px}
+aside>*,.box>*{flex-shrink:0}
+.cardbox{display:flex;flex-direction:column;gap:6px;border:1px dashed var(--line);border-radius:10px;padding:8px}
+.cardbox textarea[dir=rtl]{font-family:Amiri,"Traditional Arabic",serif;font-size:20px;line-height:1.7}
+.s-sfx{width:auto;max-width:170px;padding:5px 6px;font-size:12px}
+.mini.on{border-color:var(--accent);color:var(--accent)}
+#photoPrev{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;border:2px solid #e9c46a}
+.sc-time{color:var(--muted);font-variant-numeric:tabular-nums}
+.ayah{font-family:Amiri,"Traditional Arabic",serif;font-size:21px;line-height:1.8;color:var(--text)}
+#fxBox details input{margin-top:0}
+#fxBox .slider b{min-width:40px;text-align:right;color:var(--text)}
+.qres{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto}
+.qhit{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:var(--panel)}
+.qhit:hover{border-color:var(--accent)}
+.qhit b{font-size:12px;color:var(--accent)}
+.qhit .ar{font-family:Amiri,"Traditional Arabic",serif;font-size:18px;line-height:1.7;direction:rtl;text-align:right;color:var(--text);margin-top:4px}
+.qhit .en{font-size:12px;color:var(--muted);line-height:1.5}
+#qSel{color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:3px 4px 3px 9px;display:flex;gap:4px;align-items:center;background:var(--panel)}
+.chip button{padding:0 6px;font-size:11px;border:none;background:none;color:var(--muted)}
+.chip button:hover{color:var(--text)}
+</style>
+</head>
+<body class="app">
+<header>
+  <a class="brand" href="index.html"><div class="logo">✨</div>StoryForge <small>an idea, a script or your own voice → a finished video · footage, captions, music, post text</small></a>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main class="split">
+<aside>
+  <div class="sec">1 · Start from</div>
+  <div class="seg3" id="srcMode"><button data-s="ai" class="on">💡 An idea</button><button data-s="own">✍️ My script</button><button data-s="media">🎙️ Video / audio</button></div>
+  <div class="stack hidden" id="mediaBox" style="gap:10px">
+    <label class="drop" id="mediaDrop"><input type="file" id="mediaInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">🎙️</div><strong>Drop your video or audio here</strong><span>Only the sound is kept, unless you tick "Keep my video picture" below.</span></label>
+    <div class="file-info" id="mediaInfo">No file chosen yet</div>
+    <div class="row">
+      <div><div class="label">Language spoken</div><select id="mlang"><option value="auto">Detect</option><option value="quran">Quran recitation (exact text)</option><option value="english" selected>English</option><option value="arabic">Arabic</option><option value="french">French</option><option value="spanish">Spanish</option><option value="portuguese">Portuguese</option><option value="german">German</option><option value="yoruba">Yoruba</option><option value="hausa">Hausa</option><option value="swahili">Swahili</option><option value="hindi">Hindi</option><option value="urdu">Urdu</option><option value="chinese">Chinese</option></select></div>
+      <div id="mmodelBox"><div class="label">Listening</div><select id="mmodel"><option value="Xenova/whisper-tiny">Fast</option><option value="Xenova/whisper-base" selected>Balanced</option><option value="Xenova/whisper-small">Most accurate (250 MB)</option></select></div>
+    </div>
+    <div class="box hidden" id="quranBox">
+      <div><div class="label" style="margin:0 0 6px">🔍 Find an ayah (English or transliteration)</div>
+        <div class="row"><input type="text" id="qFind" placeholder="e.g. ayatul kursi · qul huwallahu · patience · 2:255"><button class="mini" id="qFindBtn" style="flex:none">Search</button></div>
+      </div>
+      <div class="qres hidden" id="qResults"></div>
+      <div><div class="label" style="margin:0 0 6px">Surah you recited</div><select id="qSurah"><option value="">Loading the list…</option></select></div>
+      <div class="row"><div><div class="label" style="margin:0 0 6px">From ayah</div><input type="number" id="qFrom" min="1" value="1"></div><div><div class="label" style="margin:0 0 6px">To ayah</div><input type="number" id="qTo" min="1" value="1"></div></div>
+      <div class="ptext" id="qSel" style="margin:0"></div>
+      <label class="check"><input type="checkbox" id="qAudh"> I said A'udhu billah first</label>
+      <label class="check"><input type="checkbox" id="qBism" checked> I recited Bismillah first</label>
+      <div><div class="label" style="margin:0 0 6px">Show on screen</div><select id="qCap"><option value="both">Arabic and English</option><option value="ar">Arabic only</option><option value="en">English only</option></select></div>
+      <div class="ptext" style="margin:0">Set "From" and "To" to exactly the ayat in your recording. The exact Quran text (Uthmani) and the Saheeh International translation are used, so nothing is guessed. Use ▶ ⏪ ⏩ on an ayah card to check and fine-tune.</div>
+    </div>
+  </div>
+  <textarea id="topic" rows="3" placeholder="What is the video about? e.g. 5 habits of successful students · the fear of Allah in secret · why you should drink more water"></textarea>
+  <div class="row" id="typeRow">
+    <div><div class="label">Type</div><select id="vtype"><option value="explainer">Faceless explainer</option><option value="list">Top list (e.g. 5 tips)</option><option value="story">Story narration</option><option value="motivation">Motivational</option><option value="promo">Product / business promo</option></select></div>
+    <div><div class="label">Length</div><select id="vlen"><option value="30">About 30 s</option><option value="60" selected>About 60 s</option><option value="90">About 90 s</option><option value="180">About 3 min</option></select></div>
+  </div>
+  <div><div class="label">Shape</div><select id="format"><option value="9:16">Vertical 9:16 (TikTok, Reels, Shorts, Status)</option><option value="16:9">Wide 16:9 (YouTube)</option><option value="1:1">Square 1:1</option></select></div>
+
+  <div class="sec">2 · Script</div>
+  <div class="box" id="aiBox">
+    <div class="ptext hidden" id="aiNote" style="margin:0">With your own sound, the AI only picks footage words and writes the title, description, hashtags and tags. Without a key, simple versions are made automatically.</div>
+    <div><div class="label">Use first</div><select id="provider"><option value="gemini">Google Gemini</option><option value="groq">Groq (very fast)</option></select></div>
+    <details><summary class="ptext" style="cursor:pointer;margin:0">📥 Paste all my keys at once</summary>
+      <textarea id="keyDump" rows="3" placeholder="Paste your keys text here. Gemini, Groq and Pixabay keys are found automatically."></textarea>
+      <button class="mini" id="keyImport">Fill in my keys</button>
+    </details>
+    <div class="stack keyrow" style="gap:6px">
+      <div class="label">Gemini keys · one per line, up to 8 · <a class="ptext" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get one free</a></div>
+      <textarea id="gkey" class="keys" rows="3" placeholder="AQ...&#10;AQ...&#10;AQ..." autocomplete="off" spellcheck="false"></textarea>
+      <div class="keystat" id="gstat"></div>
+      <div class="row"><select id="gmodel"><option value="">Paste a key to load writers</option></select><button class="mini" id="gRefresh" style="flex:none" title="Reload writers and wake all keys">↻</button></div>
+    </div>
+    <div class="stack keyrow" style="gap:6px">
+      <div class="label">Groq keys · one per line, up to 5 · <a class="ptext" href="https://console.groq.com/keys" target="_blank" rel="noopener">get one free</a></div>
+      <textarea id="qkey" class="keys" rows="3" placeholder="gsk_...&#10;gsk_...&#10;gsk_..." autocomplete="off" spellcheck="false"></textarea>
+      <div class="keystat" id="qstat"></div>
+      <div class="row"><select id="qmodel"><option value="">Paste a key to load writers</option></select><button class="mini" id="qRefresh" style="flex:none" title="Reload writers and wake all keys">↻</button></div>
+    </div>
+    <label class="check"><input type="checkbox" id="fallback" checked> When every key of one AI is used up, switch to the other AI automatically</label>
+    <div class="ptext" style="margin:0">Keys are saved only in this browser, never in your website files. Use a normal (not incognito) window so they stay saved.</div>
+  </div>
+  <div class="hidden" id="ownBox"><textarea id="ownScript" rows="7" placeholder="Paste or type your script. Every sentence or two becomes a scene."></textarea></div>
+  <button id="scriptBtn">📝 Write the script only (optional)</button>
+
+  <div class="sec">3 · Voice</div>
+  <div class="stack" id="voiceBox" style="gap:12px">
+    <div class="row"><select id="voice"></select><button class="mini" id="voiceTest" style="flex:none">▶ Listen</button></div>
+    <label class="slider">Speed <input type="range" id="speed" min="0.8" max="1.25" step="0.05" value="1"><b id="speedVal">1.00×</b></label>
+  </div>
+  <div class="ptext hidden" id="voiceNote" style="margin:0">🎙️ The voice from your file is used. You can polish it in the voice studio below.</div>
+  <div class="box" id="fxBox">
+    <div class="label" style="margin:0">🎚️ Voice studio</div>
+    <select id="fxPreset">
+      <option value="natural">Natural (no change)</option>
+      <option value="clear">Clear and clean (fix a weak recording)</option>
+      <option value="sweet">Warm and sweet</option>
+      <option value="studio">Studio podcast</option>
+      <option value="mosque">Mosque echo (recitation)</option>
+      <option value="hall">Big hall echo</option>
+      <option value="deeper">Deeper and fuller</option>
+      <option value="custom">My own settings</option>
+    </select>
+    <div class="ptext" id="fxInfo" style="margin:0"></div>
+    <details><summary class="ptext" style="cursor:pointer;margin:0">Fine-tune</summary>
+      <div class="stack" style="gap:6px;margin-top:8px">
+        <label class="slider">Pitch <input type="range" id="fxPitch" min="-6" max="6" step="0.5" value="0"><b id="fxPitchVal">0</b></label>
+        <label class="slider">Echo <input type="range" id="fxEcho" min="0" max="100" value="0"><b id="fxEchoVal">0%</b></label>
+        <label class="slider">Echo size <input type="range" id="fxRoom" min="1" max="10" value="4"><b id="fxRoomVal">4</b></label>
+        <label class="slider">Warmth <input type="range" id="fxWarm" min="0" max="100" value="0"><b id="fxWarmVal">0%</b></label>
+        <label class="slider">Clarity <input type="range" id="fxClear" min="0" max="100" value="0"><b id="fxClearVal">0%</b></label>
+        <label class="slider">Remove hiss <input type="range" id="fxClean" min="0" max="100" value="0"><b id="fxCleanVal">0%</b></label>
+        <label class="check"><input type="checkbox" id="fxLevel"> Even out loud and soft parts</label>
+        <div class="ptext" style="margin:0">Pitch below zero makes a high or young-sounding voice deeper. Small steps (−2 to −4) sound most natural.</div>
+      </div>
+    </details>
+    <div class="row"><button class="mini" id="fxBefore">▶ Before</button><button class="mini" id="fxAfter">▶ After</button></div>
+  </div>
+
+  <div class="sec">4 · Visuals &amp; captions</div>
+  <div><div class="label">Background visuals</div><select id="vidSrc"><option value="stock">Stock footage (Pixabay), with backups</option><option value="own">My own photos and videos</option><option value="builtin">Built-in moving backgrounds only</option></select></div>
+  <div class="stack" id="stockBox" style="gap:10px">
+    <div class="stack keyrow" style="gap:6px">
+      <div class="label">Pixabay key · <a class="ptext" href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">get one free</a></div>
+      <input type="text" id="xkey" placeholder="Paste your free Pixabay API key" autocomplete="off" spellcheck="false">
+    </div>
+    <details><summary class="ptext" style="cursor:pointer;margin:0">Already have a Pexels key? (optional)</summary>
+      <input type="text" id="pkey" placeholder="Pexels API key" autocomplete="off" spellcheck="false">
+    </details>
+    <div><div class="label">People in clips</div><select id="people"><option value="nowomen">Avoid women</option><option value="none">No people at all</option><option value="any">Any clips</option></select></div>
+  </div>
+  <div class="row">
+    <div><div class="label">Change picture every</div><select id="shotLen"><option value="3">3 seconds</option><option value="5" selected>5 seconds</option><option value="8">8 seconds</option><option value="0">Once per sentence</option></select></div>
+    <div><div class="label">Built-in background</div><select id="biStyle"><option value="auto">Mix of all</option><option value="stars">Starry night sky</option><option value="light">Soft golden light</option><option value="waves">Calm waves</option></select></div>
+  </div>
+  <div class="box">
+    <div class="label" style="margin:0">My background library</div>
+    <label class="pick">🖼️ Add my photos or videos<input type="file" id="bgAdd" accept="image/*,video/*" multiple hidden></label>
+    <div class="chips" id="myBgList"></div>
+    <div class="ptext" style="margin:0">Used for "My own photos and videos", and as the first backup when stock footage is missing. Saved in this browser.</div>
+  </div>
+  <div class="row">
+    <div><div class="label">Captions</div><select id="capStyle"><option value="pop">Bold yellow (TikTok)</option><option value="box">White on dark box</option><option value="outline">White with outline</option><option value="none">No captions</option></select></div>
+    <div><div class="label">Words at a time</div><select id="wpc"><option value="3">3 words</option><option value="5" selected>5 words</option><option value="0">Full sentence</option></select></div>
+  </div>
+  <div><div class="label">Emojis in captions</div><select id="emojiMode"><option value="pop">Pop up above the words</option><option value="inline">Next to the words</option><option value="none">No emojis</option></select></div>
+  <label class="check"><input type="checkbox" id="hlOn" checked> Highlight each word as it is spoken</label>
+  <div><div class="label">Quality</div><select id="quality"><option value="720">720p (faster)</option><option value="1080" selected>1080p (best)</option></select></div>
+
+  <div class="sec">5 · Sound</div>
+  <div><div class="label">Background sound</div>
+    <div class="row"><select id="bgSound"><option value="">No background sound</option></select><button class="mini" id="soundPlay" style="flex:none" title="Listen">▶</button><button class="mini" id="soundDel" style="flex:none" title="Remove from my library">🗑</button></div>
+  </div>
+  <label class="pick">🎵 Add sounds to my library (MP3, you can pick several)<input type="file" id="soundAdd" accept="audio/*" multiple hidden></label>
+  <label class="slider">Volume under the voice <input type="range" id="musicVol" min="0" max="60" value="16"></label>
+  <label class="check"><input type="checkbox" id="duck" checked> Lower the sound while the narrator speaks, louder at the start and end</label>
+  <div class="ptext" style="margin:0">Each scene can also get its own extra sound (like rain or night ambience) from the scene cards on the right.</div>
+
+  <div class="sec">6 · Your photo &amp; finishing touches</div>
+  <div class="row"><label class="pick">🧑 Choose my photo<input type="file" id="photoInput" accept="image/*" hidden></label><button class="mini hidden" id="photoRemove" style="flex:none" title="Remove photo">✕</button></div>
+  <div class="row" style="align-items:center"><img id="photoPrev" class="hidden" alt=""><div class="ptext" id="photoName" style="margin:0">No photo · the video is made without a presenter</div></div>
+  <div><div class="label">Show my photo</div><select id="presMode"><option value="corner">Corner bubble (whole video)</option><option value="bookends">Big at the start and end only</option><option value="full">Big presenter (whole video)</option></select></div>
+  <input type="text" id="nameTag" placeholder="Name tag under the photo (optional), e.g. Abdullah · Daily Reminder">
+  <label class="check"><input type="checkbox" id="introOn" checked> Show the video title at the start</label>
+  <input type="text" id="channel" placeholder="Channel name for the ending, e.g. @dailyreminder">
+  <input type="text" id="outroLine" placeholder="Closing line" value="Follow for more reminders">
+  <label class="check"><input type="checkbox" id="xfOn" checked> Smooth fades between clips</label>
+  <label class="check"><input type="checkbox" id="cineOn" checked> Warm cinematic look</label>
+
+  <button class="primary big" id="oneBtn">✨ Make my video (one click)</button>
+  <button class="big hidden" id="renderBtn">🎬 Make the video with these scenes</button>
+  <button id="cancelBtn" class="hidden">Cancel</button>
+  <div class="hidden" id="prog"><div class="bar"><div id="bar"></div></div><div class="ptext" id="ptext"></div></div>
+  <div class="note hidden" id="note"></div>
+  <div class="box post hidden" id="postBox">
+    <div class="label" style="margin:0">Ready to post</div>
+    <div class="row"><input type="text" id="postTitle" placeholder="Title"><button class="mini cp" data-t="postTitle">📋</button></div>
+    <div class="row"><textarea id="postDesc" rows="4" placeholder="Description and hashtags"></textarea><button class="mini cp" data-t="postDesc">📋</button></div>
+    <div class="row"><input type="text" id="postTags" placeholder="Tags (YouTube)"><button class="mini cp" data-t="postTags">📋</button></div>
+  </div>
+  <div class="result hidden" id="doneBox"><button class="primary big" id="downloadBtn">⬇ Download video</button><button id="srtBtn" style="width:100%;margin-top:8px">⬇ Captions (.srt)</button><button id="creditsBtn" style="width:100%;margin-top:8px">⬇ Clip credits (.txt)</button></div>
+  <div class="credit">Stock videos by <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> and <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a> · AI voice by Kokoro · AI listener by Whisper · Quran text by alquran.cloud</div>
+</aside>
+<section class="out">
+  <div class="out-head"><span id="hint">Type your idea on the left, or upload your own video or audio, then click "Make my video"</span></div>
+  <div class="stage"><div class="empty" id="empty">✨<br>Your finished video will play here</div><video id="out" class="hidden" controls playsinline></video></div>
+  <div class="scenes" id="scenes"><div class="muted">Your scenes appear here after the script is written or your file is listened to. You can change any sentence, search word, clip, sound or verse card, then render again.</div></div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+let Bridge={ dock(){}, setResult(){}, take:async()=>null };
+try{ Bridge=await import('./forge-bridge.js'); }catch(e){ console.warn('Tool bar unavailable',e); }
+Bridge.dock('autovideo');
+import('./presenter-explainer.js').then(m=>{ if(m.mountUI) m.mountUI(); }).catch(e=>console.warn('Presenter tools unavailable',e));
+const $=id=>document.getElementById(id);
+let MBP=null, KP=null, TFP=null, STP=null;
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+const loadKokoro=()=>KP||(KP=import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm').catch(()=>import('https://esm.sh/kokoro-js@1.2.1')));
+const loadTF=()=>TFP||(TFP=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'));
+const loadST=()=>STP||(STP=import('https://cdn.jsdelivr.net/npm/soundtouchjs/+esm').catch(()=>import('https://esm.sh/soundtouchjs')));
+const KEYS={ pexels:'forge:pexelsKey', pixabay:'forge:pixabayKey', gemini:'forge:geminiKey', gmodel:'forge:geminiModel', groq:'forge:groqKey', qmodel:'forge:groqModel', provider:'forge:aiProvider', voice:'forge:voice', people:'forge:people', bgSound:'forge:bgSound', photo:'forge:presenterPhoto', srcMode:'forge:set:srcMode' };
+const GBASE='https://generativelanguage.googleapis.com/v1beta/', QBASE='https://api.groq.com/openai/v1/';
+const FORMATS={ '9:16':[1080,1920], '16:9':[1920,1080], '1:1':[1080,1080] };
+const VOICES=[['am_michael','Michael: calm US male'],['am_fenrir','Fenrir: deep US male'],['am_puck','Puck: upbeat US male'],['bm_george','George: British male'],['bm_fable','Fable: British storyteller (male)'],['af_heart','Heart: warm US female'],['af_bella','Bella: lively US female'],['af_nicole','Nicole: soft US female'],['af_sarah','Sarah: clear US female'],['bf_emma','Emma: British female'],['bf_isabella','Isabella: British female']];
+const TYPES={ explainer:'faceless educational explainer', list:'top-list countdown', story:'story narration', motivation:'motivational speech', promo:'product or business promo' };
+const LEAD=0.25, GAP=0.35, FPS=30, GOLD='#e9c46a';
+const RTL=/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+const TOPIC_PH='What is the video about? e.g. 5 habits of successful students · the fear of Allah in secret · why you should drink more water';
+let scenes=[], srcMode='ai', busy=false, cancelled=false, tts=null, out=null, soundList=[], photoImg=null, myBgs=[];
+let media=null, asr=null, asrModel='', transcript=null, lastCaps=[], qInfo=null;
+let resultBlob=null, resultUrl=null, resultName='', credits='', wakeLock=null, nextId=1;
+
+/* ---------- helpers ---------- */
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3600); }
+function showNote(m,type){ const n=$('note'); n.textContent=m; n.className='note'+(type==='ok'?' ok':''); show('note'); n.scrollIntoView({ behavior:'smooth', block:'center' }); }
+function setP(p,text){ $('bar').style.width=(clamp(p,0,1)*100).toFixed(1)+'%'; if(text) $('ptext').textContent=text; }
+function fmtSize(b){ return b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+function fmtTime(s){ s=Math.round(s); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+function fmtClock(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function fmtSec(s){ s=Math.max(0,s||0); return Math.floor(s/60)+':'+(s%60).toFixed(1).padStart(4,'0'); }
+async function keepAwake(on){ try{ if(on && 'wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; } }catch{} }
+window.addEventListener('beforeunload',e=>{ if(busy){ e.preventDefault(); e.returnValue=''; } });
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const check=()=>{ if(cancelled) throw new Error('cancelled'); };
+async function wait(ms){ const end=Date.now()+ms; while(Date.now()<end){ check(); await sleep(Math.min(1000,end-Date.now())); } }
+function hasCard(sc){ return !!((sc.cardAr||'').trim() || (sc.cardTr||'').trim()); }
+function saveText(text,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\ufeff'+text],{ type:'text/plain;charset=utf-8' })); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+const arDigits=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
+if(location.protocol==='file:') showNote('This page was opened by double-clicking the file. Open it with Live Server in VS Code, or on your Netlify site.');
+
+/* ---------- emojis for captions ---------- */
+const EMOJI=new Map(('smile:😊 smiles:😊 happy:😊 happiness:😊 joy:😄 laugh:😂 cry:😢 tears:😢 tear:😢 weep:😢 sad:😔 sadness:😔 grief:😔 fear:😨 afraid:😨 scared:😨 angry:😠 anger:😠 love:❤️ heart:❤️ hearts:❤️ kind:🤗 kindness:🤗 hug:🤗 peace:🕊️ calm:😌 sleep:😴 tired:😩 sick:🤒 ill:🤒 health:💪 healthy:💪 strong:💪 strength:💪 pray:🤲 prayer:🤲 dua:🤲 supplication:🤲 salah:🧎 prostrate:🧎 prostration:🧎 mosque:🕌 masjid:🕌 kaaba:🕋 mecca:🕋 makkah:🕋 hajj:🕋 quran:📖 book:📖 read:📖 learn:🎓 knowledge:🎓 study:📚 school:🏫 student:🎓 teacher:👨‍🏫 write:✍️ pen:🖊️ ramadan:🌙 fasting:🌙 moon:🌙 night:🌙 star:⭐ sun:☀️ morning:🌅 sunrise:🌅 sunset:🌇 sky:🌌 heavens:🌌 cloud:☁️ rain:🌧️ storm:⛈️ thunder:⚡ lightning:⚡ wind:🌬️ snow:❄️ cold:🥶 hot:🥵 fire:🔥 hellfire:🔥 hell:🔥 burn:🔥 water:💧 river:🏞️ sea:🌊 ocean:🌊 wave:🌊 mountain:⛰️ earth:🌍 world:🌍 tree:🌳 garden:🌳 paradise:🌴 jannah:🌴 flower:🌸 fruit:🍎 grape:🍇 olive:🫒 honey:🍯 milk:🥛 bread:🍞 food:🍲 eat:🍽️ meal:🍽️ drink:🥤 cup:☕ tea:🍵 coffee:☕ bottle:🍾 spoon:🥄 plate:🍽️ knife:🔪 fish:🐟 camel:🐪 cow:🐄 cattle:🐄 sheep:🐑 goat:🐐 horse:🐎 bird:🐦 dog:🐕 cat:🐈 ant:🐜 bee:🐝 spider:🕷️ snake:🐍 elephant:🐘 lion:🦁 money:💰 wealth:💰 rich:💰 gold:🪙 silver:🪙 charity:🤲 give:🎁 gift:🎁 poor:🥺 hungry:🥺 orphan:🧒 child:🧒 children:🧒 kid:🧒 baby:👶 mother:👩 father:👨 parents:👨‍👩‍👧 family:👨‍👩‍👧 brother:🤝 sister:🤝 friend:🤝 home:🏠 house:🏠 door:🚪 key:🔑 lock:🔒 clock:⏰ hour:⏳ patience:⏳ patient:⏳ wait:⏳ death:🕯️ grave:🪦 seed:🌱 grow:🌱 light:💡 idea:💡 think:🤔 thought:🤔 question:❓ answer:💬 speak:🗣️ talk:🗣️ listen:👂 hear:👂 eye:👀 hand:✋ walk:🚶 run:🏃 travel:✈️ journey:🧭 path:🛤️ road:🛤️ car:🚗 phone:📱 computer:💻 work:💼 job:💼 business:💼 success:🏆 win:🏆 victory:🏆 goal:🎯 fail:❌ wrong:❌ lie:❌ truth:✅ thank:🙏 thanks:🙏 grateful:🙏 gratitude:🙏 forgive:🤍 forgiveness:🤍 mercy:🤍 merciful:🤍 sin:⚠️ warning:⚠️ danger:⚠️ stop:🛑 angel:😇 devil:😈 satan:😈 shaytan:😈 king:👑 crown:👑 war:⚔️ fight:⚔️ shield:🛡️ protect:🛡️ protection:🛡️ dates:🌴 palm:🌴 salt:🧂 oil:🫗 clothes:👕 shoes:👟 sword:⚔️ ship:🚢 boat:⛵ city:🏙️ desert:🏜️ sand:🏜️ stone:🪨 rock:🪨 iron:⚙️ blood:🩸 bone:🦴 smell:👃 taste:👅 hope:🌈 dream:💭 rest:😌 smart:🧠 brain:🧠 mind:🧠').split(' ').map(p=>{ const i=p.indexOf(':'); return [p.slice(0,i),p.slice(i+1)]; }));
+function emojiFor(word){
+  const w=String(word).toLowerCase().replace(/[’']s\b/,'').replace(/[^a-z]/g,''); if(w.length<3) return '';
+  const c=[w, w.replace(/ied$/,'y'), w.replace(/ies$/,'y'), w.replace(/es$/,''), w.replace(/s$/,''), w.replace(/ing$/,''), w.replace(/ing$/,'e'), w.replace(/(.)\1ing$/,'$1'), w.replace(/ed$/,''), w.replace(/ed$/,'e'), w.replace(/(.)\1ed$/,'$1'), w.replace(/ful$/,'')];
+  for(const x of c) if(EMOJI.has(x)) return EMOJI.get(x);
+  return '';
+}
+function emojisOf(text,max){ const o=[]; for(const w of String(text).split(/\s+/)){ const e=emojiFor(w); if(e && !o.includes(e)) o.push(e); if(o.length>=max) break; } return o.join(' '); }
+
+/* ---------- saved settings (only in this browser) ---------- */
+$('voice').innerHTML=VOICES.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
+$('voice').value=localStorage.getItem(KEYS.voice)||'am_michael';
+$('voice').onchange=()=>localStorage.setItem(KEYS.voice,$('voice').value);
+$('people').value=localStorage.getItem(KEYS.people)||'nowomen';
+$('people').onchange=()=>{ localStorage.setItem(KEYS.people,$('people').value); scenes.forEach(s=>{ s.results=null; s.pick=-1; }); if(scenes.length){ renderScenes(); toast('Clips will be searched again with this setting'); } };
+const PERSIST=['presMode','nameTag','introOn','channel','outroLine','hlOn','xfOn','cineOn','duck','musicVol','capStyle','wpc','quality','mlang','mmodel','fxPreset','fxPitch','fxEcho','fxRoom','fxWarm','fxClear','fxClean','fxLevel','qSurah','qFrom','qTo','qAudh','qBism','qCap','shotLen','emojiMode','vidSrc','biStyle'];
+PERSIST.forEach(id=>{
+  const el=$(id), k='forge:set:'+id, v=localStorage.getItem(k);
+  if(v!==null){ if(el.type==='checkbox') el.checked=v==='1'; else el.value=v; }
+  const save=()=>localStorage.setItem(k, el.type==='checkbox' ? (el.checked?'1':'0') : el.value);
+  el.addEventListener('change',save); el.addEventListener('input',save);
+});
+[['pkey','pexels'],['xkey','pixabay'],['gkey','gemini'],['qkey','groq']].forEach(([id,k])=>{ $(id).value=localStorage.getItem(KEYS[k])||''; });
+$('provider').value=localStorage.getItem(KEYS.provider)||'gemini';
+$('provider').onchange=()=>localStorage.setItem(KEYS.provider,$('provider').value);
+$('pkey').addEventListener('input',()=>localStorage.setItem(KEYS.pexels,$('pkey').value.trim()));
+$('xkey').addEventListener('input',()=>localStorage.setItem(KEYS.pixabay,$('xkey').value.trim()));
+let gT=0, qT=0;
+$('gkey').addEventListener('input',()=>{ localStorage.setItem(KEYS.gemini,$('gkey').value.trim()); keyStatus('gemini'); clearTimeout(gT); gT=setTimeout(()=>loadGemini().catch(e=>toast('Gemini: '+e.message)),900); });
+$('qkey').addEventListener('input',()=>{ localStorage.setItem(KEYS.groq,$('qkey').value.trim()); keyStatus('groq'); clearTimeout(qT); qT=setTimeout(()=>loadGroq().catch(e=>toast('Groq: '+e.message)),900); });
+$('gmodel').onchange=()=>{ localStorage.setItem(KEYS.gmodel,$('gmodel').value); keyStatus('gemini'); };
+$('qmodel').onchange=()=>{ localStorage.setItem(KEYS.qmodel,$('qmodel').value); keyStatus('groq'); };
+const wake=p=>{ POOLS[p].rest={}; localStorage.removeItem('forge:'+p+'Rest'); keyStatus(p); };
+$('gRefresh').onclick=()=>{ wake('gemini'); loadGemini().then(()=>toast('Gemini writers updated · all keys woken up')).catch(e=>toast('Gemini: '+e.message)); };
+$('qRefresh').onclick=()=>{ wake('groq'); loadGroq().then(()=>toast('Groq writers updated · all keys woken up')).catch(e=>toast('Groq: '+e.message)); };
+$('keyImport').onclick=()=>{
+  const t=$('keyDump').value;
+  const g=t.match(/AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{20,}/g)||[];
+  const q=t.match(/gsk_[0-9A-Za-z]{20,}/g)||[];
+  const x=(t.match(/\b\d{4,12}-[0-9a-f]{20,40}\b/i)||[])[0];
+  if(!g.length && !q.length && !x) return toast('No Gemini, Groq or Pixabay keys found in that text');
+  const add=(id,found)=>{ if(!found.length) return; const now=$(id).value.split(/[\s,;]+/).filter(Boolean); $(id).value=[...new Set([...now,...found])].join('\n'); $(id).dispatchEvent(new Event('input')); };
+  add('gkey',g); add('qkey',q);
+  if(x){ $('xkey').value=x; $('xkey').dispatchEvent(new Event('input')); }
+  $('keyDump').value=''; toast('Added '+g.length+' Gemini + '+q.length+' Groq key(s)'+(x ? ' + Pixabay key' : ''));
+};
+$('speed').oninput=()=>$('speedVal').textContent=(+$('speed').value).toFixed(2)+'×';
+function setSrcMode(m){
+  srcMode=m; localStorage.setItem(KEYS.srcMode,m);
+  const md=m==='media';
+  $('srcMode').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.s===m));
+  $('aiBox').classList.toggle('hidden',m==='own');
+  $('ownBox').classList.toggle('hidden',m!=='own');
+  $('mediaBox').classList.toggle('hidden',!md);
+  $('typeRow').classList.toggle('hidden',md);
+  $('voiceBox').classList.toggle('hidden',md);
+  $('voiceNote').classList.toggle('hidden',!md);
+  $('aiNote').classList.toggle('hidden',!md);
+  $('topic').placeholder=md ? 'What is it about? (optional, helps the AI pick better footage and graphics)' : TOPIC_PH;
+  $('scriptBtn').textContent=md ? '📝 Listen and make the scenes only (optional)' : '📝 Write the script only (optional)';
+}
+$('srcMode').onclick=e=>{ const b=e.target.closest('button'); if(!b || busy) return; setSrcMode(b.dataset.s); };
+setSrcMode(localStorage.getItem(KEYS.srcMode)||'ai');
+document.querySelectorAll('.cp').forEach(b=>b.onclick=async()=>{ const el=$(b.dataset.t); try{ await navigator.clipboard.writeText(el.value); toast('Copied'); }catch{ el.select(); toast('Press Ctrl + C'); } });
+
+/* ---------- saved libraries: my sounds and my backgrounds (in this browser) ---------- */
+let DBP=null;
+const idb=()=>DBP||(DBP=new Promise((res,rej)=>{ const r=indexedDB.open('storyforge',2); r.onupgradeneeded=()=>{ const db=r.result; if(!db.objectStoreNames.contains('sounds')) db.createObjectStore('sounds',{ keyPath:'id' }); if(!db.objectStoreNames.contains('bgs')) db.createObjectStore('bgs',{ keyPath:'id' }); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
+async function storeAll(st){ const db=await idb(); return new Promise((res,rej)=>{ const q=db.transaction(st).objectStore(st).getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
+async function storeGet(st,id){ const db=await idb(); return new Promise((res,rej)=>{ const q=db.transaction(st).objectStore(st).get(id); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); }
+async function storePut(st,rec){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(st,'readwrite'); t.objectStore(st).put(rec); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('storage full')); }); }
+async function storeDel(st,id){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(st,'readwrite'); t.objectStore(st).delete(id); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const bufCache=new Map();
+async function soundBuffer(id){
+  if(!id) return null; if(bufCache.has(id)) return bufCache.get(id);
+  const rec=await storeGet('sounds',id); if(!rec) return null;
+  const ac=new AudioContext();
+  try{ const b=await ac.decodeAudioData(await rec.blob.arrayBuffer()); bufCache.set(id,b); return b; }finally{ ac.close(); }
+}
+async function refreshSounds(){
+  try{ soundList=(await storeAll('sounds')).map(r=>({ id:r.id, name:r.name })).sort((a,b)=>a.name.localeCompare(b.name)); }catch{ soundList=[]; }
+  const cur=$('bgSound').value||localStorage.getItem(KEYS.bgSound)||'';
+  $('bgSound').innerHTML='<option value="">No background sound</option>'+soundList.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join('');
+  $('bgSound').value=soundList.some(s=>s.id===cur) ? cur : '';
+  if(scenes.length) renderScenes();
+}
+$('bgSound').onchange=()=>localStorage.setItem(KEYS.bgSound,$('bgSound').value);
+$('soundAdd').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; let n=0;
+  for(const f of files){
+    try{ const ac=new AudioContext(); await ac.decodeAudioData(await f.arrayBuffer()); ac.close();
+      await storePut('sounds',{ id:newId(), name:f.name.replace(/\.[^.]+$/,''), blob:f }); n++; }
+    catch{ toast('Could not read '+f.name+'. Try an MP3.'); }
+  }
+  if(n){ await refreshSounds(); if(!$('bgSound').value && soundList.length){ $('bgSound').value=soundList[0].id; localStorage.setItem(KEYS.bgSound,soundList[0].id); } toast(n+' sound(s) added to your library'); }
+};
+let preview=null;
+function stopPreview(){ if(preview){ preview.pause(); URL.revokeObjectURL(preview.src); preview=null; } $('soundPlay').textContent='▶'; }
+$('soundPlay').onclick=async()=>{
+  if(preview) return stopPreview();
+  const id=$('bgSound').value; if(!id) return toast('Choose a sound first');
+  const rec=await storeGet('sounds',id); if(!rec) return;
+  preview=new Audio(URL.createObjectURL(rec.blob)); preview.volume=0.8; preview.onended=stopPreview; preview.play(); $('soundPlay').textContent='■';
+};
+$('soundDel').onclick=async()=>{
+  const id=$('bgSound').value; if(!id) return toast('Choose a sound to remove');
+  const s=soundList.find(x=>x.id===id); if(!confirm('Remove "'+(s ? s.name : 'this sound')+'" from your library?')) return;
+  stopPreview(); await storeDel('sounds',id); bufCache.delete(id); scenes.forEach(sc=>{ if(sc.sfx===id) sc.sfx=''; });
+  localStorage.removeItem(KEYS.bgSound); $('bgSound').value=''; await refreshSounds(); toast('Removed from your library');
+};
+refreshSounds();
+async function refreshBgs(){
+  try{ myBgs=await storeAll('bgs'); }catch{ myBgs=[]; }
+  $('myBgList').innerHTML=myBgs.length ? myBgs.map(b=>'<span class="chip" data-id="'+esc(b.id)+'">'+(b.type==='vid' ? '🎬 ' : '🖼️ ')+esc(b.name.slice(0,24))+'<button title="Remove">✕</button></span>').join('') : '<span class="ptext" style="margin:0">No files yet</span>';
+  if(scenes.length) renderScenes();
+}
+$('bgAdd').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; let n=0;
+  for(const f of files){
+    const type=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name) ? 'vid' : f.type.startsWith('image/') ? 'img' : '';
+    if(!type){ toast('Skipped '+f.name+' (not a photo or video)'); continue; }
+    try{ await storePut('bgs',{ id:newId(), name:f.name, type, blob:f }); n++; }catch{ toast('Could not save '+f.name+'. The browser storage may be full.'); }
+  }
+  if(n){ await refreshBgs(); toast(n+' file(s) added to your background library'); }
+};
+$('myBgList').addEventListener('click',async e=>{ const chip=e.target.closest('.chip'); if(!chip || e.target.tagName!=='BUTTON') return; await storeDel('bgs',chip.dataset.id); await refreshBgs(); });
+refreshBgs();
+function srcUI(){ $('stockBox').classList.toggle('hidden',$('vidSrc').value!=='stock'); if(scenes.length) renderScenes(); }
+$('vidSrc').addEventListener('change',srcUI);
+srcUI();
+
+/* ---------- my photo (presenter) ---------- */
+function setPhoto(url){
+  if(!url){ photoImg=null; hide('photoPrev'); hide('photoRemove'); $('photoName').textContent='No photo · the video is made without a presenter'; return; }
+  const im=new Image(); im.src=url; photoImg=im; $('photoPrev').src=url; show('photoPrev'); show('photoRemove'); $('photoName').textContent='Your photo is ready';
+}
+setPhoto(localStorage.getItem(KEYS.photo));
+$('photoInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const bmp=await createImageBitmap(f), s=Math.min(1,720/Math.max(bmp.width,bmp.height)), c=document.createElement('canvas');
+    c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    const url=c.toDataURL('image/jpeg',0.88);
+    try{ localStorage.setItem(KEYS.photo,url); }catch{ toast('The photo is used now but could not be saved for next time'); }
+    setPhoto(url); toast('Photo added');
+  }catch{ toast('Could not read that photo. Try a JPG or PNG.'); }
+};
+$('photoRemove').onclick=()=>{ localStorage.removeItem(KEYS.photo); setPhoto(null); };
+
+/* ---------- your own video or audio ---------- */
+const mdrop=$('mediaDrop');
+$('mediaInput').onchange=e=>{ loadMedia(e.target.files[0]); e.target.value=''; };
+mdrop.addEventListener('dragover',e=>{ e.preventDefault(); mdrop.classList.add('over'); });
+mdrop.addEventListener('dragleave',()=>mdrop.classList.remove('over'));
+mdrop.addEventListener('drop',e=>{ e.preventDefault(); mdrop.classList.remove('over'); loadMedia(e.dataTransfer.files[0]); });
+async function loadMedia(f){
+  if(!f || busy) return;
+  const isV=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);
+  const isA=f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(f.name);
+  if(!isV && !isA) return toast('Please choose a video or an audio file');
+  if(srcMode!=='media') setSrcMode('media');
+  $('mediaInfo').textContent='Reading the sound from '+f.name+'…';
+  try{
+    const ac=new AudioContext(); let buf;
+    try{ buf=await ac.decodeAudioData(await f.arrayBuffer()); }finally{ ac.close(); }
+    if(!buf || buf.duration<1) throw new Error('no sound');
+    media={ file:f, name:f.name, kind:isV ? 'video' : 'audio', buf, dur:buf.duration, id:Date.now() };
+    transcript=null;
+    if(scenes.some(s=>s.t0!=null)){ scenes=[]; renderScenes(); }
+    $('mediaInfo').textContent=(isV ? '🎬 ' : '🎵 ')+f.name+' · '+fmtSize(f.size)+' · '+fmtClock(buf.duration);
+    $('hint').textContent='Click "Make my video". Your file is prepared first, then visuals are found for every part.';
+    if(buf.duration>20*60) toast('This is a long file. Preparing and building will take a while, so keep this tab open.');
+  }catch(e){
+    media=null; $('mediaInfo').textContent='No file chosen yet';
+    showNote('Could not read the sound in '+f.name+'. Make sure it has sound, or convert it to MP4 or MP3 first with the Video Toolkit.');
+  }
+}
+async function to16k(buf){
+  const off=new OfflineAudioContext(1,Math.ceil(buf.duration*16000),16000), s=off.createBufferSource();
+  s.buffer=buf; s.connect(off.destination); s.start(0);
+  return (await off.startRendering()).getChannelData(0);
+}
+async function getASR(model){
+  if(asr && asrModel===model) return asr;
+  const TF=await loadTF(); TF.env.allowLocalModels=false;
+  if(asr){ try{ await asr.dispose(); }catch{} asr=null; asrModel=''; }
+  asr=await TF.pipeline('automatic-speech-recognition',model,{ progress_callback:p=>{ if(p.status==='progress' && typeof p.progress==='number' && /onnx/.test(p.file||'')) setP(p.progress/100,'Downloading the AI listener (first time only, then it is saved)… '+Math.round(p.progress)+'%'); } });
+  asrModel=model; return asr;
+}
+async function listen(){
+  const lang=$('mlang').value, key=media.id+'|'+lang+'|'+$('mmodel').value;
+  if(transcript && transcript.key===key) return transcript.words;
+  setP(0.02,'Preparing the sound for listening…');
+  const audio=await to16k(media.buf); check();
+  setP(0.03,'Loading the AI listener…');
+  const pipe=await getASR($('mmodel').value), total=audio.length, t0=performance.now(), segs=[], CH=30*16000;
+  for(let off=0;off<total;off+=CH){
+    check();
+    const chunk=audio.subarray(off,Math.min(total,off+CH)), base=off/16000, dur=chunk.length/16000;
+    if(dur<0.3) break;
+    const o={ return_timestamps:true, task:'transcribe' }; if(lang!=='auto') o.language=lang;
+    const r=await pipe(chunk,o);
+    const parts=(r.chunks && r.chunks.length) ? r.chunks : [{ timestamp:[0,dur], text:r.text||'' }];
+    for(const c of parts){
+      const text=(c.text||'').replace(/\s+/g,' ').trim();
+      if(!text || /^[\[(♪*].*[\])♪*]$/.test(text)) continue;
+      const s=clamp(c.timestamp?.[0] ?? 0,0,dur), e=clamp(c.timestamp?.[1] ?? dur,0,dur);
+      const last=segs[segs.length-1];
+      if(last && last.text===text && base+s-last.e<2) continue;
+      segs.push({ s:base+s, e:base+Math.max(e,s+0.3), text });
+    }
+    const done=Math.min(1,(off+CH)/total), secs=(performance.now()-t0)/1000;
+    setP(0.05+0.2*done,'Listening to your file… '+Math.round(done*100)+'%'+(done>0.04 && done<1 ? ' · about '+fmtTime(secs/done*(1-done))+' left' : ''));
+    await yieldUI();
+  }
+  if(!segs.length) throw new Error('no speech was found in this file');
+  const words=[];
+  for(const sg of segs){
+    const ws=sg.text.split(' ').filter(Boolean), tot=ws.join(' ').length||1; let pos=0;
+    for(const w of ws){ const s=sg.s+(sg.e-sg.s)*pos/tot; pos+=w.length+1; words.push({ t:w, s, e:sg.s+(sg.e-sg.s)*Math.min(1,pos/tot) }); }
+  }
+  transcript={ key, words };
+  return words;
+}
+function mediaScenes(words){
+  const groups=[]; let cur=[];
+  for(let i=0;i<words.length;i++){
+    const w=words[i], nx=words[i+1]; cur.push(w);
+    if(!nx) break;
+    const d=w.e-cur[0].s, gap=nx.s-w.e, stop=/[.!?…؟۔]["'”’)\]]*$/.test(w.t), pause=/[,;:،]["'”’)\]]*$/.test(w.t);
+    if((d>=3 && (stop || gap>0.6)) || (d>=5.5 && pause) || d>=8){ groups.push(cur); cur=[]; }
+  }
+  if(cur.length) groups.push(cur);
+  if(groups.length>1){ const l=groups[groups.length-1]; if(l[l.length-1].e-l[0].s<1.5){ groups.pop(); groups[groups.length-1].push(...l); } }
+  return groups.map(g=>{ const sc=mk(g.map(w=>w.t).join(' '),''); sc.t0=g[0].s; sc.t1=g[g.length-1].e; sc.timed=g.map(w=>({ ...w })); return sc; });
+}
+
+/* ---------- Quran recitation: exact text, lined up with your pauses ---------- */
+const BISM_EN='In the name of Allah, the Entirely Merciful, the Especially Merciful.';
+const AUDH_AR='أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَٰنِ ٱلرَّجِيمِ', AUDH_EN='I seek refuge in Allah from Satan, the expelled.';
+let surahs=null;
+async function quranFetch(path){
+  for(const base of ['https://api.alquran.cloud/v1/','/quran-api/v1/']){
+    try{ const r=await fetch(base+path); if(!r.ok) continue; const j=await r.json(); if(j && j.code===200) return j.data; }catch{}
+  }
+  throw new Error('could not get the Quran text. Check your internet and try again');
+}
+async function loadSurahs(){
+  if(surahs) return;
+  try{ surahs=JSON.parse(localStorage.getItem('forge:surahs')||'null'); }catch{ surahs=null; }
+  if(!surahs){
+    try{ surahs=(await quranFetch('surah')).map(s=>({ n:s.number, en:s.englishName, ar:s.name, c:s.numberOfAyahs })); localStorage.setItem('forge:surahs',JSON.stringify(surahs)); }
+    catch{ surahs=null; $('qSurah').innerHTML='<option value="">Could not load the list. Check your internet</option>'; return; }
+  }
+  $('qSurah').innerHTML=surahs.map(s=>'<option value="'+s.n+'">'+s.n+'. '+esc(s.en)+' · '+esc(s.ar)+' ('+s.c+' ayat)</option>').join('');
+  $('qSurah').value=localStorage.getItem('forge:set:qSurah')||'1';
+  qRange();
+}
+function qRange(){
+  const s=surahs && surahs.find(x=>x.n===+$('qSurah').value); if(!s) return;
+  $('qFrom').max=s.c; $('qTo').max=s.c;
+  if(!(+$('qFrom').value>=1) || +$('qFrom').value>s.c) $('qFrom').value=1;
+  if(!(+$('qTo').value>=1) || +$('qTo').value>s.c) $('qTo').value=$('qFrom').value;
+  updQSel();
+}
+let topicAuto='', topicT=0; const enCache=new Map();
+async function surahEnglish(n){ if(QIDX) return QIDX.filter(x=>x.s===n).map(x=>x.en); if(enCache.has(n)) return enCache.get(n); const d=await quranFetch('surah/'+n+'/en.sahih'); const l=d.ayahs.map(x=>x.text); enCache.set(n,l); return l; }
+function autoTopic(s,a,b){
+  clearTimeout(topicT);
+  topicT=setTimeout(async()=>{
+    const cur=$('topic').value.trim(); if(cur && cur!==topicAuto) return;
+    try{
+      const en=await surahEnglish(s.n), part=en.slice(a-1,Math.max(a,b)).join(' ').replace(/\s+/g,' ').trim(); if(!part) return;
+      let t='Surah '+s.en+' '+(b>a ? a+'-'+b : a)+': '+part; if(t.length>300) t=t.slice(0,297).replace(/\s+\S*$/,'')+'…';
+      const now=$('topic').value.trim(); if(now && now!==topicAuto) return;
+      $('topic').value=t; topicAuto=t;
+    }catch{}
+  },500);
+}
+function updQSel(){
+  const s=surahs && surahs.find(x=>x.n===+$('qSurah').value); if(!s){ $('qSel').textContent=''; return; }
+  const a=+$('qFrom').value||1, b=+$('qTo').value||a;
+  $('qSel').textContent='✓ Selected: Surah '+s.en+' ('+s.n+'), ayah '+a+(b!==a ? ' to '+b : '')+(b<a ? ' · "To" must not be smaller than "From"' : '');
+  if($('mlang').value==='quran') autoTopic(s,a,b);
+}
+$('qSurah').addEventListener('change',()=>{ $('qFrom').value=1; $('qTo').value=1; localStorage.setItem('forge:set:qFrom','1'); localStorage.setItem('forge:set:qTo','1'); updQSel(); });
+['qFrom','qTo'].forEach(id=>$(id).addEventListener('input',updQSel));
+function quranUI(){ const q=$('mlang').value==='quran'; $('quranBox').classList.toggle('hidden',!q); $('mmodelBox').classList.toggle('hidden',q); if(q) loadSurahs(); }
+$('mlang').addEventListener('change',quranUI);
+
+/* ---------- find an ayah by English words or transliteration ---------- */
+let QIDX=null, QLOAD=null;
+const Q_ALIAS={ ayatulkursi:[2,255], ayatalkursi:[2,255], ayatkursi:[2,255], kursi:[2,255], throniverse:[2,255], amanarasul:[2,285], lastayatbakara:[2,285] };
+const EN_STOP=new Set('the and of a an to is in who are those that be it its this was were for on with as by at from or not they them their he his him she her we our us you your i my me has have had will shall do does did so but if then than which what when there these upon unto'.split(' '));
+async function quranEdition(ed){
+  const url='https://api.alquran.cloud/v1/quran/'+ed; let c=null;
+  try{ c=await caches.open('forge-quran-v1'); const hit=await c.match(url); if(hit){ const j=await hit.json(); if(j && j.code===200) return j.data; } }catch{}
+  for(const base of ['https://api.alquran.cloud/v1/','/quran-api/v1/']){
+    try{
+      const r=await fetch(base+'quran/'+ed); if(!r.ok) continue;
+      const copy=r.clone(), j=await r.json();
+      if(j && j.code===200){ if(c){ try{ await c.put(url,copy); }catch{} } return j.data; }
+    }catch{}
+  }
+  throw new Error('could not download the Quran text. Check your internet and try again');
+}
+function normTr(s){
+  let t=String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/<[^>]+>/g,'').replace(/[^a-z]/g,'');
+  t=t.replace(/al(?=(sh|th|dh|t|d|r|z|s|n|l))/g,'a').replace(/q/g,'k').replace(/c/g,'k').replace(/ph/g,'f').replace(/e/g,'i').replace(/o/g,'u').replace(/(.)\1+/g,'$1');
+  return t;
+}
+function enWords(s){ return String(s||'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>2 && !EN_STOP.has(w)).map(w=>w.length>4 ? w.replace(/(ing|ed|es|s)$/,'') : w); }
+async function quranIndex(){
+  if(QIDX) return QIDX;
+  if(!QLOAD) QLOAD=(async()=>{
+    const [ar,en,tr]=await Promise.all(['quran-uthmani','en.sahih','en.transliteration'].map(quranEdition));
+    const idx=[];
+    ar.surahs.forEach((s,si)=>s.ayahs.forEach((a,ai)=>{
+      const e=(en.surahs[si] && en.surahs[si].ayahs[ai] || {}).text||'', t=String((tr.surahs[si] && tr.surahs[si].ayahs[ai] || {}).text||'').replace(/<[^>]+>/g,'');
+      idx.push({ s:s.number, a:a.numberInSurah, name:s.englishName, ar:a.text, en:e, kt:normTr(t), ke:' '+enWords(e).join(' ')+' ' });
+    }));
+    QIDX=idx; return idx;
+  })().catch(e=>{ QLOAD=null; throw e; });
+  return QLOAD;
+}
+async function findAyah(){
+  const raw=$('qFind').value.trim(); if(!raw) return toast('Type a few words to search');
+  const box=$('qResults'); show('qResults');
+  box.innerHTML='<div class="muted">Searching… (the first search downloads the Quran text once, about 10 MB, then it is saved)</div>';
+  let idx;
+  try{ await loadSurahs(); idx=await quranIndex(); }catch(e){ box.innerHTML='<div class="muted">'+esc(e.message)+'.</div>'; return; }
+  const hits=[], seen=new Set(), push=(h,score)=>{ const k=h.s+':'+h.a; if(seen.has(k)) return; seen.add(k); hits.push({ h, score }); };
+  const ref=raw.match(/^(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/);
+  if(ref){ const h=idx.find(x=>x.s===+ref[1] && x.a===+ref[2]); if(h) push(h,999); }
+  const kq=normTr(raw), al=Q_ALIAS[kq];
+  if(al){ const h=idx.find(x=>x.s===al[0] && x.a===al[1]); if(h) push(h,998); }
+  const surHits=surahs && kq.length>=3 ? surahs.filter(s=>{ const n=normTr(s.en); return n===kq || n.replace(/^a/,'')===kq.replace(/^a/,'') || (kq.length>=4 && n.includes(kq)); }).slice(0,3) : [];
+  const words=enWords(raw), trWords=raw.toLowerCase().split(/\s+/).map(normTr).filter(w=>w.length>=3);
+  const phrase=words.length>1 ? ' '+words.join(' ')+' ' : '';
+  for(const x of idx){
+    let sc=0;
+    if(kq.length>=4 && x.kt.includes(kq)) sc+=10+kq.length/5;
+    else if(trWords.length){ const m=trWords.filter(w=>x.kt.includes(w)).length; if(m/trWords.length>=0.5) sc+=m/trWords.length*6; }
+    if(words.length){ if(phrase && x.ke.includes(phrase)) sc+=9; const m=words.filter(w=>x.ke.includes(' '+w+' ')).length; sc+=m/words.length*5; }
+    if(sc>=3) push(x,sc);
+  }
+  hits.sort((a,b)=>b.score-a.score);
+  const top=hits.slice(0,25);
+  const sHtml=surHits.map(s=>'<div class="qhit" data-s="'+s.n+'" data-a="1" data-to="'+s.c+'"><b>Surah '+s.n+' · '+esc(s.en)+' · '+esc(s.ar)+'</b><div class="en">Whole surah: ayah 1 to '+s.c+'</div></div>').join('');
+  const aHtml=top.map(({ h })=>'<div class="qhit" data-s="'+h.s+'" data-a="'+h.a+'"><b>'+h.s+':'+h.a+' · '+esc(h.name)+'</b><div class="ar">'+esc(h.ar)+'</div><div class="en">'+esc(h.en)+'</div></div>').join('');
+  box.innerHTML=(sHtml || aHtml) ? '<div class="muted">Tap a result to select it.</div>'+sHtml+aHtml : '<div class="muted">Nothing found. Try other words, e.g. "patience", "mercy", "qul audhu", or a surah name like "Yasin".</div>';
+}
+$('qFindBtn').onclick=findAyah;
+$('qFind').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); findAyah(); } });
+$('qResults').addEventListener('click',async e=>{
+  const el=e.target.closest('.qhit'); if(!el) return;
+  await loadSurahs();
+  const s=+el.dataset.s, a=+el.dataset.a, to=+el.dataset.to||a;
+  $('qSurah').value=String(s); localStorage.setItem('forge:set:qSurah',String(s));
+  $('qFrom').value=a; $('qTo').value=to; localStorage.setItem('forge:set:qFrom',String(a)); localStorage.setItem('forge:set:qTo',String(to));
+  qRange(); hide('qResults');
+  const nm=(surahs && surahs.find(x=>x.n===s) || {}).en || s;
+  toast('Selected Surah '+nm+', ayah '+a+(to!==a ? ' to '+to : '')+'. Change "To ayah" if you recited more.');
+});
+
+function alignUnits(units,buf){
+  const d=buf.getChannelData(0), R=buf.sampleRate, F=Math.max(1,Math.round(R*0.02)), n=Math.floor(d.length/F), env=new Float32Array(n);
+  for(let i=0;i<n;i++){ let s=0; for(let j=i*F;j<(i+1)*F;j++) s+=d[j]*d[j]; env[i]=Math.sqrt(s/F); }
+  const sorted=Float32Array.from(env).sort(), noise=sorted[Math.floor(n*0.1)]||0, loud=sorted[Math.floor(n*0.95)]||0, thr=noise+(loud-noise)*0.12;
+  const fr=i=>i*F/R;
+  let a=0; while(a<n && env[a]<=thr) a++;
+  let b=n-1; while(b>0 && env[b]<=thr) b--;
+  if(a>=b) throw new Error('no recitation was found in this file');
+  const start=fr(a), end=fr(b+1), N=units.length, D=end-start;
+  const lens=units.map(u=>3+u.ar.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640\s]/g,'').length), tot=lens.reduce((x,y)=>x+y,0);
+  const first=Math.max(0,start-0.1), last=Math.min(buf.duration,end+0.3);
+  const prop=()=>{ const o=[first]; let acc=0; for(let i=0;i<N-1;i++){ acc+=lens[i]; o.push(start+D*acc/tot); } o.push(last); return o; };
+  if(N===1) return [first,last];
+  const cands=[]; let q=-1;
+  for(let i=a;i<=b;i++){
+    if(env[i]<=thr){ if(q<0) q=i; }
+    else if(q>=0){ const len=fr(i)-fr(q); if(len>=0.2) cands.push({ t:(fr(q)+fr(i))/2, on:fr(i), s:len }); q=-1; }
+  }
+  if(cands.length<1.5*(N-1)){
+    const sm=new Float32Array(n);
+    for(let i=a;i<=b;i++){ let s=0,c=0; for(let k=-5;k<=5;k++){ const j=i+k; if(j>=a && j<=b){ s+=env[j]; c++; } } sm[i]=s/c; }
+    for(let i=a+10;i<b-10;i++){ if(sm[i]<sm[i-1] && sm[i]<=sm[i+1] && sm[i]<loud*0.35){ const t=fr(i); if(cands.every(c=>Math.abs(c.t-t)>0.6)) cands.push({ t, on:t, s:0.05 }); } }
+    cands.sort((x,y)=>x.t-y.t);
+  }
+  const K=cands.length;
+  if(K<N-1) return prop();
+  const P=[{ t:start, on:start, s:0 },...cands,{ t:end, on:end, s:0 }];
+  const A=2.5, B=1.4, INF=1e18;
+  const cost=(i,p,qq)=>{ const exp=D*lens[i]/tot, r=(P[qq].t-P[p].t)/exp-1; return A*r*r; };
+  const reward=j=>B*Math.min(P[j].s,1.5);
+  const dp=[], bk=[];
+  for(let i=0;i<N-1;i++){ dp.push(new Float64Array(K+2).fill(INF)); bk.push(new Int32Array(K+2).fill(-1)); }
+  for(let j=1;j<=K;j++) dp[0][j]=cost(0,0,j)-reward(j);
+  for(let i=1;i<N-1;i++){
+    const maxD=D*lens[i]/tot*4+8;
+    for(let j=i+1;j<=K;j++){
+      let best=INF, bi=-1;
+      for(let k=j-1;k>=i;k--){ if(P[j].t-P[k].t>maxD) break; const v=dp[i-1][k]; if(v>=INF) continue; const c=v+cost(i,k,j); if(c<best){ best=c; bi=k; } }
+      if(bi>=0){ dp[i][j]=best-reward(j); bk[i][j]=bi; }
+    }
+  }
+  let best=INF, bj=-1;
+  for(let j=N-1;j<=K;j++){ const v=dp[N-2][j]; if(v>=INF) continue; const c=v+cost(N-1,j,K+1); if(c<best){ best=c; bj=j; } }
+  if(bj<0) return prop();
+  const cuts=new Array(N-1); let j=bj;
+  for(let i=N-2;i>=0;i--){ cuts[i]=j; j=bk[i][j]; }
+  const o=[first]; cuts.forEach(c=>o.push(Math.max(0,P[c].on-0.08))); o.push(last);
+  return o;
+}
+async function quranScenes(){
+  await loadSurahs();
+  const s=+$('qSurah').value; if(!s) throw new Error('choose the surah you recited in step 1');
+  setP(0.05,'Getting the exact Quran text…');
+  const data=await quranFetch('surah/'+s+'/editions/quran-uthmani,en.sahih');
+  const ar=data[0], en=data[1], n=ar.numberOfAyahs;
+  const a=clamp(+$('qFrom').value||1,1,n), b=clamp(+$('qTo').value||a,a,n), bism=$('qBism').checked;
+  const units=[];
+  if($('qAudh').checked) units.push({ ar:AUDH_AR, en:AUDH_EN, num:0, label:"A'udhu billah" });
+  for(let k=a;k<=b;k++){
+    let t=ar.ayahs[k-1].text; const e=en.ayahs[k-1].text;
+    if(k===1 && s!==1 && s!==9){
+      const ws=t.split(' ');
+      if(/^بِسْمِ/.test(ws[0]) && ws.length>4){ t=ws.slice(4).join(' '); if(bism) units.push({ ar:ws.slice(0,4).join(' '), en:BISM_EN, num:0, label:'Bismillah' }); }
+    }else if(k===a && bism && s!==1 && s!==9){
+      const b0=ar.ayahs[0].text.split(' ').slice(0,4).join(' ');
+      units.push({ ar:b0, en:BISM_EN, num:0, label:'Bismillah' });
+    }
+    units.push({ ar:t, en:e, num:k, label:'Ayah '+k });
+  }
+  qInfo={ n:s, name:ar.englishName, a, b };
+  if(media.dur/units.length<1.2) throw new Error('you chose '+units.length+' parts (ayah '+a+' to '+b+'), but your recording is only '+fmtClock(media.dur)+' long. Set "From ayah" and "To ayah" to exactly the ayat you recited');
+  setP(0.12,'Lining up each ayah with your recitation…'); await yieldUI();
+  const bounds=alignUnits(units,media.buf);
+  return units.map((u,i)=>{ const sc=mk(u.en,''); sc.quran=u; sc.t0=bounds[i]; sc.t1=bounds[i+1]; return sc; });
+}
+function quranPost(){
+  const r=qInfo.a===qInfo.b ? qInfo.a : qInfo.a+'-'+qInfo.b, nm=qInfo.name.replace(/[^A-Za-z]/g,'');
+  return { title:('Surah '+qInfo.name+' '+r+' | Beautiful Quran Recitation').slice(0,90), description:'A recitation of Surah '+qInfo.name+', ayat '+r+', with the Arabic text and English translation.', hashtags:['Quran','QuranRecitation','Islam','Surah'+nm,'Recitation','Muslim'], tags:['quran','quran recitation','surah '+qInfo.name.toLowerCase(),'islam','beautiful recitation','quran with english translation'] };
+}
+quranUI();
+
+/* ---------- key rotation (many keys per AI, limits tracked per writer) ---------- */
+const POOLS={
+  gemini:{ name:'Gemini', el:'gkey', stat:'gstat', max:8 },
+  groq:{ name:'Groq', el:'qkey', stat:'qstat', max:5 }
+};
+const tag=k=>k.slice(-6);
+for(const p in POOLS){ const P=POOLS[p]; P.next=+localStorage.getItem('forge:'+p+'Next')||0; try{ P.rest=JSON.parse(localStorage.getItem('forge:'+p+'Rest')||'{}'); }catch{ P.rest={}; } }
+const allKeys=p=>[...new Set($(POOLS[p].el).value.split(/[\s,;]+/).map(s=>s.trim()).filter(s=>s.length>10))];
+const keyList=p=>allKeys(p).slice(0,POOLS[p].max);
+const hasKeys=p=>keyList(p).length>0;
+const scopeNow=p=>p==='gemini' ? $('gmodel').value : $('qmodel').value;
+const restUntil=(P,key,scope)=>Math.max(P.rest[tag(key)]||0, scope ? (P.rest[tag(key)+'|'+scope]||0) : 0);
+function keyStatus(p){
+  const P=POOLS[p], all=allKeys(p), l=all.slice(0,P.max), now=Date.now(), el=$(P.stat), sc=scopeNow(p);
+  const resting=l.filter(k=>restUntil(P,k,sc)>now).length;
+  let s=l.length ? l.length+' key'+(l.length>1?'s':'')+' ready, taking turns' : 'No keys yet';
+  if(resting) s=(l.length-resting)+' of '+l.length+' keys available for this writer · '+resting+' resting after a limit (↻ wakes them)';
+  if(all.length>P.max) s+=' · only the first '+P.max+' are used';
+  el.textContent=s; el.classList.toggle('warn',!!resting && resting===l.length);
+}
+function keyErr(msg,rest,global){ const e=new Error(msg); e.rest=rest; e.global=!!global; return e; }
+function waitText(ms){ const m=Math.max(1,Math.ceil(ms/60000)); return m<60 ? m+' min' : Math.round(m/60)+' h'; }
+async function withKey(p,fn,scope=''){
+  const P=POOLS[p], list=keyList(p);
+  if(!list.length) throw new Error('no '+P.name+' key');
+  const errs=[]; let tried=0;
+  for(let n=0;n<list.length;n++){
+    const i=(P.next+n)%list.length, key=list[i];
+    if(restUntil(P,key,scope)>Date.now()) continue;
+    tried++;
+    try{
+      const r=await fn(key);
+      P.next=(i+1)%list.length; localStorage.setItem('forge:'+p+'Next',P.next);
+      return r;
+    }catch(e){
+      if(!e.rest) throw e;
+      P.rest[e.global || !scope ? tag(key) : tag(key)+'|'+scope]=Date.now()+e.rest;
+      for(const t in P.rest) if(P.rest[t]<Date.now()) delete P.rest[t];
+      localStorage.setItem('forge:'+p+'Rest',JSON.stringify(P.rest));
+      errs.push(e.message); keyStatus(p); console.warn(P.name+' key …'+tag(key)+(scope ? ' on '+scope : '')+': '+e.message+' → trying the next key');
+    }
+  }
+  let err;
+  if(tried) err=new Error([...new Set(errs)].join('; ')+(tried>1 ? ' (tried '+tried+' keys)' : ''));
+  else{ const soon=Math.min(...list.map(k=>restUntil(P,k,scope)))-Date.now(); err=new Error('all '+list.length+' keys are resting after hitting their limits. The first is ready again in about '+waitText(soon)); }
+  if(scope) err.skip=true;
+  throw err;
+}
+
+/* ---------- if a writer is busy or out of free requests, try the next one ---------- */
+async function tryModels(sel,name,run){
+  const pick=$(sel).value, list=[pick,...[...$(sel).options].map(o=>o.value).filter(v=>v && v!==pick)].slice(0,5);
+  let last=null;
+  for(let i=0;i<list.length;i++){
+    try{ if(i) setP(0.08,name+': trying another writer ('+list[i].replace('models/','')+')…'); return await run(list[i]); }
+    catch(e){ if(!e.skip) throw e; last=e; console.warn(name+' writer '+list[i]+': '+e.message); if(i<list.length-1) await sleep(1200); }
+  }
+  throw new Error('no writer could answer. Last problem: '+(last ? last.message : 'busy'));
+}
+
+/* ---------- AI writer 1: Google Gemini ---------- */
+async function gfetch(path,opts,key){
+  const r=await fetch(GBASE+path,{ ...opts, headers:{ 'Content-Type':'application/json', 'x-goog-api-key':key } }).catch(()=>null);
+  if(!r) throw new Error('could not reach Google. Check your internet');
+  let j=null; try{ j=await r.json(); }catch{}
+  if(!r.ok){
+    const msg=(j && j.error && j.error.message) || ('error '+r.status), all=JSON.stringify(j||{});
+    if(/API key not valid|API_KEY_INVALID|invalid authentication|UNAUTHENTICATED/i.test(msg) || r.status===401) throw keyErr('a key was not accepted (check it at aistudio.google.com/apikey)',7*864e5,true);
+    if(r.status===429){ const d=all.match(/"retryDelay"\s*:\s*"(\d+)/); throw keyErr('the free limit was reached', /PerDay/i.test(all) ? 3*36e5 : Math.max(60,d ? +d[1]+5 : 60)*1000); }
+    if(/country|region|location/i.test(msg)) throw new Error('the free tier is not available in your area');
+    if(r.status===403) throw keyErr('a key is blocked or its project is not set up',30*6e4,true);
+    if(r.status===404 || r.status>=500 || /overloaded|high demand|UNAVAILABLE/i.test(msg)){ const e=new Error(r.status===404 ? 'this writer is not available' : 'this writer is busy right now'); e.skip=true; throw e; }
+    throw new Error(msg);
+  }
+  return j;
+}
+const gcall=(path,opts={},scope='')=>withKey('gemini',key=>gfetch(path,opts,key),scope);
+async function loadGemini(){
+  if(!hasKeys('gemini')) return;
+  const j=await gcall('models?pageSize=200',{},'models');
+  const ok=m=>(m.supportedGenerationMethods||[]).includes('generateContent') && /gemini/i.test(m.name) && !/(image|tts|audio|live|embedding|vision|learnlm|robotics|computer|nano)/i.test(m.name);
+  const ver=n=>{ const v=n.match(/gemini-(\d+(?:\.\d+)?)/); return v ? parseFloat(v[1]) : 0; };
+  const score=m=>ver(m.name)*10+(/flash/i.test(m.name)?3:0)-(/lite/i.test(m.name)?1:0)-(/(preview|exp)/i.test(m.name)?2:0)-(/pro/i.test(m.name)?4:0);
+  const list=(j.models||[]).filter(ok).sort((a,b)=>score(b)-score(a));
+  if(!list.length) throw new Error('no writers available on these keys');
+  const saved=localStorage.getItem(KEYS.gmodel);
+  $('gmodel').innerHTML=list.map(m=>'<option value="'+esc(m.name)+'">'+esc(m.displayName||m.name.replace('models/',''))+'</option>').join('');
+  $('gmodel').value=list.some(m=>m.name===saved) ? saved : list[0].name;
+  keyStatus('gemini');
+}
+async function writeGemini(prompt,schema){
+  if(!$('gmodel').value) await loadGemini();
+  const body={ contents:[{ role:'user', parts:[{ text:prompt }] }], generationConfig:{ temperature:0.9, responseMimeType:'application/json', responseSchema:schema } };
+  const j=await tryModels('gmodel','Gemini',m=>gcall(m+':generateContent',{ method:'POST', body:JSON.stringify(body) },m));
+  const parts=(j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  const txt=parts.filter(p=>p.text && !p.thought).map(p=>p.text).join('').trim();
+  if(!txt) throw new Error(j.promptFeedback && j.promptFeedback.blockReason ? 'it refused this topic ('+j.promptFeedback.blockReason+')' : 'it returned an empty answer');
+  return txt;
+}
+
+/* ---------- AI writer 2: Groq ---------- */
+async function qfetch(path,opts,key){
+  const o={ ...opts, headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key } };
+  let r=await fetch(QBASE+path,o).catch(()=>null);
+  if(!r) r=await fetch('/groq-api/openai/v1/'+path,o).catch(()=>null);
+  if(!r) throw new Error('could not reach Groq. Check your internet');
+  let j=null; try{ j=await r.json(); }catch{}
+  if(!r.ok){
+    const msg=(j && j.error && j.error.message) || ('error '+r.status);
+    if(r.status===401) throw keyErr('a key was not accepted (check it at console.groq.com/keys)',7*864e5,true);
+    if(r.status===429) throw keyErr('the free limit was reached', /per day|\(TPD\)|\(RPD\)/i.test(msg) ? 3*36e5 : 65*1000);
+    if(r.status===403) throw keyErr('a key is blocked',30*6e4,true);
+    if(r.status===404 || r.status>=500 || /model/i.test(msg) && r.status===400 || /over capacity|overloaded/i.test(msg)){ const e=new Error(r.status>=500 ? 'this writer is busy right now' : 'this writer is not available'); e.skip=true; throw e; }
+    throw new Error(msg);
+  }
+  return j;
+}
+const qcall=(path,opts={},scope='')=>withKey('groq',key=>qfetch(path,opts,key),scope);
+async function loadGroq(){
+  if(!hasKeys('groq')) return;
+  const j=await qcall('models',{},'models');
+  const pref=['llama-3.3-70b-versatile','openai/gpt-oss-120b','moonshotai/kimi-k2-instruct','openai/gpt-oss-20b','llama-3.1-8b-instant'];
+  const ids=(j.data||[]).map(m=>m.id).filter(id=>!/(whisper|tts|guard|vision|distil|playai|orpheus|compound|safeguard)/i.test(id));
+  ids.sort((a,b)=>{ const ia=pref.indexOf(a), ib=pref.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  if(!ids.length) throw new Error('no writers available on these keys');
+  const saved=localStorage.getItem(KEYS.qmodel);
+  $('qmodel').innerHTML=ids.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
+  $('qmodel').value=ids.includes(saved) ? saved : ids[0];
+  keyStatus('groq');
+}
+async function writeGroq(prompt,shape){
+  if(!$('qmodel').value) await loadGroq();
+  const j=await tryModels('qmodel','Groq',m=>qcall('chat/completions',{ method:'POST', body:JSON.stringify({ model:m, temperature:0.9, response_format:{ type:'json_object' },
+    messages:[{ role:'system', content:'You are a professional short-video scriptwriter and social media editor. You always reply with valid JSON only.' },{ role:'user', content:prompt+'\nReply with JSON only, in exactly this shape: '+shape }] }) },m));
+  const txt=j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if(!txt) throw new Error('it returned an empty answer');
+  return txt;
+}
+keyStatus('gemini'); keyStatus('groq');
+if(hasKeys('gemini')) loadGemini().catch(()=>{});
+if(hasKeys('groq')) loadGroq().catch(()=>{});
+
+/* ---------- writing the script and the post text (with automatic fallback) ---------- */
+const mk=(text,search)=>({ id:nextId++, text, search, results:null, pick:-1, status:'', audio:null, audioKey:'', sfx:'', cardOpen:false, cardAr:'', cardTr:'', t0:null, t1:null, timed:null, quran:null });
+const POST_PROPS={ title:{ type:'STRING' }, description:{ type:'STRING' }, hashtags:{ type:'ARRAY', items:{ type:'STRING' } }, tags:{ type:'ARRAY', items:{ type:'STRING' } } };
+const SCRIPT_SCHEMA={ type:'OBJECT', properties:{ ...POST_PROPS, scenes:{ type:'ARRAY', items:{ type:'OBJECT', properties:{ text:{ type:'STRING' }, search:{ type:'STRING' } }, required:['text','search'] } } }, required:['title','scenes'] };
+const SCRIPT_SHAPE='{"title":"...","description":"...","hashtags":["..."],"tags":["..."],"scenes":[{"text":"...","search":"..."}]}';
+const MEDIA_SCHEMA={ type:'OBJECT', properties:{ search:{ type:'ARRAY', items:{ type:'STRING' } }, ...POST_PROPS }, required:['search','title'] };
+const MEDIA_SHAPE='{"search":["..."],"title":"...","description":"...","hashtags":["..."],"tags":["..."]}';
+function footageRule(){
+  const ppl=$('people').value;
+  return ppl==='none' ? '- The search words must describe footage with NO people: objects, places, screens, nature, city views, buildings.\n'
+    : ppl==='nowomen' ? '- The search words must avoid women and people in revealing clothing. Prefer men, hands, objects, places, screens and buildings.\n' : '';
+}
+function buildPrompt(){
+  const topic=$('topic').value.trim(); if(!topic) throw new Error('type your idea in step 1 first');
+  const sec=+$('vlen').value, words=Math.round(sec*2.5), n=Math.max(4,Math.round(sec/6));
+  return 'Write the voice-over script for a '+TYPES[$('vtype').value]+' video about: "'+topic+'".\n'
+    +'Length: about '+words+' words in total (about '+sec+' seconds when spoken), split into about '+n+' scenes.\n'
+    +'Rules:\n- The first scene is a strong hook that makes people keep watching.\n- Simple, natural spoken English with short sentences. No emojis, no hashtags, no stage directions, no scene labels inside the text.\n'
+    +'- Each scene "text" is exactly what the narrator says (1 or 2 sentences, at most 30 words).\n'
+    +'- Each scene "search" is 2 to 4 simple English words describing the concrete visual moment of that sentence (who or what, doing what, where), for a stock video site. Examples: "man praying at night", "wallet on the street", "mosque at sunrise", "laptop screen code". No names of people, brands or written text.\n'
+    +footageRule()
+    +'- Do not quote Quran verses or hadith word for word. Explain their meaning in your own words instead.\n'
+    +'- The last scene is a short call to action (follow, subscribe or share).\n'
+    +'Also write a catchy "title" (under 70 characters), a "description" (2 or 3 sentences for social media), 5 to 8 "hashtags" (without the # symbol) and 10 to 15 short YouTube search "tags".';
+}
+function buildMediaPrompt(){
+  const hint=$('topic').value.trim(), n=scenes.length, quran=$('mlang').value==='quran';
+  return 'Below is '+(quran ? 'the English translation of a Quran recitation' : 'the transcript of a '+(media.kind==='video' ? 'video' : 'voice recording'))+', split into '+n+' numbered scenes.'+(hint ? ' The creator says it is about: "'+hint+'".' : '')+'\n'
+    +'Your jobs:\n'
+    +'1. "search": exactly '+n+' items, one for each scene, in the same order. Each item is 2 to 4 simple English words describing a concrete visual moment for a stock video site that matches what that scene says (who or what, doing what, where). Examples: "man praying at night", "wallet on the street", "city traffic night", "stars night sky". Always in English. No names of people, brands or written text. Avoid repeating the same words for different scenes.\n'
+    +footageRule()
+    +'2. "title": a catchy title under 70 characters.\n'
+    +'3. "description": 2 or 3 sentences for social media.\n'
+    +'4. "hashtags": 5 to 8 hashtags without the # symbol.\n'
+    +'5. "tags": 10 to 15 short YouTube search tags.\n'
+    +(quran ? 'This is a Quran recitation'+(qInfo ? ' of Surah '+qInfo.name+', ayat '+qInfo.a+' to '+qInfo.b : '')+'. Write the title, description, hashtags and tags in English, mention the surah, describe the theme of the verses, and do not quote the verses themselves.\n\n'
+            : 'Write the title, description, hashtags and tags in the same language as the transcript. Do not quote Quran verses or hadith word for word in them.\n\n')
+    +'Scenes:\n'+scenes.map((s,i)=>(i+1)+'. '+s.text).join('\n');
+}
+function parseAI(txt){
+  const s=String(txt).replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();
+  try{ return JSON.parse(s); }catch{}
+  const a=s.indexOf('{'), b=s.lastIndexOf('}');
+  if(a>=0 && b>a){ try{ return JSON.parse(s.slice(a,b+1)); }catch{} }
+  throw new Error('the AI answer could not be read');
+}
+async function askAI(prompt,schema,shape,doing,validate,at=0.05){
+  const order=$('provider').value==='groq' ? ['groq','gemini'] : ['gemini','groq'];
+  const usable=order.filter(hasKeys);
+  if(!usable.length){ const e=new Error('paste a Gemini or Groq key in step 2, or choose "My script"'); e.noKeys=true; throw e; }
+  const tries=$('fallback').checked ? usable : usable.slice(0,1), errs=[];
+  for(const p of tries){
+    const name=p==='gemini' ? 'Gemini' : 'Groq';
+    try{
+      setP(at,name+' '+doing+'…');
+      const data=parseAI(p==='gemini' ? await writeGemini(prompt,schema) : await writeGroq(prompt,shape));
+      validate(data);
+      if(errs.length) toast(errs[0]+' · used '+name+' instead');
+      return data;
+    }catch(e){ console.warn(name,e); errs.push(name+': '+e.message); }
+  }
+  throw new Error(errs.join(' · '));
+}
+function setPost(d){
+  const hs=(d.hashtags||[]).map(h=>'#'+String(h).replace(/^#/,'').replace(/\s+/g,'')).filter(h=>h.length>1).join(' ');
+  $('postTitle').value=String(d.title||'').trim();
+  $('postDesc').value=((d.description||'')+(hs ? '\n\n'+hs : '')).trim();
+  let tg='';
+  for(const t of (d.tags||[]).map(x=>String(x).replace(/^#/,'').trim()).filter(Boolean)){ const nx=tg ? tg+', '+t : t; if(nx.length>480) break; tg=nx; }
+  $('postTags').value=tg;
+  show('postBox');
+}
+function simplePost(){
+  const text=scenes.map(s=>s.text).join(' '), sents=text.split(/(?<=[.!?؟])\s+/).filter(Boolean);
+  const kw=[...new Set(scenes.map(s=>searchFor(s.text)).join(' ').split(' ').filter(Boolean))];
+  return { title:($('topic').value.trim() || sents[0] || text).slice(0,70), description:sents.slice(0,2).join(' '), hashtags:kw.slice(0,6), tags:kw.slice(0,15) };
+}
+async function writeWithAI(){
+  const data=await askAI(buildPrompt(),SCRIPT_SCHEMA,SCRIPT_SHAPE,'is writing your script',d=>{ if(!(d.scenes||[]).some(s=>s && s.text && String(s.text).trim())) throw new Error('the AI did not return any scenes'); });
+  scenes=data.scenes.filter(s=>s && s.text && String(s.text).trim()).map(s=>mk(String(s.text).trim(),String(s.search||'').trim()));
+  setPost(data);
+}
+async function prepareMedia(){
+  if(!media) throw new Error('choose your video or audio file in step 1 first');
+  const quran=$('mlang').value==='quran';
+  let PEc=null;
+  try{ PEc=await import('./presenter-explainer.js'); PEc.useRaw(media); }catch(e){ console.warn(e); }
+  scenes=quran ? await quranScenes() : mediaScenes(PEc ? PEc.cutWords(media,await listen(),!!$('tightOn')?.checked) : await listen());
+  renderScenes();
+  let data=null;
+  try{ data=await askAI(buildMediaPrompt(),MEDIA_SCHEMA,MEDIA_SHAPE,'is choosing footage and writing your post',d=>{ if(!Array.isArray(d.search) || !d.search.length) throw new Error('the AI answer had no footage words'); },0.27); }
+  catch(e){ if(!e.noKeys){ console.warn(e); toast('The AI could not answer, so simple footage words and post text were made instead'); } }
+  scenes.forEach((sc,i)=>{ const s=data && data.search[i]; sc.search=String(s||'').trim() || (sc.quran && !sc.quran.num ? 'mosque night sky' : searchFor(sc.text)); });
+  setPost(data || (quran ? quranPost() : simplePost()));
+  if(quran) $('postDesc').value=($('postDesc').value+'\n\nTranslation: Saheeh International.').trim();
+}
+const STOP=new Set('a about after all also am an and any are as at be because been but by can could did do does for from get got had has have he her here him his how i if in into is it its just like make many me more most my no not now of on one only or our out over really so some such than that the their them then there these they this those to too up us very was we were what when where which who why will with would you your youre lets let thats dont cant wont every each made way things thing people time day know want need going'.split(' '));
+function searchFor(t){
+  const w=t.toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(x=>x.length>3 && !STOP.has(x));
+  return [...new Set(w)].sort((a,b)=>b.length-a.length).slice(0,2).join(' ') || ($('topic').value.trim().split(/\s+/).slice(0,2).join(' ')||'nature');
+}
+function splitOwn(text){
+  const sents=text.replace(/\s+/g,' ').trim().split(/(?<=[.!?])\s+/).filter(Boolean), outp=[]; let cur='';
+  for(const s of sents){ const t=cur ? cur+' '+s : s; if(cur && t.split(' ').length>28){ outp.push(cur); cur=s; } else cur=t; if(cur.split(' ').length>=14){ outp.push(cur); cur=''; } }
+  if(cur) outp.push(cur);
+  return outp;
+}
+async function prepareScript(){
+  if(srcMode==='media') await prepareMedia();
+  else if(srcMode==='own'){
+    const t=$('ownScript').value.trim(); if(!t) throw new Error('paste your script in step 2 first');
+    scenes=splitOwn(t).map(s=>mk(s,searchFor(s)));
+    if(!$('postTitle').value){ $('postTitle').value=(($('topic').value.trim())||scenes[0].text).slice(0,70); show('postBox'); }
+  }else await writeWithAI();
+  renderScenes();
+}
+
+/* ---------- stock footage: Pixabay first, Pexels optional ---------- */
+const orient=()=>({ '9:16':'portrait', '16:9':'landscape', '1:1':'square' })[$('format').value];
+const mp4s=v=>(v.video_files||[]).filter(f=>f.link && f.width && f.height && /mp4/.test(f.file_type||'')).sort((a,b)=>a.width*a.height-b.width*b.height);
+function pickFile(v,W,H){
+  const l=[...v.files].sort((a,b)=>a.width*a.height-b.width*b.height), need=Math.min(W,H)*0.66;
+  return l.find(f=>Math.min(f.width,f.height)>=need && f.width*f.height<=2.3e6) || l.filter(f=>f.width*f.height<=2.3e6).pop() || l[0] || null;
+}
+const CLIP_CACHE=new Map();
+const WOMEN=/\b(woman|women|girl|girls|female|females|lady|ladies|bikini|swimsuit|swimwear|lingerie|underwear|sexy|model|models|beauty|bride|dancer|yoga|fitness)\b/;
+const PEOPLE=/\b(people|person|persons|man|men|boy|boys|guy|guys|child|children|kid|kids|baby|family|couple|crowd|human|portrait|face|businessman|businesswoman|worker|workers|student|students|teacher|doctor)\b/;
+function peopleOk(v){
+  const mode=$('people').value; if(mode==='any') return true;
+  const t=String(v.tags||'').toLowerCase().replace(/[-_\/.,]/g,' ');
+  if(WOMEN.test(t)) return false;
+  if(mode==='none' && PEOPLE.test(t)) return false;
+  return true;
+}
+const PXB_CACHE='forge:pixabayCache2';
+function cacheGet(q){ try{ const c=JSON.parse(localStorage.getItem(PXB_CACHE)||'{}'), e=c[q]; return e && Date.now()-e.t<864e5 ? e.r : null; }catch{ return null; } }
+function cachePut(q,r){ try{ const c=JSON.parse(localStorage.getItem(PXB_CACHE)||'{}'), now=Date.now(); for(const k in c) if(now-c[k].t>864e5) delete c[k]; c[q]={ t:now, r }; localStorage.setItem(PXB_CACHE,JSON.stringify(c)); }catch{} }
+async function pixabayVideos(query){
+  const q=query.trim().toLowerCase().slice(0,100), hit=cacheGet(q); if(hit) return hit;
+  const qs='videos/?key='+encodeURIComponent($('xkey').value.trim())+'&q='+encodeURIComponent(q)+'&per_page=20&safesearch=true&video_type=film';
+  let res=await fetch('https://pixabay.com/api/'+qs).catch(()=>null);
+  if(!res) res=await fetch('/pixabay-api/'+qs).catch(()=>null);
+  if(!res) throw new Error('could not reach Pixabay. Check your internet');
+  if(res.status===429) throw new Error('the Pixabay limit was reached (100 searches per minute). Wait a minute and try again');
+  if(!res.ok){
+    const t=(await res.text().catch(()=>'')).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,160);
+    if(/key/i.test(t) || res.status===401 || res.status===403) throw new Error('the Pixabay key was not accepted (Pixabay said: "'+(t || 'error '+res.status)+'")');
+    throw new Error('Pixabay answered with an error ('+res.status+(t ? ': '+t : '')+')');
+  }
+  const j=await res.json();
+  const r=(j.hits||[]).filter(h=>h.duration>=3 && h.videos).map(h=>{
+    const files=['tiny','small','medium','large'].map(k=>h.videos[k]).filter(f=>f && f.url && f.width && f.height).map(f=>({ link:f.url, width:f.width, height:f.height }));
+    const th=(h.videos.small||h.videos.tiny||{}).thumbnail||'';
+    return { id:'x'+h.id, image:th, duration:h.duration, user:h.user, url:h.pageURL, src:'Pixabay', tags:h.tags||'', files };
+  }).filter(v=>v.files.length);
+  cachePut(q,r); return r;
+}
+async function pexelsVideos(query){
+  const key=$('pkey').value.trim();
+  const qs='v1/videos/search?query='+encodeURIComponent(query)+'&per_page=15&orientation='+orient(), opts={ headers:{ Authorization:key } };
+  let res; try{ res=await fetch('https://api.pexels.com/'+qs,opts); }catch{ res=await fetch('/pexels-api/'+qs,opts).catch(()=>null); }
+  if(!res) throw new Error('could not reach Pexels. Check your internet');
+  if(res.status===401 || res.status===403) throw new Error('the Pexels key was not accepted');
+  if(res.status===429) throw new Error('the Pexels limit was reached (200 searches per hour). Try again later');
+  if(!res.ok || !/json/.test(res.headers.get('content-type')||'')) throw new Error('Pexels answered with an error ('+res.status+')');
+  return ((await res.json()).videos||[]).filter(v=>v.duration>=3 && mp4s(v).length).map(v=>({ id:'p'+v.id, image:v.image, duration:v.duration, user:v.user && v.user.name, url:v.url, src:'Pexels', tags:String(v.url||'').split('/video/')[1]||'', files:mp4s(v).map(f=>({ link:f.link, width:f.width, height:f.height })) }));
+}
+async function searchOnce(query){
+  const x=$('xkey').value.trim(), p=$('pkey').value.trim();
+  if(!x && !p) throw new Error('paste your free Pixabay key in step 4');
+  let firstErr=null;
+  if(x){ try{ const r=(await pixabayVideos(query)).filter(peopleOk); if(r.length || !p) return r; }catch(e){ if(!p) throw e; firstErr=e; } }
+  try{ return (await pexelsVideos(query)).filter(peopleOk); }catch(e){ throw firstErr || e; }
+}
+async function footageSearch(query){
+  let r=await searchOnce(query);
+  const w=query.trim().split(/\s+/);
+  if(!r.length && w.length>2) r=await searchOnce(w.slice(0,2).join(' '));
+  return r;
+}
+async function searchScene(sc,autoPick){
+  if(!sc.search.trim()) sc.search=searchFor(sc.text);
+  sc.status='Searching for "'+sc.search+'"…'; renderOne(sc);
+  try{
+    sc.results=await footageSearch(sc.search);
+    if(autoPick || sc.pick<0){ const used=new Set(scenes.filter(x=>x!==sc && x.pick>=0 && x.results).map(x=>x.results[x.pick].id)); const i=sc.results.findIndex(v=>!used.has(v.id)); sc.pick=i>=0 ? i : (sc.results.length ? 0 : -1); }
+  }finally{ sc.status=''; renderOne(sc); }
+}
+async function getClipBlob(link){
+  try{ const r=await fetch(link); if(r.ok) return await r.blob(); }catch{}
+  const routes=[[/^https:\/\/videos\.pexels\.com\/(.+)$/,'/pexels-video/'],[/^https:\/\/cdn\.pixabay\.com\/(.+)$/,'/pixabay-video/']];
+  for(const [re,base] of routes){ const m=link.match(re); if(m){ try{ const r=await fetch(base+m[1]); if(r.ok && !/text\/html/.test(r.headers.get('content-type')||'')) return await r.blob(); }catch{} } }
+  throw new Error('a stock clip could not be downloaded. Check that the _redirects file is uploaded to Netlify');
+}
+
+/* ---------- scenes panel ---------- */
+function sfxOptions(sel){ return '<option value="">No scene sound</option>'+soundList.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===sel?' selected':'')+'>'+esc(s.name)+'</option>').join(''); }
+function cardHtml(sc,i){
+  const vs=$('vidSrc').value, backup=myBgs.length ? 'one of your own files' : 'a built-in moving background';
+  let clips;
+  if(sc.status) clips='<div class="muted">'+esc(sc.status)+'</div>';
+  else if(vs==='own') clips='<div class="muted">'+(myBgs.length ? 'Your own photos and videos are used here.' : 'No files in your library yet, so a built-in moving background is used here.')+'</div>';
+  else if(vs==='builtin') clips='<div class="muted">A built-in moving background is used here.</div>';
+  else if(!sc.results) clips='<div class="muted">Clips are found automatically when you make the video, or click 🔍. If none are found, '+backup+' is used.</div>';
+  else if(!sc.results.length) clips='<div class="muted">No stock clip found, so '+backup+' will be used. Or try simpler words like "mosque", "night sky" or "nature" and click 🔍.</div>';
+  else clips='<div class="clips">'+sc.results.map((v,k)=>'<div class="clip'+(k===sc.pick?' on':'')+'" data-k="'+k+'" title="Video by '+esc(v.user || v.src)+' on '+esc(v.src)+'"><img src="'+esc(v.image)+'" alt="" loading="lazy"><span>'+v.duration+'s</span></div>').join('')+'</div>';
+  const sfx=soundList.length ? '<select class="s-sfx" title="Extra sound for this scene">'+sfxOptions(sc.sfx)+'</select>' : '';
+  const q='<input type="text" class="q" value="'+esc(sc.search)+'" placeholder="footage search words"><button class="mini s-search" title="Search clips">🔍</button>';
+  if(sc.quran){
+    const u=sc.quran;
+    return '<div class="sc" data-id="'+sc.id+'"><div class="sc-top"><b>'+esc(u.label)+'</b><span class="sc-time">starts '+fmtSec(sc.t0)+'</span>'+q+sfx
+      +'<button class="mini s-play" title="Listen to this part">▶</button><button class="mini s-early" title="Show it a little earlier">⏪</button><button class="mini s-late" title="Show it a little later">⏩</button></div>'
+      +'<div class="ayah" dir="rtl">'+esc(u.ar)+(u.num ? ' ﴿'+arDigits(u.num)+'﴾' : '')+'</div><div class="muted">'+esc(u.en)+'</div>'+clips+'</div>';
+  }
+  const isM=sc.t0!=null;
+  const time=isM ? '<span class="sc-time">'+fmtClock(sc.t0)+'–'+fmtClock(sc.t1)+'</span>' : (sc.dur ? '· '+sc.dur.toFixed(1)+'s' : '');
+  const moveDel=isM ? '' : '<button class="mini s-up" title="Move up">↑</button><button class="mini s-del" title="Delete scene">✕</button>';
+  const card=sc.cardOpen ? '<div class="cardbox"><div class="label" style="margin:0">Verse / hadith card · paste the exact text yourself</div>'
+    +'<textarea class="s-ar" dir="rtl" rows="2" placeholder="Arabic text (optional)">'+esc(sc.cardAr)+'</textarea>'
+    +'<textarea class="s-tr" rows="2" placeholder="Translation and reference, e.g. (Quran 65:2)">'+esc(sc.cardTr)+'</textarea></div>' : '';
+  return '<div class="sc" data-id="'+sc.id+'"><div class="sc-top"><b>Scene '+(i+1)+'</b>'+time+q+sfx+'<button class="mini s-card'+(sc.cardOpen?' on':'')+'" title="Verse or hadith card">📜</button>'+moveDel+'</div>'
+    +'<textarea class="s-text" rows="2"'+(isM ? ' dir="auto" title="Fix any wrong word here. This changes the captions only, not the sound."' : '')+'>'+esc(sc.text)+'</textarea>'+card+clips+'</div>';
+}
+function renderScenes(){
+  const isM=scenes.some(s=>s.t0!=null), isQ=scenes.some(s=>s.quran);
+  $('scenes').innerHTML=scenes.length ? scenes.map(cardHtml).join('')+(isM ? '' : '<button class="mini" id="addScene">+ Add a scene</button>') : '<div class="muted">Your scenes appear here after the script is written or your file is listened to.</div>';
+  if(scenes.length){
+    $('hint').textContent=scenes.length+(isQ ? ' parts · press ▶ to check each ayah, ⏪ ⏩ to fine-tune, then render' : ' scenes · '+(isM ? 'fix any caption word, change footage, then render' : 'edit anything, then render'));
+    $('renderBtn').textContent=resultBlob ? '🎬 Render again with my edits' : '🎬 Make the video with these scenes';
+    show('renderBtn');
+  }else hide('renderBtn');
+}
+function renderOne(sc){ const el=$('scenes').querySelector('[data-id="'+sc.id+'"]'); if(el) el.outerHTML=cardHtml(sc,scenes.indexOf(sc)); }
+const sceneOf=el=>scenes.find(s=>s.id===+el.closest('.sc')?.dataset.id);
+$('scenes').addEventListener('input',e=>{
+  const sc=sceneOf(e.target); if(!sc) return; const c=e.target.classList;
+  if(c.contains('s-text')) sc.text=e.target.value;
+  if(c.contains('q')) sc.search=e.target.value;
+  if(c.contains('s-ar')) sc.cardAr=e.target.value;
+  if(c.contains('s-tr')) sc.cardTr=e.target.value;
+  if(c.contains('s-sfx')) sc.sfx=e.target.value;
+});
+$('scenes').addEventListener('click',e=>{
+  if(busy) return;
+  if(e.target.id==='addScene'){ scenes.push(mk('Write what the narrator says here.','')); renderScenes(); return; }
+  const sc=sceneOf(e.target); if(!sc) return;
+  const clip=e.target.closest('.clip'), c=e.target.classList, i=scenes.indexOf(sc);
+  if(clip){ sc.pick=+clip.dataset.k; renderOne(sc); }
+  else if(c.contains('s-search')) searchScene(sc,false).catch(err=>showNote('Search failed: '+err.message+'.'));
+  else if(c.contains('s-play')){ if(media) playBuf(sliceBuf(media.buf,sc.t0,Math.max(0.3,sc.t1-sc.t0))); }
+  else if(c.contains('s-early') || c.contains('s-late')){
+    const pv=scenes[i-1], d=c.contains('s-early') ? -0.2 : 0.2;
+    const t=clamp(sc.t0+d, pv ? pv.t0+0.3 : 0, sc.t1-0.3);
+    sc.t0=t; if(pv){ pv.t1=t; renderOne(pv); } renderOne(sc);
+  }
+  else if(c.contains('s-card')){ if(sc.cardOpen){ if(hasCard(sc) && !confirm('Remove the verse card from this scene?')) return; sc.cardOpen=false; sc.cardAr=''; sc.cardTr=''; } else sc.cardOpen=true; renderOne(sc); }
+  else if(c.contains('s-del')){ scenes.splice(i,1); renderScenes(); }
+  else if(c.contains('s-up') && i>0){ [scenes[i-1],scenes[i]]=[scenes[i],scenes[i-1]]; renderScenes(); }
+});
+
+/* ---------- AI voice (Kokoro, runs in a background worker so the page never freezes) ---------- */
+const yieldUI=()=>new Promise(r=>{ const c=new MessageChannel(); c.port1.onmessage=()=>r(); c.port2.postMessage(0); });
+const VOICE_WORKER=`
+let tts=null;
+self.onmessage=async e=>{
+  const { id, text, voice, speed }=e.data;
+  try{
+    if(!tts){
+      let mod; try{ mod=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm'); }catch{ mod=await import('https://esm.sh/kokoro-js@1.2.1'); }
+      tts=await mod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{ dtype:'q8', device:'wasm', progress_callback:p=>{ if(p && p.status==='progress' && typeof p.progress==='number' && /onnx/.test(p.file||'')) self.postMessage({ type:'progress', progress:p.progress }); } });
+    }
+    if(!text){ self.postMessage({ id, type:'ready' }); return; }
+    const a=await tts.generate(text,{ voice, speed });
+    const audio=new Float32Array(a.audio);
+    self.postMessage({ id, type:'done', audio, rate:a.sampling_rate },[audio.buffer]);
+  }catch(err){ self.postMessage({ id, type:'error', message:String(err && err.message || err) }); }
+};`;
+function workerTTS(){
+  const w=new Worker(URL.createObjectURL(new Blob([VOICE_WORKER],{ type:'text/javascript' })),{ type:'module' });
+  const jobs=new Map(); let n=0;
+  w.onmessage=e=>{ const d=e.data; if(d.type==='progress'){ setP(d.progress/100,'Downloading the AI voice (first time only)… '+Math.round(d.progress)+'%'); return; } const j=jobs.get(d.id); if(!j) return; jobs.delete(d.id); if(d.type==='error') j.reject(new Error(d.message)); else j.resolve(d); };
+  w.onerror=e=>{ for(const j of jobs.values()) j.reject(new Error(e.message||'the voice worker stopped')); jobs.clear(); };
+  const call=msg=>new Promise((resolve,reject)=>{ const id=++n; jobs.set(id,{ resolve, reject }); w.postMessage({ id, ...msg }); });
+  return { ready:()=>call({ text:'' }), generate:async(text,o)=>{ const d=await call({ text, voice:o.voice, speed:o.speed }); return { audio:d.audio, sampling_rate:d.rate }; } };
+}
+async function getTTS(){
+  if(tts) return tts;
+  setP(0,'Loading the AI voice (first time downloads about 90 MB, then it is saved)…');
+  try{ const wt=workerTTS(); await wt.ready(); tts=wt; return tts; }
+  catch(e){ console.warn('Voice worker unavailable, using the page instead',e); }
+  const { KokoroTTS }=await loadKokoro();
+  tts=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{ dtype:'q8', device:'wasm',
+    progress_callback:p=>{ if(p.status==='progress' && typeof p.progress==='number' && /onnx/.test(p.file||'')) setP(p.progress/100,'Downloading the AI voice (first time only)… '+Math.round(p.progress)+'%'); } });
+  return tts;
+}
+$('voiceTest').onclick=async()=>{
+  if(busy) return; busy=true; show('prog'); hide('note');
+  try{
+    const t=await getTTS(); setP(1,'Speaking…');
+    const a=await t.generate('Hi! This is how your video will sound. Pretty natural, right?',{ voice:$('voice').value, speed:+$('speed').value });
+    const ctx=new AudioContext(), b=ctx.createBuffer(1,a.audio.length,a.sampling_rate); b.copyToChannel(a.audio,0);
+    const s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(); s.onended=()=>ctx.close();
+    hide('prog');
+  }catch(e){ showNote('The voice could not load: '+(e.message||e)+'.'); }
+  finally{ busy=false; }
+};
+
+/* ---------- voice studio (echo, warmth, clarity, hiss removal, pitch, even loudness) ---------- */
+const FX_IDS=['fxPitch','fxEcho','fxRoom','fxWarm','fxClear','fxClean'];
+const FX_PRESETS={
+  natural:{ pitch:0, echo:0, room:4, warm:0, clear:0, clean:0, level:false },
+  clear:{ pitch:0, echo:0, room:3, warm:15, clear:45, clean:45, level:true },
+  sweet:{ pitch:0, echo:14, room:3, warm:45, clear:30, clean:30, level:true },
+  studio:{ pitch:0, echo:0, room:2, warm:30, clear:35, clean:50, level:true },
+  mosque:{ pitch:0, echo:45, room:8, warm:35, clear:25, clean:30, level:true },
+  hall:{ pitch:0, echo:60, room:10, warm:25, clear:20, clean:20, level:true },
+  deeper:{ pitch:-3, echo:8, room:3, warm:40, clear:25, clean:30, level:true }
+};
+const FX_TIPS={
+  natural:'No change to the voice.',
+  clear:'Removes rumble and hiss, and makes words easier to understand. Good for weak or noisy recordings.',
+  sweet:'A warmer, softer, smoother voice with a touch of space.',
+  studio:'A close, rich podcast sound with even loudness.',
+  mosque:'A deep, long echo with soft repeats, like a recitation in a large mosque.',
+  hall:'A very big, open echo.',
+  deeper:'Lowers the voice a little and adds body. Good for a voice that sounds too high or young.',
+  custom:'Your own mix. Press ▶ After to check it.'
+};
+const FX_FMT={ fxPitch:v=>(v>0?'+':'')+v, fxEcho:v=>v+'%', fxRoom:v=>String(v), fxWarm:v=>v+'%', fxClear:v=>v+'%', fxClean:v=>v+'%' };
+const fxSettings=()=>({ pitch:+$('fxPitch').value, echo:+$('fxEcho').value, room:+$('fxRoom').value, warm:+$('fxWarm').value, clear:+$('fxClear').value, clean:+$('fxClean').value, level:$('fxLevel').checked });
+const fxActive=S=>!!(S.pitch || S.echo || S.warm || S.clear || S.clean || S.level);
+const roomSecs=r=>0.5+r*0.35;
+function fxLabels(){ for(const id of FX_IDS) $(id+'Val').textContent=FX_FMT[id](+$(id).value); $('fxInfo').textContent=FX_TIPS[$('fxPreset').value]||''; }
+function setPresetCustom(){ if($('fxPreset').value==='custom') return; $('fxPreset').value='custom'; localStorage.setItem('forge:set:fxPreset','custom'); fxLabels(); }
+function applyPreset(k){
+  const p=FX_PRESETS[k]; if(!p){ fxLabels(); return; }
+  const map={ fxPitch:p.pitch, fxEcho:p.echo, fxRoom:p.room, fxWarm:p.warm, fxClear:p.clear, fxClean:p.clean };
+  for(const id in map){ $(id).value=map[id]; $(id).dispatchEvent(new Event('change')); }
+  $('fxLevel').checked=p.level; $('fxLevel').dispatchEvent(new Event('change'));
+  fxLabels();
+}
+FX_IDS.forEach(id=>$(id).addEventListener('input',()=>{ fxLabels(); setPresetCustom(); }));
+$('fxLevel').addEventListener('change',e=>{ if(e.isTrusted) setPresetCustom(); });
+$('fxPreset').addEventListener('change',()=>applyPreset($('fxPreset').value));
+fxLabels();
+
+async function pitchShift(buf,semi){
+  const { SoundTouch, SimpleFilter, WebAudioBufferSource }=await loadST();
+  const st=new SoundTouch(); st.pitchSemitones=semi; st.tempo=1; st.rate=1;
+  const filter=new SimpleFilter(new WebAudioBufferSource(buf),st);
+  const n=buf.length, L=new Float32Array(n), R=new Float32Array(n), BLOCK=8192, tmp=new Float32Array(BLOCK*2);
+  let pos=0, loops=0;
+  while(pos<n){
+    const got=filter.extract(tmp,BLOCK); if(!got) break;
+    for(let i=0;i<got && pos<n;i++,pos++){ L[pos]=tmp[i*2]; R[pos]=tmp[i*2+1]; }
+    if(++loops%30===0) await yieldUI();
+  }
+  const o=new AudioBuffer({ length:n, numberOfChannels:2, sampleRate:buf.sampleRate });
+  o.copyToChannel(L,0); o.copyToChannel(R,1);
+  return o;
+}
+function cleanNoise(ch,rate,amt){
+  const W=Math.max(1,Math.round(rate*0.01)), n=Math.ceil(ch.length/W), env=new Float32Array(n);
+  for(let k=0;k<n;k++){ let s=0; const a=k*W, b=Math.min(ch.length,a+W); for(let i=a;i<b;i++) s+=ch[i]*ch[i]; env[k]=Math.sqrt(s/Math.max(1,b-a)); }
+  const sorted=Float32Array.from(env).sort(), floor=sorted[Math.floor(n*0.1)]||0, loud=sorted[Math.floor(n*0.95)]||0;
+  if(loud<=floor*1.5) return;
+  const thr=floor+(loud-floor)*(0.04+0.1*amt), minG=1-0.85*amt, g=new Float32Array(n);
+  let cur=1, hold=0;
+  for(let k=0;k<n;k++){
+    if(env[k]>=thr) hold=15; else if(hold>0) hold--;
+    const target=hold>0 ? 1 : minG;
+    cur+=(target-cur)*(target>cur ? 0.6 : 0.15); g[k]=cur;
+  }
+  for(let i=0;i<ch.length;i++){ const k=i/W, k0=Math.min(n-1,Math.floor(k)), k1=Math.min(n-1,k0+1), f=k-k0; ch[i]*=g[k0]*(1-f)+g[k1]*f; }
+}
+function makeIR(ctx,secs){
+  const rate=ctx.sampleRate, n=Math.max(1,Math.ceil(secs*rate)), ir=ctx.createBuffer(2,n,rate), pre=Math.round(rate*0.02);
+  for(let c=0;c<2;c++){ const d=ir.getChannelData(c); let lp=0; for(let i=pre;i<n;i++){ const t=(i-pre)/(n-pre); lp=lp*0.6+(Math.random()*2-1)*0.4; d[i]=lp*Math.pow(1-t,3); } }
+  return ir;
+}
+function normalize(b,peak,onlyDown){
+  let mx=0;
+  for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c); for(let i=0;i<d.length;i++){ const v=Math.abs(d[i]); if(v>mx) mx=v; } }
+  if(mx<1e-4 || (onlyDown && mx<=peak)) return;
+  const k=Math.min(peak/mx,8);
+  for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=k; }
+}
+async function processVoice(buf,S){
+  let b=buf;
+  if(S.pitch){ try{ b=await pitchShift(b,S.pitch); }catch(e){ console.warn('Pitch change unavailable',e); toast('The pitch change could not load (check your internet). The other effects were still applied.'); } }
+  const chs=[];
+  for(let c=0;c<b.numberOfChannels;c++){ const d=new Float32Array(b.getChannelData(c)); if(S.clean>0) cleanNoise(d,b.sampleRate,S.clean/100); chs.push(d); }
+  const src0=new AudioBuffer({ length:b.length, numberOfChannels:chs.length, sampleRate:b.sampleRate });
+  chs.forEach((d,c)=>src0.copyToChannel(d,c));
+  const rate=48000, tail=S.echo>0 ? roomSecs(S.room) : 0;
+  const off=new OfflineAudioContext(2,Math.ceil((b.duration+tail)*rate),rate), s=off.createBufferSource(); s.buffer=src0;
+  let node=s;
+  const add=n=>{ node.connect(n); node=n; return n; };
+  const hp=add(off.createBiquadFilter()); hp.type='highpass'; hp.frequency.value=S.clean>0 ? 85 : 50;
+  const lo=add(off.createBiquadFilter()); lo.type='lowshelf'; lo.frequency.value=220; lo.gain.value=S.warm/100*5;
+  const mud=add(off.createBiquadFilter()); mud.type='peaking'; mud.frequency.value=450; mud.Q.value=1; mud.gain.value=-S.clear/100*2.5;
+  const pr=add(off.createBiquadFilter()); pr.type='peaking'; pr.frequency.value=3200; pr.Q.value=0.9; pr.gain.value=S.clear/100*4.5;
+  const hs=add(off.createBiquadFilter()); hs.type='highshelf'; hs.frequency.value=9000; hs.gain.value=S.clear/100*3-S.warm/100*2.5;
+  if(S.level){ const c=add(off.createDynamicsCompressor()); c.threshold.value=-22; c.knee.value=12; c.ratio.value=3.5; c.attack.value=0.006; c.release.value=0.2; }
+  const dry=off.createGain(); dry.gain.value=1; node.connect(dry); dry.connect(off.destination);
+  if(S.echo>0){
+    const cv=off.createConvolver(); cv.buffer=makeIR(off,roomSecs(S.room));
+    const wet=off.createGain(); wet.gain.value=S.echo/100*0.9;
+    node.connect(cv); cv.connect(wet); wet.connect(off.destination);
+    dry.gain.value=1-S.echo/100*0.25;
+    if(S.room>=6){
+      const d=off.createDelay(1); d.delayTime.value=0.2+S.room*0.012;
+      const fb=off.createGain(); fb.gain.value=0.32;
+      const lp=off.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
+      const eg=off.createGain(); eg.gain.value=S.echo/100*0.35;
+      node.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(eg); eg.connect(off.destination);
+    }
+  }
+  s.start(0);
+  const outb=await off.startRendering();
+  normalize(outb,S.level ? 0.89 : 0.98,!S.level);
+  return outb;
+}
+let fxPlayer=null, fxBusy=false, fxTestCache=null;
+function stopFx(){ if(fxPlayer){ try{ fxPlayer.src.stop(); }catch{} try{ fxPlayer.ctx.close(); }catch{} fxPlayer=null; } }
+function playBuf(b){ stopFx(); const ctx=new AudioContext(), s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.onended=()=>{ if(fxPlayer && fxPlayer.src===s) stopFx(); }; s.start(); fxPlayer={ ctx, src:s }; }
+function sliceBuf(b,from,secs){
+  const a=Math.max(0,Math.floor(from*b.sampleRate)), n=Math.max(1,Math.min(b.length-a,Math.floor(secs*b.sampleRate)));
+  const o=new AudioBuffer({ length:n, numberOfChannels:b.numberOfChannels, sampleRate:b.sampleRate });
+  for(let c=0;c<b.numberOfChannels;c++) o.copyToChannel(b.getChannelData(c).subarray(a,a+n),c);
+  return o;
+}
+async function fxSample(){
+  if(srcMode==='media'){ if(!media) throw new Error('choose your video or audio file in step 1 first'); return sliceBuf(media.buf,media.dur>20 ? Math.min(5,media.dur*0.1) : 0,12); }
+  const voice=$('voice').value, speed=+$('speed').value, key=voice+'|'+speed;
+  if(fxTestCache && fxTestCache.key===key) return fxTestCache.buf;
+  show('prog'); const t=await getTTS(); setP(1,'Making a voice sample…');
+  const a=await t.generate('Hi! This is how the voice will sound in your video, with the voice studio settings you chose.',{ voice, speed });
+  const b=new AudioBuffer({ length:a.audio.length, numberOfChannels:1, sampleRate:a.sampling_rate }); b.copyToChannel(a.audio,0);
+  hide('prog'); fxTestCache={ key, buf:b }; return b;
+}
+async function fxPreview(after){
+  if(busy || fxBusy) return;
+  fxBusy=true; const btn=$(after ? 'fxAfter' : 'fxBefore'), label=btn.textContent; btn.textContent='…';
+  try{ let b=await fxSample(); const S=fxSettings(); if(after && fxActive(S)) b=await processVoice(b,S); playBuf(b); }
+  catch(e){ hide('prog'); showNote('Could not play the sample: '+(e.message||e)+'.'); }
+  finally{ fxBusy=false; btn.textContent=label; }
+}
+$('fxBefore').onclick=()=>fxPreview(false);
+$('fxAfter').onclick=()=>fxPreview(true);
+
+/* ---------- captions ---------- */
+function wrap(ctx,text,maxW){ const words=text.split(/\s+/).filter(Boolean), lines=[]; let line=''; for(const w of words){ const t=line ? line+' '+w : w; if(ctx.measureText(t).width>maxW && line){ lines.push(line); line=w; } else line=t; } if(line) lines.push(line); return lines; }
+function sceneWords(sc,md){
+  const words=sc.text.trim().split(/\s+/).filter(Boolean); if(!words.length) return [];
+  if(md && sc.timed && sc.timed.length===words.length) return words.map((w,i)=>({ t:w, s:sc.timed[i].s, e:sc.timed[i].e }));
+  const total=words.join(' ').length; let pos=0;
+  return words.map(w=>{ const s=sc.start+sc.dur*(pos/total); pos+=w.length+1; return { t:w, s, e:sc.start+sc.dur*Math.min(1,pos/total) }; });
+}
+function buildCaptions(n,md,emode){
+  const caps=[];
+  for(const sc of scenes){
+    if(sc.quran) continue;
+    const timed=sceneWords(sc,md); if(!timed.length) continue;
+    timed.forEach(w=>{ w.emo=emode!=='none' ? emojiFor(w.t) : ''; });
+    const size=n||timed.length;
+    for(let i=0;i<timed.length;i+=size){ const g=timed.slice(i,i+size); caps.push({ start:g[0].s, end:g[g.length-1].e, words:g }); }
+  }
+  caps.sort((a,b)=>a.start-b.start);
+  for(let i=0;i<caps.length-1;i++){ const gap=caps[i+1].start-caps[i].end; if(gap>0 && gap<0.5) caps[i].end=caps[i+1].start; }
+  return caps;
+}
+const capAt=(caps,t)=>caps.find(c=>t>=c.start && t<c.end)||null;
+function drawCaption(ctx,W,H,cap,t,style,hl,emode){
+  if(!cap || style==='none') return;
+  const pop=style==='pop', rtl=cap.words.some(w=>RTL.test(w.t)), up=pop && !rtl, fs=Math.round(Math.min(W,H)*(pop ? 0.075 : 0.055)), inl=emode==='inline';
+  const TF=rtl ? '700 '+Math.round(fs*1.1)+'px Amiri, "Traditional Arabic", serif' : '900 '+fs+'px "Segoe UI", Roboto, Arial, sans-serif', EF=Math.round(fs*0.95)+'px '+EMOJI_FONT;
+  ctx.save(); ctx.font=TF;
+  ctx.textBaseline='middle'; ctx.textAlign=rtl ? 'right' : 'left'; ctx.direction=rtl ? 'rtl' : 'ltr';
+  const space=ctx.measureText(' ').width, maxW=W*0.84, lines=[]; let line=[], lw=0;
+  for(const w0 of cap.words){
+    const w={ ...w0, d:up ? w0.t.toUpperCase() : w0.t }; w.w=ctx.measureText(w.d).width; w.ew=0;
+    if(inl && w0.emo){ ctx.font=EF; w.ew=ctx.measureText(w0.emo).width+space*0.5; ctx.font=TF; }
+    const tw=w.w+w.ew, nw=line.length ? lw+space+tw : tw;
+    if(nw>maxW && line.length){ lines.push({ ws:line, w:lw }); line=[w]; lw=tw; } else { line.push(w); lw=nw; }
+  }
+  if(line.length) lines.push({ ws:line, w:lw });
+  const lh=fs*(rtl ? 1.6 : 1.25), top=(W<H ? H*0.70 : H*0.84)-lines.length*lh/2;
+  const base=pop ? '#ffd60a' : '#ffffff', active=pop ? '#ffffff' : '#ffd60a';
+  lines.forEach((L,i)=>{
+    const y=top+i*lh+lh/2, left=W/2-L.w/2; let x=rtl ? W/2+L.w/2 : left;
+    if(style==='box'){ const pad=fs*0.35; ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(left-pad,y-lh/2,L.w+pad*2,lh,fs*0.22); else ctx.rect(left-pad,y-lh/2,L.w+pad*2,lh); ctx.fill(); }
+    for(const w of L.ws){
+      const on=hl && t>=w.s && t<w.e;
+      if(style!=='box'){ ctx.lineJoin='round'; ctx.lineWidth=Math.max(4,fs*0.2); ctx.strokeStyle='#000'; ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=fs*0.15; ctx.strokeText(w.d,x,y); ctx.shadowColor='transparent'; }
+      ctx.fillStyle=on ? active : base; ctx.fillText(w.d,x,y);
+      if(w.ew && t>=w.s){ ctx.save(); ctx.font=EF; ctx.shadowColor='transparent'; ctx.fillText(w.emo, rtl ? x-w.w-space*0.5 : x+w.w+space*0.5, y); ctx.restore(); }
+      x+=rtl ? -(w.w+w.ew+space) : w.w+w.ew+space;
+    }
+  });
+  if(emode==='pop'){
+    let pw=null; for(const w of cap.words) if(w.emo && t>=w.s) pw=w;
+    if(pw){
+      const age=t-pw.s, k=age<0.18 ? 0.4+age/0.18*0.8 : age<0.3 ? 1.2-(age-0.18)/0.12*0.2 : 1, sz=Math.round(fs*1.7*k);
+      ctx.font=sz+'px '+EMOJI_FONT; ctx.textAlign='center'; ctx.direction='ltr'; ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=fs*0.3; ctx.fillStyle='#fff';
+      ctx.fillText(pw.emo,W/2,top-fs*1.2);
+    }
+  }
+  ctx.restore();
+}
+function srtTime(s){ const t=Math.max(0,Math.round(s*1000)), h=Math.floor(t/36e5), m=Math.floor(t/6e4)%60, x=Math.floor(t/1000)%60; return [h,m,x].map(v=>String(v).padStart(2,'0')).join(':')+','+String(t%1000).padStart(3,'0'); }
+
+/* ---------- decoding a video clip (loops if shorter than the shot) ---------- */
+async function openClip(MB,blob,W,H){
+  const input=new MB.Input({ source:new MB.BlobSource(blob), formats:MB.ALL_FORMATS });
+  const track=await input.getPrimaryVideoTrack();
+  if(!track || !(await track.canDecode())) throw new Error('cannot decode');
+  const first=await track.getFirstTimestamp(), dur=Math.max(0.5,(await track.computeDuration())-first), skip=Math.min(0.4,dur*0.1);
+  const hold=new OffscreenCanvas(W,H);
+  return { input, first:first+skip, dur:dur-skip, hold, hx:hold.getContext('2d'), sink:new MB.CanvasSink(track,{ width:W, height:H, fit:'cover', poolSize:2 }), iter:null, next:null, has:false, pos:-1 };
+}
+async function restartClip(c){ if(c.iter){ try{ await c.iter.return(); }catch{} } c.iter=c.sink.canvases(c.first); const r=await c.iter.next(); c.next=r.done ? null : r.value; }
+async function clipFrame(c,t){
+  if(!c.iter) await restartClip(c);
+  const target=c.first+(t % c.dur);
+  if(target<c.pos-0.001) await restartClip(c);
+  while(c.next && (!c.has || c.next.timestamp<=target+0.001)){ c.hx.drawImage(c.next.canvas,0,0); c.has=true; const r=await c.iter.next(); c.next=r.done ? null : r.value; }
+  c.pos=target; return c.has ? c.hold : null;
+}
+async function closeClip(c){ if(!c || !c.sink) return; try{ if(c.iter) await c.iter.return(); }catch{} try{ c.input.dispose?.(); }catch{} }
+function makeGrain(){ const c=new OffscreenCanvas(256,256), x=c.getContext('2d'), im=x.createImageData(256,256); for(let i=0;i<im.data.length;i+=4){ const v=Math.random()*255; im.data[i]=im.data[i+1]=im.data[i+2]=v; im.data[i+3]=255; } x.putImageData(im,0,0); return c; }
+
+/* ---------- making the video ---------- */
+function setBusy(on){
+  busy=on; $('oneBtn').disabled=on; $('renderBtn').disabled=on; $('scriptBtn').disabled=on; $('voiceTest').disabled=on; $('fxBefore').disabled=on; $('fxAfter').disabled=on;
+  $('srcMode').querySelectorAll('button').forEach(b=>b.disabled=on);
+  mdrop.style.pointerEvents=on?'none':'';
+  on ? show('cancelBtn') : hide('cancelBtn');
+  $('scenes').style.pointerEvents=on?'none':''; $('scenes').style.opacity=on?'.65':'';
+  keepAwake(on);
+}
+$('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stopping…'; if(out){ try{ await out.cancel(); }catch{} } };
+async function render(){
+  if(!('VideoEncoder' in window)) throw new Error('making videos needs Google Chrome or Microsoft Edge on a computer');
+  if(!scenes.length) throw new Error('there are no scenes yet');
+  const md=srcMode==='media', vsrcMode=(srcMode==='media' && $('keepPic')?.checked) ? 'builtin' : $('vidSrc').value, hasStock=!!($('xkey').value.trim() || $('pkey').value.trim());
+  if(md){
+    if(!media) throw new Error('choose your video or audio file in step 1 first');
+    if(!scenes.every(s=>s.t0!=null)) throw new Error('these scenes were not made from your file. Click "Make my video" so your file is prepared first');
+  }
+  stopPreview(); stopFx();
+  const MB=await loadMB();
+  const q=+$('quality').value, [BW,BH]=FORMATS[$('format').value], k=q/Math.min(BW,BH), W=Math.round(BW*k/2)*2, H=Math.round(BH*k/2)*2, m=Math.min(W,H), vert=W<H;
+
+  if(!md){
+    const t=await getTTS(), voice=$('voice').value, speed=+$('speed').value;
+    for(let i=0;i<scenes.length;i++){
+      check(); const sc=scenes[i], key=voice+'|'+speed+'|'+sc.text.trim();
+      setP(0.05+0.25*i/scenes.length,'Recording the voice… scene '+(i+1)+' of '+scenes.length);
+      if(sc.audioKey!==key){ const a=await t.generate(sc.text.trim(),{ voice, speed }); sc.audio={ data:a.audio, rate:a.sampling_rate }; sc.audioKey=key; }
+    }
+  }
+
+  setP(0.3,'Preparing your sounds…');
+  const vol=+$('musicVol').value, bg=vol>0 ? await soundBuffer($('bgSound').value).catch(()=>null) : null;
+  const FX=fxSettings(), fxOn=fxActive(FX), fxTail=FX.echo>0 ? Math.min(3,roomSecs(FX.room)*0.6) : 0;
+  let total;
+  if(md){
+    scenes.forEach(sc=>{ sc.start=sc.t0; sc.dur=Math.max(0.2,sc.t1-sc.t0); });
+    total=Math.max(media.dur,scenes[scenes.length-1].t1)+(bg ? 1.5 : 0.2)+fxTail;
+    scenes.forEach((sc,i)=>{ sc.vs=i ? Math.max(scenes[i-1].vs+0.3,(scenes[i-1].t1+sc.t0)/2) : 0; });
+    scenes.forEach((sc,i)=>{ sc.ve=i<scenes.length-1 ? scenes[i+1].vs : total; sc.end=sc.ve; });
+  }else{
+    const lead=bg ? 1.2 : LEAD, tail=bg ? 1.8 : 0.6;
+    let time=lead;
+    scenes.forEach(sc=>{ sc.start=time; sc.dur=sc.audio.data.length/sc.audio.rate; sc.end=time+sc.dur+GAP; time=sc.end; });
+    total=time+tail+fxTail;
+    scenes.forEach((sc,i)=>{ sc.vs=i ? scenes[i-1].end : 0; sc.ve=i===scenes.length-1 ? total : sc.end; });
+  }
+  renderScenes();
+
+  let stockErr='';
+  if(vsrcMode==='stock' && hasStock){
+    const pace=scenes.length>60 ? 650 : 250;
+    for(let i=0;i<scenes.length && !stockErr;i++){
+      check(); const sc=scenes[i];
+      if(sc.results) continue;
+      setP(0.32+0.08*i/scenes.length,'Finding footage… part '+(i+1)+' of '+scenes.length);
+      for(let a=0;a<2;a++){
+        try{ await searchScene(sc,true); break; }
+        catch(e){
+          if(/Pixabay limit/.test(e.message) && !a){ setP(0.32+0.08*i/scenes.length,'Pixabay limit reached · waiting one minute, then continuing…'); await wait(61000); continue; }
+          if(/not accepted|limit/i.test(e.message)) stockErr=e.message;
+          break;
+        }
+      }
+      await sleep(pace);
+    }
+  }
+
+  const SHOT=+$('shotLen').value, bStyle=$('biStyle').value, BSTY=['stars','light','waves'], builtinFor=si=>bStyle==='auto' ? BSTY[si%3] : bStyle;
+  const own=vsrcMode==='builtin' ? [] : myBgs.slice();
+  let ownIdx=0, fallbackCount=0;
+  const nextOwn=()=>own.length ? own[(ownIdx++)%own.length] : null;
+  const used=new Set(), shots=[];
+  if(vsrcMode==='stock') scenes.forEach(sc=>{ if(sc.pick>=0 && sc.results && sc.results[sc.pick]) used.add(sc.results[sc.pick].id); });
+  scenes.forEach((sc,si)=>{
+    const span=Math.max(0.1,sc.ve-sc.vs), want=SHOT ? clamp(Math.round(span/SHOT),1,6) : 1;
+    let list=[];
+    if(vsrcMode==='stock'){
+      const main=sc.pick>=0 && sc.results ? sc.results[sc.pick] : null;
+      if(main){
+        list.push({ kind:'stock', v:main });
+        for(const v of sc.results){ if(list.length>=want) break; if(!used.has(v.id)){ used.add(v.id); list.push({ kind:'stock', v }); } }
+      }
+    }
+    if(!list.length){
+      if(vsrcMode==='stock') fallbackCount++;
+      for(let j=0;j<want;j++){ const o=nextOwn(); list.push(o ? { kind:o.type, item:o } : { kind:'builtin', style:builtinFor(si) }); }
+      if(list.every(x=>x.kind==='builtin')) list=[list[0]];
+    }
+    const n=list.length;
+    list.forEach((x,j)=>shots.push({ si, vs:sc.vs+span*j/n, ve:sc.vs+span*(j+1)/n, ...x }));
+  });
+
+  const blobs=new Array(shots.length).fill(null), jobs=[...new Set(shots.filter(s=>s.kind==='stock').map(s=>s.v))], totalJobs=jobs.length;
+  let done=0;
+  if(totalJobs) await Promise.all(Array.from({ length:4 },async()=>{
+    while(jobs.length){
+      check();
+      const v=jobs.shift(), f=pickFile(v,W,H), key=v.id+'|'+(f ? f.link : '');
+      if(f && !CLIP_CACHE.has(key)) CLIP_CACHE.set(key,await getClipBlob(f.link).catch(()=>null));
+      v._blob=f ? CLIP_CACHE.get(key) : null;
+      done++; setP(0.4+0.15*done/Math.max(1,totalJobs),'Downloading footage… '+done+' of '+totalJobs+' clips');
+    }
+  }));
+  const ownImgs=new Map();
+  for(const s of shots){ if(s.kind==='img' && !ownImgs.has(s.item.id)){ try{ ownImgs.set(s.item.id,await createImageBitmap(s.item.blob)); }catch{ ownImgs.set(s.item.id,null); } } }
+  shots.forEach((s,i)=>{ blobs[i]=s.kind==='stock' ? (s.v._blob||null) : s.kind==='vid' ? s.item.blob : null; });
+
+  const SR=48000;
+  setP(0.55,'Preparing the voice…');
+  let voiceTrack;
+  if(md) voiceTrack=media.buf;
+  else{
+    const vo=new OfflineAudioContext(1,Math.ceil(total*SR),SR);
+    for(const sc of scenes){ const b=vo.createBuffer(1,sc.audio.data.length,sc.audio.rate); b.copyToChannel(sc.audio.data,0); const s=vo.createBufferSource(); s.buffer=b; s.connect(vo.destination); s.start(sc.start); }
+    voiceTrack=await vo.startRendering();
+  }
+  check();
+  let voiceOut=voiceTrack;
+  if(fxOn){ setP(0.56,'Polishing the voice in the voice studio…'); voiceOut=await processVoice(voiceTrack,FX); check(); }
+
+  setP(0.58,'Mixing the sound…');
+  const off=new OfflineAudioContext(2,Math.ceil(total*SR),SR);
+  { const s=off.createBufferSource(); s.buffer=voiceOut; s.connect(off.destination); s.start(0); }
+  if(bg){
+    const s=off.createBufferSource(), g=off.createGain(), v=vol/100, hi=$('duck').checked ? Math.min(0.9,v*2.2) : v;
+    s.buffer=bg; s.loop=bg.duration<total; s.connect(g); g.connect(off.destination);
+    const iv=[]; for(const sc of scenes){ const a=sc.start-0.15, b=sc.start+sc.dur+0.15; if(iv.length && a-iv[iv.length-1][1]<0.9) iv[iv.length-1][1]=b; else iv.push([a,b]); }
+    g.gain.setValueAtTime(0,0); g.gain.linearRampToValueAtTime(hi,0.8);
+    for(const [a,b] of iv){ g.gain.setValueAtTime(hi,Math.max(a-0.35,0.8)); g.gain.linearRampToValueAtTime(v,Math.max(a,0.85)); g.gain.setValueAtTime(v,b); g.gain.linearRampToValueAtTime(hi,b+0.4); }
+    const endT=Math.max(total-1.5,iv[iv.length-1][1]+0.45); g.gain.setValueAtTime(hi,endT); g.gain.linearRampToValueAtTime(0,total);
+    s.start(0);
+  }
+  for(const sc of scenes){
+    if(!sc.sfx) continue; const b=await soundBuffer(sc.sfx).catch(()=>null); if(!b) continue;
+    const s=off.createBufferSource(), g=off.createGain(), t0=sc.vs, t1=sc.ve;
+    s.buffer=b; s.loop=b.duration<(t1-t0); s.connect(g); g.connect(off.destination);
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.5,t0+0.3); g.gain.setValueAtTime(0.5,Math.max(t0+0.3,t1-0.5)); g.gain.linearRampToValueAtTime(0,t1);
+    s.start(t0); s.stop(t1+0.05);
+  }
+  const mixed=await off.startRendering();
+
+  if(scenes.some(hasCard) || scenes.some(s=>s.quran || RTL.test(s.text))){ try{ await document.fonts.load('700 48px Amiri'); }catch{} }
+  let usePhoto=false; if(photoImg){ try{ await photoImg.decode(); }catch{} usePhoto=photoImg.naturalWidth>0; }
+
+  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H; const ctx=canvas.getContext('2d');
+  out=new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:'in-memory' }), target:new MB.BufferTarget() });
+  let vcodec='avc'; try{ if(MB.getFirstEncodableVideoCodec) vcodec=(await MB.getFirstEncodableVideoCodec(out.format.getSupportedVideoCodecs(),{ width:W, height:H }))||'avc'; }catch{}
+  const vsrc=new MB.CanvasSource(canvas,{ codec:vcodec, quality:new MB.Quality('high') }); out.addVideoTrack(vsrc,{ frameRate:FPS });
+  let acodec='aac'; try{ if(MB.getFirstEncodableAudioCodec) acodec=(await MB.getFirstEncodableAudioCodec(out.format.getSupportedAudioCodecs(),{ numberOfChannels:2, sampleRate:SR }))||'aac'; }catch{}
+  const asrc=new MB.AudioBufferSource({ codec:acodec, quality:new MB.Quality('high') }); out.addAudioTrack(asrc);
+  await out.start(); await asrc.add(mixed); asrc.close();
+
+  const frames=Math.ceil(total*FPS);
+  const env=new Float32Array(frames);
+  {
+    const d=voiceTrack.getChannelData(0), r=voiceTrack.sampleRate, win=Math.max(1,Math.floor(r/FPS)), f1=Math.min(frames,Math.ceil(voiceTrack.duration*FPS));
+    for(let f=0;f<f1;f++){ const i0=Math.floor(f/FPS*r); let s=0,n=0; for(let i=i0;i<Math.min(d.length,i0+win);i++){ s+=d[i]*d[i]; n++; } env[f]=n ? Math.sqrt(s/n) : 0; }
+  }
+  let mx=0; for(let f=0;f<frames;f++) mx=Math.max(mx,env[f]);
+  let lv=0; for(let f=0;f<frames;f++){ const x=mx ? Math.min(1,env[f]/(mx*0.7)) : 0; lv=x>lv ? lv+(x-lv)*0.6 : lv*0.85; env[f]=lv; }
+
+  const emode=$('emojiMode').value, qMode=$('qCap').value;
+  const caps=buildCaptions(+$('wpc').value,md,emode), style=$('capStyle').value, hl=$('hlOn').checked, XF=$('xfOn').checked ? 0.45 : 0, cine=$('cineOn').checked;
+  lastCaps=[...caps, ...scenes.filter(s=>s.quran).map(s=>({ start:s.t0, end:s.t1, words:[{ t:qMode==='ar' ? s.quran.ar : qMode==='en' ? s.quran.en : s.quran.ar+'\n'+s.quran.en }] }))].sort((a,b)=>a.start-b.start);
+  const title=$('postTitle').value.trim(), channel=$('channel').value.trim(), outroLine=$('outroLine').value.trim(), introOn=$('introOn').checked, pm=$('presMode').value, tagText=$('nameTag').value.trim();
+  const vign=ctx.createRadialGradient(W/2,H/2,m*0.35,W/2,H/2,Math.hypot(W,H)/2); vign.addColorStop(0,'rgba(0,0,0,0)'); vign.addColorStop(1,'rgba(0,0,0,0.5)');
+  const grain=cine ? ctx.createPattern(makeGrain(),'repeat') : null;
+  const clips=new Array(shots.length).fill(undefined);
+  const rnd=(s=>()=>{ s=s+0x6D2B79F5|0; let t=Math.imul(s^s>>>15,1|s); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; })(7);
+  const STARS=Array.from({ length:170 },()=>({ x:rnd(), y:rnd(), r:0.6+rnd()*1.7, f:0.6+rnd()*2, p:rnd()*6.283, v:0.2+rnd()*0.6 }));
+
+  function drawBuiltin(styleName,tt,A){
+    ctx.save();
+    if(styleName==='stars'){
+      const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#03040f'); g.addColorStop(0.55,'#10163a'); g.addColorStop(1,'#2a1d48');
+      ctx.globalAlpha=A; ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      const mx2=W*0.72, my2=H*0.2, rg=ctx.createRadialGradient(mx2,my2,0,mx2,my2,m*0.5); rg.addColorStop(0,'rgba(233,196,106,0.24)'); rg.addColorStop(1,'rgba(233,196,106,0)');
+      ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#ffffff';
+      for(const s of STARS){
+        const x=((s.x*W+tt*s.v*m*0.01)%W+W)%W, y=s.y*H*0.9, tw=0.35+0.65*(0.5+0.5*Math.sin(tt*s.f+s.p));
+        ctx.globalAlpha=A*tw; ctx.beginPath(); ctx.arc(x,y,s.r*m*0.0022,0,6.283); ctx.fill();
+      }
+    }else if(styleName==='light'){
+      const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#120c04'); g.addColorStop(0.5,'#2a1c08'); g.addColorStop(1,'#3d2a10');
+      ctx.globalAlpha=A; ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      ctx.globalCompositeOperation='lighter';
+      for(let k2=0;k2<4;k2++){
+        const x=W*(0.5+0.35*Math.sin(tt*0.11+k2*1.7)), y=H*(0.4+0.3*Math.sin(tt*0.07+k2*2.3)), r=m*(0.45+0.15*Math.sin(tt*0.2+k2));
+        const rg=ctx.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,'rgba(233,196,106,0.20)'); rg.addColorStop(1,'rgba(233,196,106,0)');
+        ctx.globalAlpha=A; ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+      }
+      ctx.translate(W*0.5,-H*0.05); ctx.rotate(Math.sin(tt*0.08)*0.12);
+      const len=Math.hypot(W,H);
+      for(let k2=-3;k2<=3;k2++){
+        const a0=k2*0.22; ctx.globalAlpha=A*(0.05+0.03*Math.sin(tt*0.5+k2)); ctx.fillStyle='#ffe2a8';
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.sin(a0-0.05)*len,Math.cos(a0-0.05)*len); ctx.lineTo(Math.sin(a0+0.05)*len,Math.cos(a0+0.05)*len); ctx.closePath(); ctx.fill();
+      }
+    }else{
+      const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#06202b'); g.addColorStop(0.5,'#0c3c4c'); g.addColorStop(1,'#155e66');
+      ctx.globalAlpha=A; ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      for(let k2=0;k2<4;k2++){
+        const base=H*(0.5+0.12*k2), amp=m*(0.025+0.01*k2), fq=1.2+k2*0.5, sp=0.35+k2*0.12;
+        ctx.globalAlpha=A*(0.10+0.04*k2); ctx.fillStyle='#bfe9ec'; ctx.beginPath(); ctx.moveTo(0,H);
+        for(let x=0;x<=W+1;x+=W/48) ctx.lineTo(x,base+Math.sin(x/W*6.283*fq+tt*sp+k2)*amp);
+        ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  async function ensure(i){
+    if(clips[i]!==undefined) return;
+    const s=shots[i]; clips[i]=null;
+    if(s.kind==='img'){ const im=ownImgs.get(s.item.id); clips[i]=im ? { img:im } : { bi:builtinFor(s.si) }; }
+    else if(s.kind==='builtin') clips[i]={ bi:s.style };
+    else if(blobs[i]){ try{ clips[i]=await openClip(MB,blobs[i],W,H); }catch{ clips[i]=null; } }
+  }
+  async function drawLayer(i,tt,alpha,blur){
+    const sh=shots[i], c=clips[i], p=clamp((tt-sh.vs)/Math.max(0.1,sh.ve-sh.vs),0,1), A=clamp(alpha,0,1);
+    ctx.save(); ctx.globalAlpha=A; if(blur) ctx.filter=blur;
+    if(c && c.img){
+      const im=c.img, s0=Math.max(W/im.width,H/im.height), s=(blur ? 1.1 : 1.04)+0.08*p, dw=im.width*s0*s, dh=im.height*s0*s, pan=(dw-W)/2*(p-0.5)*(i%2 ? 1 : -1)*0.8;
+      ctx.drawImage(im,(W-dw)/2+pan,(H-dh)/2,dw,dh);
+    }else if(c && c.bi) drawBuiltin(c.bi,tt,A);
+    else{
+      const img=c ? await clipFrame(c,tt-sh.vs) : null;
+      if(img){ const s=(blur ? 1.1 : 1.02)+0.07*p, sw=W*s, sh2=H*s, pan=(sw-W)/2*(p-0.5)*(i%2 ? 1 : -1); ctx.drawImage(img,(W-sw)/2+pan,(H-sh2)/2,sw,sh2); }
+      else drawBuiltin(builtinFor(sh.si),tt,A);
+    }
+    ctx.restore();
+  }
+  function cinematic(f){
+    ctx.save();
+    ctx.globalCompositeOperation='soft-light'; ctx.fillStyle='rgba(255,165,80,0.3)'; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation='source-over'; ctx.fillStyle=vign; ctx.fillRect(0,0,W,H);
+    if(grain){ ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=0.08; ctx.translate(-((f*37)%256),-((f*91)%256)); ctx.fillStyle=grain; ctx.fillRect(0,0,W+256,H+256); }
+    ctx.restore();
+  }
+  function drawCard(sc,since){
+    const ar=(sc.cardAr||'').trim(), tr=(sc.cardTr||'').trim(), a=clamp(since/0.6,0,1), maxW=W*0.82, afs=Math.round(m*0.075), tfs=Math.round(m*0.042);
+    const AF='700 '+afs+'px Amiri, "Traditional Arabic", serif', TF='italic 600 '+tfs+'px Georgia, "Times New Roman", serif';
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,'+(0.5*a)+')'; ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=a; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=AF; ctx.direction='rtl'; const al=ar ? wrap(ctx,ar,maxW) : [];
+    ctx.font=TF; ctx.direction='ltr'; const tl=tr ? wrap(ctx,tr,maxW) : [];
+    const alh=afs*1.7, tlh=tfs*1.45, gap=al.length && tl.length ? afs*0.9 : 0;
+    let y=H*0.45-(al.length*alh+gap+tl.length*tlh)/2;
+    ctx.shadowColor='rgba(0,0,0,.7)'; ctx.shadowBlur=afs*0.25;
+    ctx.font=AF; ctx.direction='rtl'; ctx.fillStyle='#ffffff';
+    for(const l of al){ ctx.fillText(l,W/2,y+alh/2); y+=alh; }
+    if(gap){ ctx.shadowBlur=0; ctx.fillStyle=GOLD; ctx.fillRect(W/2-W*0.12,y+gap/2-2,W*0.24,4); y+=gap; ctx.shadowBlur=tfs*0.25; }
+    ctx.font=TF; ctx.direction='ltr'; ctx.fillStyle='#f3e7c9';
+    for(const l of tl){ ctx.fillText(l,W/2,y+tlh/2); y+=tlh; }
+    ctx.restore();
+  }
+  function drawAyah(sc,since){
+    const u=sc.quran, a=clamp(since/0.35,0,1); if(a<=0) return;
+    const showAr=qMode!=='en', showEn=qMode!=='ar', maxW=W*0.86, num=u.num ? ' ﴿'+arDigits(u.num)+'﴾' : '';
+    let afs=m*(vert ? 0.068 : 0.06), tfs=m*(vert ? 0.04 : 0.036), al=[], tl=[], h=0, AF='', TF='';
+    for(let k2=0;k2<9;k2++){
+      AF='700 '+Math.round(afs)+'px Amiri, "Traditional Arabic", serif'; TF='italic 600 '+Math.round(tfs)+'px Georgia, "Times New Roman", serif';
+      ctx.font=AF; ctx.direction='rtl'; al=showAr ? wrap(ctx,u.ar+num,maxW) : [];
+      ctx.font=TF; ctx.direction='ltr'; tl=showEn ? wrap(ctx,u.en,maxW) : [];
+      h=al.length*afs*1.75+(al.length && tl.length ? afs*0.7 : 0)+tl.length*tfs*1.45;
+      if(h<=H*(vert ? 0.42 : 0.5)) break;
+      afs*=0.88; tfs*=0.9;
+    }
+    const emo=emode!=='none' && showEn ? emojisOf(u.en,3) : '', es=Math.round(tfs*1.5), tot=h+(emo ? es*1.4 : 0);
+    let y=(vert ? H*0.66 : H*0.6)-tot/2;
+    ctx.save(); ctx.globalAlpha=a;
+    const pad=m*0.04, g=ctx.createLinearGradient(0,y-pad*2,0,y+tot+pad*2);
+    g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.2,'rgba(0,0,0,0.62)'); g.addColorStop(0.8,'rgba(0,0,0,0.62)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,y-pad*2,W,tot+pad*4);
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor='rgba(0,0,0,.7)'; ctx.shadowBlur=afs*0.2;
+    ctx.font=AF; ctx.direction='rtl'; ctx.fillStyle='#ffffff';
+    for(const l of al){ ctx.fillText(l,W/2,y+afs*0.875); y+=afs*1.75; }
+    if(al.length && tl.length){ ctx.shadowBlur=0; ctx.fillStyle=GOLD; ctx.fillRect(W/2-W*0.1,y+afs*0.35-2,W*0.2,3); y+=afs*0.7; ctx.shadowBlur=tfs*0.25; }
+    ctx.font=TF; ctx.direction='ltr'; ctx.fillStyle='#f3e7c9';
+    for(const l of tl){ ctx.fillText(l,W/2,y+tfs*0.72); y+=tfs*1.45; }
+    if(emo){ ctx.shadowBlur=0; ctx.font=es+'px '+EMOJI_FONT; ctx.fillText(emo,W/2,y+es*0.8); }
+    ctx.restore();
+  }
+  function drawPresenter(kind,lvl,tt){
+    const big=kind==='big', r=big ? m*(vert ? 0.28 : 0.24) : m*0.13;
+    const cx=big ? W/2 : m*0.05+r, cy=big ? H*(vert ? 0.42 : 0.55) : H*(vert ? 0.20 : 0.31)+r;
+    const R=r*(1+0.012*Math.sin(tt*Math.PI/2)+0.035*lvl);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,R+r*(0.08+0.22*lvl),0,Math.PI*2); ctx.strokeStyle='rgba(233,196,106,'+(0.15+0.45*lvl)+')'; ctx.lineWidth=Math.max(2,r*0.03); ctx.stroke();
+    ctx.shadowColor='rgba(233,196,106,'+(0.4+0.5*lvl)+')'; ctx.shadowBlur=r*(0.12+0.4*lvl);
+    ctx.beginPath(); ctx.arc(cx,cy,R+r*0.055,0,Math.PI*2); ctx.fillStyle=GOLD; ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+    const iw=photoImg.naturalWidth, ih=photoImg.naturalHeight, s=Math.max(2*R/iw,2*R/ih), dw=iw*s, dh=ih*s;
+    ctx.drawImage(photoImg,cx-dw/2,clamp(cy-dh*0.42,cy+R-dh,cy-R),dw,dh);
+    ctx.restore();
+    if(tagText){
+      const fs=Math.round(m*(big ? 0.042 : 0.028)); ctx.save(); ctx.font='800 '+fs+'px "Segoe UI", Roboto, Arial, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const tw=Math.min(ctx.measureText(tagText).width,W*0.8), pad=fs*0.5, ty=cy+R+r*0.06+fs*1.1, tx=big ? W/2 : Math.max(cx,tw/2+pad+m*0.03);
+      ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(tx-tw/2-pad,ty-fs*0.8,tw+pad*2,fs*1.6,fs*0.8); else ctx.rect(tx-tw/2-pad,ty-fs*0.8,tw+pad*2,fs*1.6); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.fillText(tagText,tx,ty,W*0.8); ctx.restore();
+    }
+  }
+  function drawBanner(main,sub,a){
+    if(a<=0 || (!main && !sub)) return;
+    const fs=Math.round(m*0.06), ss=Math.round(m*0.038), maxW=W*0.86, MF='900 '+fs+'px "Segoe UI", Roboto, Arial, sans-serif', SF='600 '+ss+'px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.save(); ctx.globalAlpha=clamp(a,0,1); ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=MF; const ml=main ? wrap(ctx,main,maxW).slice(0,2) : [];
+    ctx.font=SF; const sl=sub ? wrap(ctx,sub,maxW).slice(0,2) : [];
+    const y0=H*0.06, h=ml.length*fs*1.2+sl.length*ss*1.35+m*0.05;
+    const g=ctx.createLinearGradient(0,0,0,y0+h+m*0.04); g.addColorStop(0,'rgba(0,0,0,0.75)'); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,y0+h+m*0.04);
+    let y=y0+m*0.02; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=fs*0.2;
+    ctx.font=MF; ctx.fillStyle='#ffffff'; for(const l of ml){ ctx.fillText(l,W/2,y+fs*0.6); y+=fs*1.2; }
+    ctx.font=SF; ctx.fillStyle=GOLD; for(const l of sl){ ctx.fillText(l,W/2,y+ss*0.68); y+=ss*1.35; }
+    ctx.restore();
+  }
+
+  let PEX=null;
+  if(md && $('keepPic')?.checked){
+    if(media.kind!=='video') throw new Error('"Keep my video picture" needs a video file, not an audio file');
+    const PE=await import('./presenter-explainer.js');
+    PEX=await PE.setup({ MB, file:media.file, fileKey:media.id, W, H, words:(transcript && $('mlang').value!=='quran') ? transcript.words : [], topic:$('topic').value.trim(), askAI, setP });
+  }
+  const t0=performance.now(), last=scenes[scenes.length-1];
+  let hi=0, prev=-1;
+  for(let f=0;f<frames;f++){
+    check();
+    const tt=f/FPS;
+    while(hi<shots.length-1 && tt>=shots[hi].ve){ if(prev>=0){ await closeClip(clips[prev]); clips[prev]=null; } prev=hi; hi++; }
+    const sh=shots[hi], si=sh.si, sc=scenes[si], since=tt-sh.vs;
+    if(prev>=0 && since>=XF){ await closeClip(clips[prev]); clips[prev]=null; prev=-1; }
+    await ensure(hi); if(prev>=0) await ensure(prev);
+    const card=hasCard(sc);
+    let pres=null;
+    if(usePhoto){ const ends=si===0 || si===scenes.length-1; if(pm==='corner') pres='corner'; else if(pm==='full') pres=card ? 'corner' : 'big'; else if(pm==='bookends' && ends && !card) pres='big'; }
+    const blur=pres==='big' ? 'blur('+Math.round(m*0.012)+'px) brightness(0.72)' : null;
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+    await drawLayer(hi,tt,1,blur);
+    if(prev>=0) await drawLayer(prev,tt,1-since/XF,blur);
+    if(cine) cinematic(f);
+    const shade=ctx.createLinearGradient(0,H*0.45,0,H); shade.addColorStop(0,'rgba(0,0,0,0)'); shade.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=shade; ctx.fillRect(0,H*0.45,W,H*0.55);
+    if(card) drawCard(sc,tt-sc.vs);
+    if(pres) drawPresenter(pres,env[f],tt);
+    if(introOn && title && tt<3.2) drawBanner(title,channel,Math.min(tt/0.35,(3.2-tt)/0.5,1));
+    if(scenes.length>1 && tt>=last.vs && (channel || outroLine)) drawBanner(channel || outroLine, channel ? outroLine : '', Math.min(1,(tt-last.vs)/0.5));
+    if(PEX) await PEX.draw(ctx,tt);
+    if(sc.quran){ if(style!=='none') drawAyah(sc,tt-sc.start); }
+    else if(!card) drawCaption(ctx,W,H,capAt(caps,tt),tt,style,hl,emode);
+    await vsrc.add(tt,1/FPS); if(f%8===0) await yieldUI();
+    if(f%15===0){ const pr=f/frames, secs=(performance.now()-t0)/1000; setP(0.6+0.4*pr,'Building the video… '+Math.round(pr*100)+'%'+(pr>0.05 ? ' · about '+fmtTime(secs/pr*(1-pr))+' left' : '')); }
+  }
+  for(const c of clips) await closeClip(c);
+  if(PEX) await PEX.close();
+  vsrc.close(); setP(1,'Finishing…'); await out.finalize();
+
+  resultBlob=new Blob([out.target.buffer],{ type:'video/mp4' }); out=null;
+  if(resultUrl) URL.revokeObjectURL(resultUrl);
+  resultUrl=URL.createObjectURL(resultBlob);
+  const v=$('out'); v.src=resultUrl; show('out'); hide('empty');
+  const nameSrc=$('postTitle').value || $('topic').value || (md ? media.name.replace(/\.[^.]+$/,'') : '') || 'storyforge-video';
+  resultName=(nameSrc.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-').slice(0,60)||'storyforge-video')+'.mp4';
+  const seen=new Set(), lines=[];
+  shots.forEach(s=>{ if(s.kind==='stock' && s.v && !seen.has(s.v.id)){ seen.add(s.v.id); lines.push((lines.length+1)+'. video by '+(s.v.user || 'unknown')+' on '+s.v.src+', '+s.v.url); } });
+  const usedOwn=shots.some(s=>s.kind==='img' || s.kind==='vid'), usedBuiltin=shots.some(s=>s.kind==='builtin');
+  const bgName=bg ? (soundList.find(s=>s.id===$('bgSound').value)||{}).name : '';
+  const isQ=scenes.some(s=>s.quran);
+  const voiceLine=md ? 'Sound: from your file '+media.name+'\n'+(isQ ? 'Quran text: Uthmani script; translation: Saheeh International (via alquran.cloud)\n' : 'Captions: Whisper speech recognition (MIT)\n') : 'Voice: Kokoro TTS (Apache-2.0)\n';
+  const fxLine=fxOn ? 'Voice studio: '+$('fxPreset').selectedOptions[0].textContent+'\n' : '';
+  credits=(lines.length ? 'Stock videos provided by Pixabay (https://pixabay.com) and Pexels (https://www.pexels.com)\n\n'+lines.join('\n')+'\n\n' : '')+(usedOwn ? 'Backgrounds: your own photos and videos\n' : '')+(usedBuiltin && !PEX ? 'Backgrounds: StoryForge built-in moving backgrounds\n' : '')+(bgName ? 'Background sound: '+bgName+'\n' : '')+voiceLine+fxLine;
+  show('doneBox'); Bridge.setResult(resultBlob,resultName);
+  $('renderBtn').textContent='🎬 Render again with my edits';
+  setP(1,'Finished · '+fmtTime(total)+' video · '+fmtSize(resultBlob.size));
+  const backupName=own.length ? 'your own files' : 'built-in moving backgrounds';
+  let extra='';
+  if(vsrcMode==='stock' && !hasStock) extra=' No Pixabay key was entered, so '+backupName+' were used.';
+  else if(stockErr) extra=' Stock footage stopped working ('+stockErr+'), so '+fallbackCount+' part(s) used '+backupName+'.';
+  else if(fallbackCount) extra=' '+fallbackCount+' part(s) had no matching stock clip and used '+backupName+'.';
+  showNote((isQ ? 'Your recitation video is ready! If any ayah appears a little early or late, press ⏪ or ⏩ on its card below, then click "Render again".'
+              : PEX ? 'Your video is ready! Your picture was kept with animated graphics. To change pauses or mistakes, use the ✂️ box on the left, then click "Apply and make my video".'
+              : md ? 'Your video is ready! Only the sound from your file was kept, with new visuals and captions. Fix any caption word or clip below, then click "Render again", or download it.'
+              : 'Your video is ready! Play it on the right. Change any scene below it and click "Render again", or download it.')+extra,'ok');
+}
+async function runTask(fn){
+  if(busy) return;
+  cancelled=false; setBusy(true); hide('note'); show('prog'); setP(0,'Starting…'); $('prog').scrollIntoView({ behavior:'smooth', block:'center' });
+  try{ await fn(); }
+  catch(err){ console.error(err); showNote(err.message==='cancelled' || /cancel/i.test(err.message||'') ? 'Cancelled.' : 'Could not finish: '+(err.message||err)+'.'); try{ if(out) await out.cancel(); }catch{} out=null; }
+  finally{ setBusy(false); }
+}
+$('scriptBtn').onclick=()=>runTask(async()=>{
+  const md=srcMode==='media', quran=md && $('mlang').value==='quran';
+  setP(0.02, srcMode==='ai' ? 'The AI is writing your script…' : srcMode==='own' ? 'Splitting your script into scenes…' : quran ? 'Preparing your recitation…' : 'Listening to your file…');
+  await prepareScript();
+  setP(1, md ? 'Scenes ready' : 'Script ready');
+  showNote(quran ? 'Ayat ready! Press ▶ on any card to check its timing, ⏪ ⏩ to adjust, then click "🎬 Make the video with these scenes".'
+              : md ? 'Scenes ready! Check the ✂️ "Pauses and mistakes" box on the left, then click "✨ Apply and make my video" (or "🎬 Make the video with these scenes").'
+              : 'Script ready! Edit any scene on the right, then click "🎬 Make the video with these scenes".','ok');
+});
+$('oneBtn').onclick=()=>runTask(async()=>{ await prepareScript(); await render(); });
+$('renderBtn').onclick=()=>runTask(render);
+$('downloadBtn').onclick=()=>{ if(!resultBlob) return; const a=document.createElement('a'); a.href=resultUrl; a.download=resultName; document.body.appendChild(a); a.click(); a.remove(); };
+$('srtBtn').onclick=()=>{
+  if(!lastCaps.length) return toast('Make the video first');
+  saveText(lastCaps.map((c,i)=>(i+1)+'\n'+srtTime(c.start)+' --> '+srtTime(c.end)+'\n'+c.words.map(w=>w.t).join(' ')).join('\n\n')+'\n', resultName.replace(/\.mp4$/,'')+'.srt');
+};
+$('creditsBtn').onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([credits],{ type:'text/plain' })); a.download='video-credits.txt'; document.body.appendChild(a); a.click(); a.remove(); };
+Bridge.take(document.querySelector('aside')).then(f=>{ if(f){ setSrcMode('media'); loadMedia(f); } });
+</script>
+</body>
+</html>

@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<!-- teleprompter.html — v8 — StoryForge Teleprompter. NEW in v8: AUDIO-ONLY mode (no camera, your face is never shown): the text still moves while you read and your VOICE is recorded, then saved as an audio file + the matching .txt script (same base name) to drop into the video maker. Choose it at the top: "What am I making? Video / Audio only". Also: the voice-follow highlight no longer flicks BACK onto a word you just read (which made it land on the wrong word in a repeated phrase); it now prefers the place at or ahead of where you are. v7: voice-follow keeps up again: it looks about 30 words ahead (v6 looked only 14, so it fell behind), the CLOSEST fitting place still wins (no jumping to a repeated phrase further down), a clear run of 5+ words further ahead catches up at once, smoother but quicker scrolling. v6: no jumping to repeated phrases; Bismillah taken from alquran.cloud. v5: computer = narrow column right under the camera (top-middle), phone turns sideways by itself (no lock) + rotate button, sound-follow measures the quiet moments, version shown on the page, voice-follow with "Heard:" box, computer mode, script saved with every video, share, [cues], clicker keys, QR send -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>StoryForge — Teleprompter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#E9C46A;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,"Segoe UI",Roboto,Arial,"Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji",sans-serif}
+.hidden{display:none !important}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+/* ---------- setup screen ---------- */
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 120px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header .logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;font-size:20px}
+header b{font-size:18px}
+header small{display:block;color:var(--muted);font-size:12px}
+header a{margin-left:auto;color:var(--muted);font-size:13px;text-decoration:none}
+.ver{display:inline-block;background:var(--accent);color:#111;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number],textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+textarea{min-height:220px;resize:vertical;line-height:1.5}
+select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;flex:none}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--accent);color:#111;border-color:var(--accent)}
+.big{width:100%;padding:16px;font-size:18px;font-weight:800;border-radius:14px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.hint b{color:var(--text)}
+ol.hint{margin:0;padding-left:20px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.slider{display:flex;align-items:center;gap:10px;font-size:14px}
+.slider input{flex:1;accent-color:var(--accent)}
+.slider b{min-width:42px;text-align:right}
+#qrBox{display:flex;flex-direction:column;align-items:center;gap:8px}
+#qrBox svg,#qrBox img{background:#fff;border-radius:10px;padding:8px;max-width:260px;width:100%;height:auto}
+#shareUrl{font-size:12px;word-break:break-all;color:var(--muted)}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 35%);display:flex;justify-content:center}
+.startbar .big{max-width:720px}
+/* ---------- prompter screen ---------- */
+#prompter{position:fixed;inset:0;background:#000;overflow:hidden;touch-action:none;user-select:none}
+#cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#cam.mirror{transform:scaleX(-1)}
+#shade{position:absolute;left:0;right:0;top:0;height:48%;background:linear-gradient(rgba(0,0,0,.82),rgba(0,0,0,.72) 82%,rgba(0,0,0,0))}
+#shade.full{bottom:0;height:auto;background:rgba(0,0,0,.78)}
+#shade.side-left{left:0;right:auto;top:0;bottom:0;height:auto;width:62%;background:linear-gradient(to right,rgba(0,0,0,.85),rgba(0,0,0,.72) 85%,rgba(0,0,0,0))}
+#shade.side-right{right:0;left:auto;top:0;bottom:0;height:auto;width:62%;background:linear-gradient(to left,rgba(0,0,0,.85),rgba(0,0,0,.72) 85%,rgba(0,0,0,0))}
+#shade.pc{top:0;height:58%;background:rgba(0,0,0,.9);border-radius:0 0 16px 16px}
+#shade.au{top:0;bottom:0;height:auto;background:#000}
+#textWrap{position:absolute;inset:0;overflow:hidden}
+#textWrap.mirror{transform:scaleX(-1)}
+#text{position:relative;padding:0 6%;will-change:transform}
+#text p{margin:0 0 .8em}
+#text p.ar{font-family:"Amiri Quran",Amiri,serif;direction:rtl;text-align:right;line-height:2.1}
+#shade.pc #text{text-align:center}
+#shade.pc #text p.ar{text-align:center}
+#shade.au #text,#shade.au #text p.ar{text-align:center}
+#text span{transition:opacity .25s,color .2s}
+#text span.done{opacity:.33}
+#text span.now{color:var(--accent)}
+#text span.cue{color:#7fb3ff;font-style:italic;font-size:.7em;opacity:.9}
+#readLine{position:absolute;left:0;right:0;height:0;border-top:2px dashed rgba(233,196,106,.55);pointer-events:none}
+#readLine::before{content:"";position:absolute;left:4px;top:-9px;border-left:12px solid var(--accent);border-top:8px solid transparent;border-bottom:8px solid transparent}
+#topbar{position:absolute;top:calc(8px + env(safe-area-inset-top));right:8px;left:8px;display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap;z-index:5;pointer-events:none}
+.pill{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:6px 10px;font-size:13px;display:flex;gap:6px;align-items:center}
+.pill.warn{border-color:var(--bad);color:#ffd0d0}
+#heard{max-width:min(60vw,420px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cfe6ff}
+#lvl{width:10px;height:10px;border-radius:50%;background:#444}
+#recDot{width:10px;height:10px;border-radius:50%;background:var(--bad);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+#bar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;background:linear-gradient(transparent,rgba(0,0,0,.75) 40%);z-index:5}
+.cbtn{width:52px;height:52px;border-radius:50%;background:rgba(20,26,38,.88);border:1px solid rgba(255,255,255,.22);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;color:#fff;padding:0}
+.cbtn svg{width:22px;height:22px;display:block}
+.cbtn .sp{display:flex;flex-direction:column;align-items:center;line-height:1}
+.cbtn .sp b{font-size:20px}
+.cbtn .sp small{font-size:9px;font-weight:500;margin-top:1px}
+.cbtn.rec{width:68px;height:68px;background:var(--bad);border-color:#fff;font-size:15px;font-weight:800;color:#fff}
+.cbtn.rec.on{border-radius:18px}
+#pcTip{position:absolute;left:20%;right:20%;top:60%;text-align:center;color:var(--muted);font-size:14px;padding:8px}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:140px;font-weight:800;color:#fff;text-shadow:0 0 30px #000;pointer-events:none;z-index:6}
+#after{position:absolute;inset:0;background:rgba(0,0,0,.92);z-index:8;display:flex;flex-direction:column;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow:auto}
+#after video{width:100%;max-height:50vh;border-radius:12px;background:#000}
+#after audio{width:100%}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- =============== SETUP =============== -->
+<div id="setup">
+  <header><div class="logo">🎙️</div><div><b>StoryForge Teleprompter <span class="ver">v8</span></b><small>Film or record audio · the text follows your voice</small></div><a href="index.html">← All tools</a></header>
+
+  <div class="card">
+    <h2>🎥 How I record</h2>
+    <div><div class="label">What am I making?</div><select id="make">
+      <option value="video">🎬 Video (I show my face)</option>
+      <option value="audio">🎙️ Audio only (no face — record my voice while I read)</option>
+    </select></div>
+    <div id="filmRow"><div class="label">Where I film</div><select id="film">
+      <option value="here">With the camera of THIS device (phone front camera or the computer's own camera)</option>
+      <option value="phone">I read on THIS screen; my phone films me with its own camera app (best quality, back camera)</option>
+    </select></div>
+    <div id="hereBox" style="display:flex;flex-direction:column;gap:10px">
+      <div class="hint" id="hereTip"></div>
+      <label class="check"><input type="checkbox" id="camMirror" checked> Show my picture like a mirror (the saved video is not mirrored)</label>
+    </div>
+    <div id="phoneBox" class="hidden">
+      <ol class="hint">
+        <li>Put your phone <b>just above the middle of this screen</b>, back camera facing you: lean it on books behind the screen so the camera peeks over the top edge, or hold it with a clip.</li>
+        <li>Lift the computer on books so the camera is at <b>your eye level</b>. Sit about <b>1.5 metres</b> away and make the text bigger with <b>A+</b>.</li>
+        <li>Turn the phone <b>sideways</b> for YouTube or keep it <b>upright</b> for Shorts.</li>
+        <li>Open the phone's <b>normal camera app</b>, video mode, and start recording.</li>
+        <li>Here, press <b>Play</b> (or the Space key) and read. The text sits right under the phone, so you look at the camera.</li>
+        <li>Stop the phone. Your script is already saved on this computer, so the video maker can use your exact words for the captions.</li>
+      </ol>
+      <div class="hint" style="margin-top:8px">🗣 <b>Voice-follow on a computer:</b> the computer's own microphone must hear your words. Watch the box at the top that says <b>Heard:</b>. If it shows nothing, speak a little louder, check the language, or plug in an <b>earphone with a microphone</b>. Voice-follow needs internet.</div>
+    </div>
+    <div id="audioBox" class="hidden">
+      <div class="hint">🎙️ <b>Audio only:</b> no camera opens and your face is never shown. The text still moves while you read, and your <b>voice is recorded</b>. Save the audio and drop it into the video maker to build the video from it (stock pictures, captions, cover…). Best for Quran reminders and voice-overs.</div>
+    </div>
+    <div id="commonOpts" style="display:flex;flex-direction:column;gap:10px">
+      <label class="check"><input type="checkbox" id="clean"> Let the device clean background noise (leave off for Quran: keeps the natural voice)</label>
+      <label class="check"><input type="checkbox" id="countOn" checked> Count down 3 · 2 · 1 before recording</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📝 Your script</h2>
+    <div class="row">
+      <div><div class="label">Saved scripts</div><select id="scriptSel"></select></div>
+      <div><div class="label">Title</div><input type="text" id="scriptName" placeholder="e.g. The benefit of being a Muslim"></div>
+    </div>
+    <textarea id="script" placeholder="Type or paste what you will say. Leave an empty line between paragraphs.&#10;&#10;Notes for yourself go in [square brackets], e.g. [smile] or [pause]: they are shown in blue and never read as words.&#10;&#10;Arabic and English can be mixed: each paragraph is shown in the right direction."></textarea>
+    <div class="row">
+      <button class="btn" id="saveBtn">💾 Save</button>
+      <button class="btn" id="newBtn">＋ New</button>
+      <button class="btn" id="delBtn">🗑 Delete</button>
+      <label class="btn" style="text-align:center">📄 Open .txt<input type="file" id="txtIn" accept=".txt,text/plain" hidden></label>
+    </div>
+    <div class="hint" id="wordInfo"></div>
+    <details>
+      <summary class="hint" style="cursor:pointer">📖 Add Quran ayat (exact text from alquran.cloud)</summary>
+      <div class="row" style="margin-top:8px">
+        <div><div class="label">Surah (1–114)</div><input type="number" id="qS" min="1" max="114" value="1"></div>
+        <div><div class="label">From ayah</div><input type="number" id="qA" min="1" value="1"></div>
+        <div><div class="label">To ayah</div><input type="number" id="qB" min="1" value="7"></div>
+      </div>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="qBism" checked> Add Bismillah at the start (not for Surah 9)</label>
+      <button class="btn" id="qGet" style="margin-top:8px;width:100%">📖 Add these ayat to my script</button>
+    </details>
+    <details id="sendBox">
+      <summary class="hint" style="cursor:pointer">📲 Send this script to my phone (from the computer)</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <div><div class="label">My Netlify site address (only needed once)</div><input type="text" id="site" placeholder="https://your-site.netlify.app"></div>
+        <button class="btn" id="shareBtn">📲 Make the link and QR code</button>
+        <div id="qrBox"></div>
+        <div id="shareUrl"></div>
+        <div class="row hidden" id="shareBtns"><button class="btn" id="copyLink">📋 Copy link</button><button class="btn" id="waLink">💬 Send by WhatsApp</button></div>
+        <div class="hint">Scan the QR code with your phone camera (or open the WhatsApp link). The script opens in the teleprompter and is saved on the phone. It also stays saved on this computer.</div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ How the text moves</h2>
+    <div><div class="label">Scroll mode</div><select id="mode">
+      <option value="voice">Voice-follow: follows the words I say (English, French…)</option>
+      <option value="sound">Sound-follow: moves while I speak, stops when I stop (any language, best for Quran and Hausa)</option>
+      <option value="steady">Steady speed (no microphone needed)</option>
+    </select></div>
+    <div id="langRow"><div class="label">Language I speak (for voice-follow)</div><select id="lang">
+      <option value="en-NG">English (Nigeria)</option>
+      <option value="en-US">English (US)</option>
+      <option value="en-GB">English (UK)</option>
+      <option value="ar-SA">Arabic</option>
+      <option value="fr-FR">French</option>
+    </select></div>
+    <label class="slider">Speed (sound-follow and steady) <input type="range" id="speed" min="1" max="12" value="3"><b id="speedVal">3</b></label>
+    <label class="slider">Text size <input type="range" id="size" min="22" max="90" value="40"><b id="sizeVal">40</b></label>
+    <div id="widthRow"><div class="label">Text column on a computer / audio (narrow keeps your eyes near the camera)</div><select id="width">
+      <option value="narrow">Narrow, right under the camera (recommended)</option>
+      <option value="medium">Medium</option>
+      <option value="wide">Wide</option>
+    </select></div>
+    <div id="areaRow"><div class="label">Where the text shows (phone held upright)</div><select id="area">
+      <option value="top">Top part of the screen, near the camera lens (recommended)</option>
+      <option value="full">The whole screen</option>
+    </select></div>
+    <label class="check"><input type="checkbox" id="mirrorText"> Mirror the text (only for a glass teleprompter)</label>
+    <div class="hint">Keys (computer, keyboard or a Bluetooth clicker): <b>Space/Enter</b> start–pause · <b>↓ / Page Down</b> next line · <b>↑ / Page Up</b> back · <b>R</b> record · <b>Esc</b> close.</div>
+  </div>
+  <div class="hint">Your scripts are saved only on this device. Nothing is uploaded.</div>
+</div>
+<div class="startbar" id="startbar"><button class="btn gold big" id="startBtn">Open the teleprompter</button></div>
+
+<!-- =============== PROMPTER =============== -->
+<div id="prompter" class="hidden">
+  <video id="cam" playsinline muted autoplay></video>
+  <div id="shade"><div id="textWrap"><div id="text"></div><div id="readLine"></div></div></div>
+  <div id="pcTip" class="hidden">Phone just above the middle of the screen, back camera facing you, recording in its camera app. Press Play or Space and read.</div>
+  <div id="topbar">
+    <span class="pill hidden" id="heardPill"><span style="color:var(--muted)">Heard:</span><span id="heard">…</span></span>
+    <span class="pill hidden" id="recPill"><span id="recDot"></span><span id="recTime">0:00</span></span>
+    <span class="pill" id="modePill"><span id="lvl"></span><span id="modeLbl">Voice</span></span>
+  </div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="cbtn" id="backBtn" title="Back a line"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 6v12L3 12zM21 6v12l-8-6z"/></svg></button>
+    <button class="cbtn" id="playBtn" title="Start / pause"></button>
+    <button class="cbtn rec" id="recBtn" title="Record">REC</button>
+    <button class="cbtn" id="fwdBtn" title="Forward a line"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6v12l8-6zM13 6v12l8-6z"/></svg></button>
+    <button class="cbtn" id="modeBtn" title="Change scroll mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 2.5v4.2h-4.2M6 21.5v-4.2h4.2"/></svg></button>
+    <button class="cbtn" id="slowBtn" title="Slower"><span class="sp"><b>−</b><small>speed</small></span></button>
+    <button class="cbtn" id="fastBtn" title="Faster"><span class="sp"><b>+</b><small>speed</small></span></button>
+    <button class="cbtn" id="smallBtn" title="Smaller text">A−</button>
+    <button class="cbtn" id="bigBtn" title="Bigger text">A+</button>
+    <button class="cbtn hidden" id="rotBtn" title="Turn the screen (sideways / upright)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M3 12a9 9 0 0 1 3-6.7M3 5v3h3M21 12a9 9 0 0 1-3 6.7M21 19v-3h-3"/></svg></button>
+    <button class="cbtn hidden" id="sideBtn" title="The camera is on the other side"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16M16 4l4 4-4 4M20 16H4M8 12l-4 4 4 4"/></svg></button>
+  </div>
+  <div id="count" class="hidden">3</div>
+  <div id="after" class="hidden">
+    <b style="font-size:18px">✓ Your take is ready</b>
+    <video id="takeVid" controls playsinline></video>
+    <audio id="takeAud" class="hidden" controls></audio>
+    <div class="hint" id="takeInfo"></div>
+    <div class="row"><button class="btn gold" id="saveTake">⬇ Save video + script</button><button class="btn hidden" id="shareTake">📤 Share (WhatsApp, Drive…)</button></div>
+    <div class="row"><button class="btn" id="againBtn">Record again from the start</button><button class="btn" id="contBtn">Continue from here</button></div>
+    <div class="hint">The script is saved as a small .txt file with the same name as the video or audio. Send <b>both</b> to your computer: the video maker uses the script for exact captions.</div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const KEY='forge:tp:';
+const IS_PHONE=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const ICON={
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15L19.5 12z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.2" height="14" rx="1"/><rect x="13.8" y="5" width="4.2" height="14" rx="1"/></svg>'
+};
+function toast(m,ms){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms||3500); }
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+/* ---------- saved settings (each device keeps its own) ---------- */
+const SET=['make','film','camSide','mode','lang','speed','size','width','area','camMirror','clean','countOn','mirrorText','site'];
+function persist(){
+  if(localStorage.getItem(KEY+'set:film')===null) localStorage.setItem(KEY+'set:film',IS_PHONE ? 'here' : 'phone');
+  if(!['4','5','6','7','8'].includes(localStorage.getItem(KEY+'ver'))){ const sp=+(localStorage.getItem(KEY+'set:speed')||3); if(sp>4) localStorage.setItem(KEY+'set:speed','3'); }
+  localStorage.setItem(KEY+'ver','8');
+  for(const id of SET){
+    const el=$(id); if(!el) continue;
+    const v=localStorage.getItem(KEY+'set:'+id);
+    if(v!==null){ if(el.type==='checkbox') el.checked=v==='1'; else el.value=v; }
+    if(el.tagName==='SELECT' && el.selectedIndex<0) el.selectedIndex=0;
+    const save=()=>localStorage.setItem(KEY+'set:'+id, el.type==='checkbox' ? (el.checked ? '1' : '0') : el.value);
+    el.addEventListener('change',save); el.addEventListener('input',save);
+  }
+}
+const camSide=()=>localStorage.getItem(KEY+'set:camSide')||'left';
+/* which setup fields show, for Video (here / phone) or Audio only */
+function recUI(){
+  const au=$('make').value==='audio', here=$('film').value==='here';
+  $('filmRow').classList.toggle('hidden',au);
+  $('hereBox').classList.toggle('hidden',au || !here);
+  $('phoneBox').classList.toggle('hidden',au || here);
+  $('audioBox').classList.toggle('hidden',!au);
+  $('commonOpts').classList.toggle('hidden',!(au || here));
+  $('areaRow').classList.toggle('hidden',au || !(here && IS_PHONE));
+  $('widthRow').classList.toggle('hidden',!au && IS_PHONE && here);
+  $('hereTip').innerHTML=IS_PHONE
+    ? '📱 Hold the phone <b>upright for Shorts</b> or turn it <b>sideways for YouTube</b>: the page turns with it (Auto-rotate on, or tap the rotate button on the screen). Open this page from your <b>https://</b> Netlify site in <b>Google Chrome</b>.'
+    : '💻 The computer\'s own camera films you. The text sits in a narrow column <b>right under the camera</b> (top-middle). Lift the computer so the camera is at <b>eye level</b>, sit about <b>1.5 metres</b> away and make the text bigger with <b>A+</b>. For the best picture, use "my phone films me" instead.';
+}
+$('make').addEventListener('change',recUI);
+$('film').addEventListener('change',recUI);
+
+/* ---------- scripts saved on this device ---------- */
+function loadScripts(){ try{ const a=JSON.parse(localStorage.getItem(KEY+'scripts')||'[]'); return Array.isArray(a) ? a : []; }catch{ return []; } }
+function storeScripts(a){ try{ localStorage.setItem(KEY+'scripts',JSON.stringify(a)); }catch{ toast('The storage is full. Delete an old script.'); } }
+function fillScripts(selId){
+  const list=loadScripts();
+  $('scriptSel').innerHTML='<option value="">New script</option>'+list.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name||'Untitled')+'</option>').join('');
+  $('scriptSel').value=selId||'';
+}
+function currentId(){ return $('scriptSel').value; }
+function saveScript(silent){
+  const txt=$('script').value.trim(); if(!txt){ if(!silent) toast('Write your script first'); return null; }
+  const list=loadScripts(); let id=currentId(), s=list.find(x=>x.id===id);
+  const name=$('scriptName').value.trim() || txt.replace(/\[[^\]]*\]/g,'').split(/\s+/).filter(Boolean).slice(0,6).join(' ');
+  if(!s){ s={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), pos:0 }; list.unshift(s); }
+  if(s.text!==$('script').value) s.pos=0;
+  s.name=name; s.text=$('script').value; s.t=Date.now();
+  storeScripts(list); fillScripts(s.id); $('scriptName').value=name;
+  localStorage.setItem(KEY+'last',s.id);
+  if(!silent) toast('✓ Saved');
+  return s;
+}
+function updateScript(fn){ const list=loadScripts(), s=list.find(x=>x.id===currentId()); if(s){ fn(s); storeScripts(list); } }
+function openScript(id){
+  const s=loadScripts().find(x=>x.id===id);
+  if(s){ $('script').value=s.text||''; $('scriptName').value=s.name||''; localStorage.setItem(KEY+'last',s.id); }
+  else{ $('script').value=''; $('scriptName').value=''; }
+  wordInfo();
+}
+function wordInfo(){
+  const n=($('script').value.replace(/\[[^\]]*\]/g,' ').match(/\S+/g)||[]).length;
+  $('wordInfo').textContent=n ? n+' words · about '+Math.max(1,Math.round(n/140*10)/10)+' minutes at a normal speaking pace' : '';
+}
+$('scriptSel').addEventListener('change',()=>openScript(currentId()));
+$('saveBtn').onclick=()=>saveScript();
+$('newBtn').onclick=()=>{ fillScripts(''); openScript(''); $('script').focus(); };
+$('delBtn').onclick=()=>{
+  const id=currentId(); if(!id) return toast('This script is not saved yet');
+  if(!confirm('Delete this script from this device?')) return;
+  storeScripts(loadScripts().filter(x=>x.id!==id)); fillScripts(''); openScript(''); toast('Deleted');
+};
+$('script').addEventListener('input',wordInfo);
+$('txtIn').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  $('script').value=await f.text(); $('scriptName').value=f.name.replace(/\.txt$/i,''); fillScripts(''); wordInfo(); saveScript();
+};
+
+/* ---------- Quran ayat (exact text from alquran.cloud, never written by AI) ---------- */
+const AR_DIG='٠١٢٣٤٥٦٧٨٩', arNum=n=>String(n).replace(/\d/g,d=>AR_DIG[d]);
+$('qGet').onclick=async()=>{
+  const s=clamp(+$('qS').value||1,1,114), a=Math.max(1,+$('qA').value||1), b=Math.max(a,+$('qB').value||a);
+  $('qGet').disabled=true; $('qGet').textContent='Getting the ayat…';
+  try{
+    const r=await fetch('https://api.alquran.cloud/v1/surah/'+s+'/quran-uthmani'); const j=await r.json();
+    if(!j || j.code!==200) throw new Error('not found');
+    const ay=j.data.ayahs, last=Math.min(b,ay.length), parts=[];
+    if($('qBism').checked && s!==9 && s!==1){
+      const r1=await fetch('https://api.alquran.cloud/v1/ayah/1:1/quran-uthmani'); const j1=await r1.json();
+      if(j1 && j1.code===200 && j1.data && j1.data.text) parts.push(j1.data.text);
+    }
+    for(let k=a;k<=last;k++){
+      let t=ay[k-1].text;
+      if(k===1 && s!==1 && s!==9){ const ws=t.split(' '); if(norm(ws[0])==='بسم' && ws.length>4) t=ws.slice(4).join(' '); }
+      parts.push(t+' ۝'+arNum(k));
+    }
+    const cur=$('script').value.trim();
+    $('script').value=(cur ? cur+'\n\n' : '')+parts.join('\n\n');
+    if(!$('scriptName').value.trim()) $('scriptName').value='Surah '+j.data.englishName+' '+a+(last>a ? '-'+last : '');
+    wordInfo(); toast('✓ Ayat added. For recitation, Sound-follow works best.');
+    if($('mode').value==='voice'){ $('mode').value='sound'; localStorage.setItem(KEY+'set:mode','sound'); modeUI(); }
+  }catch(e){ toast('Could not get the ayat. Check your internet.'); }
+  finally{ $('qGet').disabled=false; $('qGet').textContent='📖 Add these ayat to my script'; }
+};
+
+/* ---------- send a script from the computer to the phone (link + QR code, nothing is uploaded) ---------- */
+function b64url(bytes){ let s=''; for(let i=0;i<bytes.length;i+=8192) s+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function unb64url(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; const bin=atob(s), out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+async function pack(str){ const cs=new CompressionStream('deflate-raw'), w=cs.writable.getWriter(); w.write(new TextEncoder().encode(str)); w.close(); return b64url(new Uint8Array(await new Response(cs.readable).arrayBuffer())); }
+async function unpack(s){ const ds=new DecompressionStream('deflate-raw'), w=ds.writable.getWriter(); w.write(unb64url(s)); w.close(); return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer()); }
+function loadQrLib(){ return window.qrcode ? Promise.resolve() : new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+function siteBase(){
+  let site=$('site').value.trim();
+  if(!site && location.protocol==='https:') site=location.origin+location.pathname;
+  if(!site) return '';
+  if(!/^https?:\/\//.test(site)) site='https://'+site;
+  if(!/\.html?$/.test(site)){ if(!site.endsWith('/')) site+='/'; site+='teleprompter.html'; }
+  return site;
+}
+$('shareBtn').onclick=async()=>{
+  if(!saveScript(true)) return toast('Write your script first');
+  const base=siteBase(); if(!base){ toast('Type your Netlify site address first'); $('site').focus(); return; }
+  try{
+    const url=base+'#s='+await pack(JSON.stringify({ n:$('scriptName').value.trim(), t:$('script').value }));
+    $('shareUrl').textContent=url.length>160 ? url.slice(0,160)+'…' : url; $('shareUrl').dataset.url=url;
+    $('shareBtns').classList.remove('hidden'); $('qrBox').innerHTML='';
+    if(url.length<=2300){
+      await loadQrLib();
+      const qr=qrcode(0,'L'); qr.addData(url); qr.make();
+      $('qrBox').innerHTML=qr.createSvgTag({ cellSize:4, margin:2, scalable:true });
+    }else $('qrBox').innerHTML='<div class="hint">This script is too long for a QR code. Use <b>Send by WhatsApp</b> (send it to yourself) or <b>Copy link</b>.</div>';
+  }catch(e){ console.error(e); toast('Could not make the link. Use Google Chrome.'); }
+};
+$('copyLink').onclick=async()=>{ try{ await navigator.clipboard.writeText($('shareUrl').dataset.url||''); toast('Link copied'); }catch{ toast('Could not copy'); } };
+$('waLink').onclick=()=>{ const u=$('shareUrl').dataset.url; if(u) window.open('https://wa.me/?text='+encodeURIComponent(u),'_blank'); };
+async function receiveFromLink(){
+  const h=location.hash; if(!h.startsWith('#s=')) return;
+  try{
+    const o=JSON.parse(await unpack(h.slice(3)));
+    fillScripts(''); $('script').value=o.t||''; $('scriptName').value=o.n||'From my computer'; wordInfo(); saveScript(true);
+    toast('✓ Script received and saved on this phone',4500);
+  }catch(e){ toast('That link could not be opened'); }
+  history.replaceState(null,'',location.pathname);
+}
+
+/* ---------- words of the script ---------- */
+const T={ words:[], pos:0, offset:0, target:0, running:false, mode:'voice', rec:null, voiceFail:false, lastResult:0, stream:null, ac:null, an:null, buf:null,
+  noise:0, peak:0, sm:0, lv:new Float32Array(480), lvi:0, lvn:0, above:0, lastVoice:0, raf:0, last:0, wake:null, mr:null, chunks:[], blob:null, url:'', recT0:0, recTimer:0, drag:null, doneTo:0, nowEl:null, startedAt:0, ly:0.3, here:true, warn:false, land:false, far:null, audioOnly:false };
+const isArabic=s=>/[؀-ۿ]/.test(s);
+function norm(w){
+  return String(w).toLowerCase()
+    .replace(/[ؐ-ًؚ-ٰٟۖ-ۭـ]/g,'')
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^\p{L}\p{N}]/gu,'');
+}
+function buildText(){
+  const box=$('text'); box.innerHTML=''; T.words=[]; T.nowEl=null;
+  const paras=$('script').value.replace(/\r/g,'').split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
+  for(const p of paras){
+    const el=document.createElement('p'), plain=p.replace(/\[[^\]]*\]/g,'');
+    if(isArabic(plain) && !/[a-z]{3}/i.test(plain)) el.className='ar';
+    for(const seg of p.split(/(\[[^\]]*\])/)){
+      if(!seg.trim()) continue;
+      if(/^\[[^\]]*\]$/.test(seg)){ const c=document.createElement('span'); c.className='cue'; c.textContent=seg; el.appendChild(document.createTextNode(' ')); el.appendChild(c); continue; }
+      for(const w of seg.trim().split(/\s+/)){
+        el.appendChild(document.createTextNode(' '));
+        const n=norm(w), sp=document.createElement('span'); sp.textContent=w;
+        if(n){ sp.dataset.i=T.words.length; T.words.push({ el:sp, n }); }
+        el.appendChild(sp);
+      }
+    }
+    box.appendChild(el);
+  }
+  T.doneTo=0;
+}
+/* where the text sits: audio = centred column on black; computer = narrow column right under the camera; phone upright = top; phone sideways = camera side */
+function layout(){
+  const land=innerWidth>innerHeight, sh=$('shade');
+  let cls='', ly=0.3;
+  sh.style.left=''; sh.style.right='';
+  if(T.audioOnly){
+    cls='au'; ly=0.42;
+    const w={ narrow:50, medium:66, wide:86 }[$('width').value]||66;
+    sh.style.left=sh.style.right=((100-w)/2)+'%';
+    sh.className=cls; T.ly=ly;
+    $('sideBtn').classList.add('hidden');
+    $('rotBtn').classList.toggle('hidden',!IS_PHONE);
+    $('pcTip').classList.add('hidden');
+    return;
+  }
+  if(!IS_PHONE || !T.here){
+    cls='pc'; ly=0.16;
+    const w={ narrow:34, medium:50, wide:66 }[$('width').value]||34;
+    sh.style.left=sh.style.right=((100-w)/2)+'%';
+  }
+  else if(land){ cls='side-'+camSide(); ly=0.42; }
+  else if($('area').value==='full') cls='full';
+  sh.className=cls; T.ly=ly;
+  $('sideBtn').classList.toggle('hidden',!(IS_PHONE && T.here && land));
+  $('rotBtn').classList.toggle('hidden',!(IS_PHONE && T.here));
+  $('pcTip').classList.toggle('hidden',T.here);
+  if(!T.here){ const w={ narrow:34, medium:50, wide:66 }[$('width').value]||34; $('pcTip').style.left=$('pcTip').style.right=Math.max(10,(100-w)/2-6)+'%'; }
+}
+function applySize(){
+  layout();
+  $('text').style.fontSize=$('size').value+'px'; $('text').style.lineHeight='1.45';
+  $('textWrap').classList.toggle('mirror',$('mirrorText').checked);
+  $('cam').classList.toggle('mirror',$('camMirror').checked);
+  $('readLine').style.top=lineY()+'px';
+  requestAnimationFrame(()=>{ $('readLine').style.top=lineY()+'px'; T.target=clamp(lineTarget(T.pos),minOff(),maxOff()); T.offset=T.target; paint(); });
+}
+const lineY=()=>Math.round($('textWrap').clientHeight*T.ly);
+function lineTarget(i){ const N=T.words.length; if(!N) return -lineY(); const w=T.words[clamp(i,0,N-1)].el; return w.offsetTop-lineY()+Math.round(w.offsetHeight*0.15); }
+function minOff(){ return lineTarget(0); }
+function maxOff(){ return lineTarget(T.words.length-1)+(+$('size').value)*2; }
+function wordAtLine(){
+  const N=T.words.length; if(!N) return 0;
+  const y=T.offset+lineY()+4; let i=clamp(T.pos,0,N-1);
+  while(i<N-1 && T.words[i].el.offsetTop+T.words[i].el.offsetHeight<=y) i++;
+  while(i>0 && T.words[i].el.offsetTop>y) i--;
+  return i;
+}
+function markDone(p){
+  const N=T.words.length; p=clamp(p,0,N);
+  if(p>T.doneTo) for(let i=T.doneTo;i<p;i++) T.words[i].el.classList.add('done');
+  else for(let i=p;i<T.doneTo;i++) T.words[i].el.classList.remove('done');
+  T.doneTo=p;
+  const now=T.mode==='voice' && p<N ? T.words[p].el : null;
+  if(now!==T.nowEl){ if(T.nowEl) T.nowEl.classList.remove('now'); if(now) now.classList.add('now'); T.nowEl=now; }
+}
+function setPos(p,jump){
+  T.pos=clamp(p,0,T.words.length); markDone(T.pos);
+  T.target=clamp(lineTarget(T.pos),minOff(),maxOff());
+  if(jump){ T.offset=T.target; T.far=null; }
+}
+function paint(){ $('text').style.transform='translateY('+(-T.offset).toFixed(1)+'px)'; }
+
+/* ---------- voice-follow: matches what you say with the script (Chrome's own speech recognition) ---------- */
+function lev(a,b){
+  const m=a.length, n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({ length:n+1 },(_,j)=>j), cur=new Array(n+1);
+  for(let i=1;i<=m;i++){ cur[0]=i; for(let j=1;j<=n;j++) cur[j]=Math.min(prev[j-1]+(a[i-1]===b[j-1] ? 0 : 1),prev[j]+1,cur[j-1]+1); [prev,cur]=[cur,prev]; }
+  return prev[n];
+}
+function sim(a,b){ if(a===b) return 1; if(a.length<3 || b.length<3) return 0; return 1-lev(a,b)/Math.max(a.length,b.length); }
+/* how well the last words you said fit, if the last one is script word j */
+function scoreAt(tail,j){
+  let sc=0, k=j, hits=0;
+  for(let q=tail.length-1;q>=0 && k>=0;q--){
+    const s0=sim(tail[q],T.words[k].n);
+    if(s0>=0.72){ sc+=s0; hits++; k--; continue; }
+    if(k>0){ const s1=sim(tail[q],T.words[k-1].n); if(s1>=0.72){ sc+=s1*0.8; hits++; k-=2; continue; } }
+    if(q===tail.length-1) return null;
+  }
+  return { sc, hits };
+}
+const NEAR=30, FAR=90;
+/* distance from the reading line: going back counts three times as far as going forward */
+const gap=(j,pos)=>j+1>=pos ? j+1-pos : (pos-j-1)*3;
+function matchSpoken(text){
+  const sp=String(text).split(/\s+/).map(norm).filter(Boolean); if(!sp.length) return;
+  const tail=sp.slice(-6), N=T.words.length; if(!N) return;
+  const pos=T.pos;
+  /* 1. the next ~30 words: every place that fits is a candidate. Among the places that fit (almost) as well
+        as the best one, the CLOSEST wins, so a phrase repeated further down never pulls the text away,
+        but when you read faster than Chrome reports, the text still catches up quickly. */
+  const lo=Math.max(0,pos-3), hi=Math.min(N-1,pos+NEAR);
+  const cands=[];
+  for(let j=lo;j<=hi;j++){
+    const r=scoreAt(tail,j); if(!r) continue;
+    const need=tail.length===1 ? (j<=pos+4 && tail[0].length>=4 ? 1 : 99) : (j+1-pos<=10 ? 2 : 3);
+    if(r.hits<need) continue;
+    cands.push({ j, hits:r.hits });
+  }
+  if(cands.length){
+    /* v8: prefer places at or just ahead of where we are, so the gold word does not flick BACK onto a word
+          you just read (a repeated phrase). Go back only if nothing fits at or ahead. */
+    let pool=cands.filter(c=>c.j+1>=pos-1);
+    if(!pool.length) pool=cands;
+    const top=Math.max(...pool.map(c=>c.hits));
+    const pick=pool.filter(c=>c.hits>=top-1).sort((a,b)=>gap(a.j,pos)-gap(b.j,pos))[0];
+    T.far=null;
+    if(pick.j+1!==pos) setPos(pick.j+1);
+    return;
+  }
+  /* 2. further ahead: only when you really skipped part of the script, and only if the words appear ONCE there.
+        5+ words in a row: catch up at once. 4 words: two moments in a row must agree. */
+  if(tail.length<4) return;
+  let fj=-1, fh=0, places=0, lastJ=-99;
+  for(let j=hi+1;j<=Math.min(N-1,pos+FAR);j++){
+    const r=scoreAt(tail,j); if(!r || r.hits<4) continue;
+    if(j-lastJ>3) places++;
+    lastJ=j;
+    if(r.hits>fh){ fh=r.hits; fj=j; }
+  }
+  if(fj<0 || places!==1){ T.far=null; return; }
+  if(fh>=5){ T.far=null; setPos(fj+1); return; }
+  const now=performance.now();
+  if(T.far && Math.abs(T.far.j-fj)<=3 && now-T.far.t<4000){ T.far=null; setPos(fj+1); }
+  else T.far={ j:fj, t:now };
+}
+function setWarn(on){
+  if(on===T.warn) return; T.warn=on;
+  $('modePill').classList.toggle('warn',on);
+  $('modeLbl').textContent=on ? 'Voice · not catching words' : MODES[T.mode];
+}
+function startVoice(){
+  const SR=window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('Voice-follow needs Google Chrome. Choose Sound-follow instead.',5000); return; }
+  stopVoice(); T.voiceFail=false; T.far=null;
+  const r=new SR(); r.lang=$('lang').value; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
+  r.onresult=e=>{
+    let txt=''; for(let i=e.resultIndex;i<e.results.length;i++) txt+=' '+e.results[i][0].transcript;
+    txt=txt.trim(); if(!txt) return;
+    T.lastResult=performance.now(); setWarn(false);
+    $('heard').textContent=txt.split(/\s+/).slice(-6).join(' ');
+    matchSpoken(txt);
+  };
+  r.onerror=e=>{
+    if(e.error==='network'){ toast('Voice-follow needs internet (Chrome uses Google to understand the words). Check your connection.',6000); }
+    else if(e.error==='not-allowed' || e.error==='service-not-allowed'){ T.voiceFail=true; toast('Allow the microphone for this page (tap the lock next to the address), then press Play again.',6000); pause(); }
+    else if(e.error==='audio-capture'){
+      T.voiceFail=true;
+      if(T.here && !T.audioOnly && T.stream && T.stream.getVideoTracks().length){ toast('On this device the camera and voice-follow cannot share the microphone, so Sound-follow is used for this take.',6000); setMode('sound'); }
+      else toast('No microphone was found. Plug one in or choose Sound-follow.',6000);
+    }
+    else if(e.error==='language-not-supported'){ toast('This language is not supported here. Choose English (US).',6000); }
+  };
+  r.onend=()=>{ if(T.rec===r && T.running && T.mode==='voice' && !T.voiceFail) setTimeout(()=>{ if(T.rec===r && T.running) try{ r.start(); }catch{} },120); };
+  T.rec=r; T.lastResult=performance.now();
+  $('heardPill').classList.remove('hidden'); $('heard').textContent='…';
+  try{ r.start(); }catch(e){ console.warn(e); }
+}
+function stopVoice(){ const r=T.rec; T.rec=null; if(r){ r.onend=null; try{ r.abort(); }catch{} } setWarn(false); }
+
+/* ---------- microphone level: measures the quiet moments (room noise) and the loud ones (your voice) ---------- */
+function startLevel(stream){
+  if(T.ac || !stream || !stream.getAudioTracks().length) return;
+  try{
+    T.ac=new (window.AudioContext||window.webkitAudioContext)(); T.ac.resume();
+    const src=T.ac.createMediaStreamSource(stream); T.an=T.ac.createAnalyser(); T.an.fftSize=1024; src.connect(T.an);
+    T.buf=new Float32Array(T.an.fftSize); T.lvi=0; T.lvn=0; T.noise=0; T.peak=0; T.sm=0;
+  }catch(e){ console.warn(e); }
+}
+function readLevel(){
+  if(!T.an) return 0;
+  T.an.getFloatTimeDomainData(T.buf); let s=0; for(let i=0;i<T.buf.length;i++) s+=T.buf[i]*T.buf[i];
+  const rms=Math.sqrt(s/T.buf.length);
+  T.sm=T.sm*0.7+rms*0.3;
+  T.lv[T.lvi]=T.sm; T.lvi=(T.lvi+1)%T.lv.length; if(T.lvn<T.lv.length) T.lvn++;
+  if(T.lvi%20===0 && T.lvn>=60){
+    const a=Array.from(T.lv.subarray(0,T.lvn)).sort((x,y)=>x-y);
+    T.noise=a[Math.floor(a.length*0.08)]; T.peak=a[Math.floor(a.length*0.95)];
+  }
+  return rms;
+}
+function voiceThreshold(){
+  if(T.lvn<60) return 1;
+  const lo=Math.max(0.004,T.noise*2.5), hi=Math.max(0.004,T.peak*0.45);
+  return Math.min(lo,hi);
+}
+const audioOpts=()=>{ const c=$('clean').checked && (T.here || T.audioOnly); return { echoCancellation:c, noiseSuppression:c, autoGainControl:c }; };
+async function ensureMic(){
+  if(T.stream && T.stream.getAudioTracks().length) return T.stream;
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({ audio:audioOpts() });
+    if(T.stream) s.getTracks().forEach(t=>T.stream.addTrack(t)); else T.stream=s;
+    startLevel(T.stream);
+  }catch{ toast('Allow the microphone for Sound-follow, or choose Steady speed.'); }
+  return T.stream;
+}
+
+/* ---------- camera (only when filming on this device) ---------- */
+async function openCamera(){
+  if(!T.here) return;
+  try{
+    T.stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ ideal:1920 }, height:{ ideal:1080 }, frameRate:{ ideal:30 } }, audio:audioOpts() });
+    $('cam').srcObject=T.stream; $('cam').classList.remove('hidden');
+    startLevel(T.stream);
+  }catch(e){
+    console.warn(e); $('cam').classList.add('hidden');
+    toast(location.protocol!=='https:' && !/^(localhost|127\.)/.test(location.hostname) ? 'The camera only works when this page is opened from https:// (your Netlify site).' : 'Allow the camera and microphone for this page (tap the lock next to the address).',6000);
+  }
+}
+function closeCamera(){
+  if(T.stream){ T.stream.getTracks().forEach(t=>t.stop()); T.stream=null; }
+  $('cam').srcObject=null;
+  if(T.ac){ try{ T.ac.close(); }catch{} T.ac=null; T.an=null; }
+}
+
+/* ---------- keep the screen on ---------- */
+async function wakeOn(){ try{ if('wakeLock' in navigator) T.wake=await navigator.wakeLock.request('screen'); }catch{} }
+function wakeOff(){ try{ T.wake && T.wake.release(); }catch{} T.wake=null; }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !$('prompter').classList.contains('hidden')) wakeOn(); });
+
+/* ---------- the moving text ---------- */
+const MODES={ voice:'Voice', sound:'Sound', steady:'Steady' };
+function setMode(m){
+  T.mode=m; $('mode').value=m; localStorage.setItem(KEY+'set:mode',m);
+  stopVoice(); $('modeLbl').textContent=MODES[m]; markDone(T.pos);
+  $('heardPill').classList.toggle('hidden',m!=='voice');
+  $('slowBtn').classList.toggle('hidden',m==='voice'); $('fastBtn').classList.toggle('hidden',m==='voice');
+  if(T.running){ if(m==='voice') startVoice(); else ensureMic(); }
+}
+function modeUI(){ $('langRow').classList.toggle('hidden',$('mode').value!=='voice'); }
+$('mode').addEventListener('change',modeUI);
+function pxPerSec(){ return (+$('speed').value)*(+$('size').value)*0.28; }
+function loop(now){
+  const dt=Math.min(0.1,(now-(T.last||now))/1000); T.last=now;
+  const lv=readLevel(), thr=voiceThreshold();
+  T.above=lv>thr ? T.above+1 : 0;
+  const speaking=T.above>=3;
+  if(speaking) T.lastVoice=now;
+  $('lvl').style.background=!T.an ? '#444' : speaking ? 'var(--ok)' : '#555';
+  if(T.running && !T.drag){
+    if(T.mode==='steady') T.target+=pxPerSec()*dt;
+    else if(T.mode==='sound'){ if(now-T.lastVoice<350) T.target+=pxPerSec()*dt; }
+    else if(T.mode==='voice') setWarn(now-T.startedAt>6000 && now-T.lastResult>6000 && (!T.an || now-T.lastVoice<1500));
+    if(T.mode!=='voice'){ T.target=clamp(T.target,minOff(),maxOff()); const p=wordAtLine(); if(p!==T.pos){ T.pos=p; markDone(p); } }
+  }
+  const k=T.mode==='voice' ? Math.min(1,dt*8) : 1;
+  T.offset+=(T.target-T.offset)*k;
+  paint();
+  if(T.running && T.words.length && T.mode!=='voice' && T.pos>=T.words.length-1 && T.offset>=maxOff()-2) pause(true);
+  T.raf=requestAnimationFrame(loop);
+}
+function play(){
+  if(!T.words.length) return toast('Your script is empty');
+  T.running=true; T.startedAt=performance.now(); T.last=0; $('playBtn').innerHTML=ICON.pause;
+  if(T.mode==='voice'){ if(!T.an && !T.here) ensureMic(); startVoice(); }
+  else ensureMic();
+}
+function pause(end){
+  T.running=false; $('playBtn').innerHTML=ICON.play; stopVoice();
+  if(end===true) toast('End of the script');
+}
+$('playBtn').innerHTML=ICON.play;
+$('playBtn').onclick=()=>{ if(T.running) pause(); else play(); };
+$('backBtn').onclick=()=>stepLine(-1);
+$('fwdBtn').onclick=()=>stepLine(1);
+function stepLine(dir){
+  const N=T.words.length; if(!N) return;
+  let i=clamp(T.pos,0,N-1); const top=T.words[i].el.offsetTop;
+  if(dir>0){ while(i<N-1 && T.words[i].el.offsetTop<=top) i++; }
+  else{ while(i>0 && T.words[i].el.offsetTop>=top) i--; const t2=T.words[i].el.offsetTop; while(i>0 && T.words[i-1].el.offsetTop===t2) i--; }
+  setPos(i,true);
+}
+$('modeBtn').onclick=()=>{ const order=['voice','sound','steady'], m=order[(order.indexOf(T.mode)+1)%3]; setMode(m); toast(MODES[m]+(m==='voice' ? ': follows your words' : m==='sound' ? ': moves while you speak' : ': steady speed')); };
+function changeSpeed(d){ $('speed').value=clamp(+$('speed').value+d,1,12); localStorage.setItem(KEY+'set:speed',$('speed').value); $('speedVal').textContent=$('speed').value; toast('Speed '+$('speed').value,1200); }
+$('slowBtn').onclick=()=>changeSpeed(-1);
+$('fastBtn').onclick=()=>changeSpeed(1);
+function changeSize(d){ $('size').value=clamp(+$('size').value+d,22,90); localStorage.setItem(KEY+'set:size',$('size').value); $('sizeVal').textContent=$('size').value; applySize(); }
+$('smallBtn').onclick=()=>changeSize(-4);
+$('bigBtn').onclick=()=>changeSize(4);
+$('sideBtn').onclick=()=>{ localStorage.setItem(KEY+'set:camSide',camSide()==='left' ? 'right' : 'left'); applySize(); toast('Text moved to the camera side'); };
+$('rotBtn').onclick=async()=>{
+  T.land=!(innerWidth>innerHeight);
+  try{
+    if(!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI:'hide' });
+    await screen.orientation.lock(T.land ? 'landscape' : 'portrait');
+    toast(T.land ? 'Sideways (YouTube)' : 'Upright (Shorts)',1500);
+  }catch(e){ toast('Turn on Auto-rotate on your phone (swipe down from the top), then turn the phone.',6000); }
+};
+
+/* touch: drag to move the text, tap a word to jump there, tap empty space to pause */
+$('textWrap').addEventListener('pointerdown',e=>{ T.drag={ y:e.clientY, start:T.target, moved:false }; $('textWrap').setPointerCapture(e.pointerId); });
+$('textWrap').addEventListener('pointermove',e=>{
+  const d=T.drag; if(!d) return; const dy=e.clientY-d.y;
+  if(Math.abs(dy)>8) d.moved=true;
+  if(d.moved){ T.target=clamp(d.start-dy,minOff(),maxOff()); T.offset=T.target; paint(); }
+});
+$('textWrap').addEventListener('pointerup',e=>{
+  const d=T.drag; T.drag=null; if(!d) return;
+  if(d.moved){ const p=wordAtLine(); T.pos=p; markDone(p); T.far=null; if(T.mode==='voice') setPos(p); return; }
+  const el=document.elementFromPoint(e.clientX,e.clientY), i=el && el.dataset ? el.dataset.i : undefined;
+  if(i!=null){ setPos(+i,true); toast('Jumped here',1200); }
+  else{ if(T.running) pause(); else play(); }
+});
+$('textWrap').addEventListener('pointercancel',()=>{ T.drag=null; });
+$('textWrap').addEventListener('wheel',e=>{ e.preventDefault(); T.target=clamp(T.target+e.deltaY,minOff(),maxOff()); T.offset=T.target; paint(); const p=wordAtLine(); T.pos=p; markDone(p); T.far=null; },{ passive:false });
+
+/* ---------- recording inside the page (video, or audio only) ---------- */
+function pickType(){
+  const types=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  return types.find(t=>window.MediaRecorder && MediaRecorder.isTypeSupported(t))||'';
+}
+function pickAudioType(){
+  const types=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm'];
+  return types.find(t=>window.MediaRecorder && MediaRecorder.isTypeSupported(t))||'';
+}
+async function startRec(){
+  if(T.audioOnly){
+    if(!T.stream || !T.stream.getAudioTracks().length) await ensureMic();
+    if(!T.stream || !T.stream.getAudioTracks().length){ toast('No microphone was found. Allow the microphone for this page (tap the lock next to the address), then try again.',6000); return; }
+  }else{
+    if(!T.here) return;
+    if(!T.stream || !T.stream.getVideoTracks().length){ toast('The camera is not on. Allow the camera, then close and open the teleprompter again.'); return; }
+  }
+  if(!window.MediaRecorder){ toast('This browser cannot record. Use Google Chrome.'); return; }
+  if($('countOn').checked){
+    const c=$('count'); c.classList.remove('hidden');
+    for(const n of [3,2,1]){ c.textContent=n; await sleep(900); }
+    c.classList.add('hidden');
+  }
+  let mt;
+  if(T.audioOnly){
+    mt=pickAudioType();
+    const au=new MediaStream(T.stream.getAudioTracks());
+    try{ T.mr=new MediaRecorder(au,{ mimeType:mt||undefined, audioBitsPerSecond:192000 }); }
+    catch{ T.mr=new MediaRecorder(au); }
+  }else{
+    mt=pickType();
+    try{ T.mr=new MediaRecorder(T.stream,{ mimeType:mt||undefined, videoBitsPerSecond:8000000, audioBitsPerSecond:192000 }); }
+    catch{ T.mr=new MediaRecorder(T.stream); }
+  }
+  T.chunks=[];
+  T.mr.ondataavailable=e=>{ if(e.data && e.data.size) T.chunks.push(e.data); };
+  T.mr.onstop=()=>{ T.blob=new Blob(T.chunks,{ type:T.mr.mimeType }); showAfter(); };
+  T.mr.start(1000); T.recT0=performance.now();
+  $('recBtn').classList.add('on'); $('recBtn').textContent='STOP'; $('recPill').classList.remove('hidden');
+  clearInterval(T.recTimer); T.recTimer=setInterval(()=>{ const s=Math.floor((performance.now()-T.recT0)/1000); $('recTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+  if(!T.running) play();
+}
+function stopRec(){
+  if(T.mr && T.mr.state!=='inactive') T.mr.stop();
+  clearInterval(T.recTimer); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; $('recPill').classList.add('hidden');
+  pause();
+}
+$('recBtn').onclick=()=>{ if(T.mr && T.mr.state==='recording') stopRec(); else startRec(); };
+function baseName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); const nm=($('scriptName').value.trim()||'take').replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,40)||'take'; return nm+'-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function takeFiles(){
+  const isAud=T.audioOnly || /^audio\//.test(T.blob.type);
+  const ext=isAud ? (/mp4/.test(T.blob.type) ? '.m4a' : '.webm') : (/mp4/.test(T.blob.type) ? '.mp4' : '.webm');
+  const base=T.base||baseName();
+  return [ new File([T.blob],base+ext,{ type:T.blob.type }), new File([$('script').value],base+'.txt',{ type:'text/plain' }) ];
+}
+function showAfter(){
+  if(T.url) URL.revokeObjectURL(T.url);
+  T.url=URL.createObjectURL(T.blob); T.base=baseName();
+  const isAud=T.audioOnly || /^audio\//.test(T.blob.type);
+  $('takeVid').classList.toggle('hidden',isAud);
+  $('takeAud').classList.toggle('hidden',!isAud);
+  if(isAud) $('takeAud').src=T.url; else $('takeVid').src=T.url;
+  $('saveTake').textContent=isAud ? '⬇ Save audio + script' : '⬇ Save video + script';
+  const mb=(T.blob.size/1048576).toFixed(1), ext=isAud ? (/mp4/.test(T.blob.type) ? 'Audio (M4A)' : 'Audio (WebM)') : (/mp4/.test(T.blob.type) ? 'MP4' : 'WebM');
+  $('takeInfo').textContent=T.base+' · '+ext+' · '+mb+' MB';
+  let canShare=false; try{ canShare=!!(navigator.canShare && navigator.canShare({ files:takeFiles() })); }catch{}
+  $('shareTake').classList.toggle('hidden',!canShare);
+  $('after').classList.remove('hidden');
+  updateScript(s=>{ s.pos=T.pos; });
+}
+function download(file){ const u=URL.createObjectURL(file), a=document.createElement('a'); a.href=u; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); }
+$('saveTake').onclick=async()=>{
+  if(!T.blob) return;
+  const [v,t]=takeFiles(); download(v); await sleep(900); download(t);
+  const isAud=T.audioOnly || /^audio\//.test(T.blob.type);
+  toast('✓ '+(isAud ? 'Audio' : 'Video')+' and script saved in your Downloads folder (if Chrome asks, allow both downloads)',6000);
+};
+$('shareTake').onclick=async()=>{ try{ await navigator.share({ files:takeFiles(), title:$('scriptName').value||'My take' }); }catch(e){ if(e && e.name!=='AbortError') toast('Sharing did not work. Use the Save button.'); } };
+$('againBtn').onclick=()=>{ $('after').classList.add('hidden'); $('takeVid').pause(); $('takeAud').pause(); setPos(0,true); };
+$('contBtn').onclick=()=>{ $('after').classList.add('hidden'); $('takeVid').pause(); $('takeAud').pause(); };
+
+/* ---------- open and close the teleprompter ---------- */
+async function openPrompter(){
+  if(!$('script').value.trim()) return toast('Write or paste your script first');
+  saveScript(true);
+  T.audioOnly=$('make').value==='audio';
+  T.here=T.audioOnly ? true : ($('film').value==='here');
+  $('cam').classList.toggle('hidden',T.audioOnly);
+  $('setup').classList.add('hidden'); $('startbar').classList.add('hidden'); $('prompter').classList.remove('hidden');
+  $('recBtn').classList.toggle('hidden',!(T.audioOnly || T.here));
+  try{ await document.documentElement.requestFullscreen?.({ navigationUI:'hide' }); }catch{}
+  try{ screen.orientation?.unlock?.(); }catch{}
+  wakeOn();
+  buildText();
+  T.mode=$('mode').value; setMode(T.mode);
+  if(!T.audioOnly) await openCamera();
+  if(T.audioOnly || !T.here) await ensureMic();
+  await sleep(150);
+  applySize();
+  const s=loadScripts().find(x=>x.id===currentId());
+  await sleep(80);
+  setPos(s && s.pos && s.pos<T.words.length-3 ? s.pos : 0,true);
+  if(s && s.pos>3) toast('Continuing where you stopped. Use the back button or drag the text to go back.');
+  cancelAnimationFrame(T.raf); T.last=0; T.raf=requestAnimationFrame(loop);
+  if(T.audioOnly) toast('Tap REC to record your voice (no camera, no face). Press Play or Space and read.',5000);
+  else if(T.here) toast(IS_PHONE ? 'Tap REC to record, or Play to only read. Turn the phone sideways for YouTube.' : 'Tap REC to record, or Play to only read. Look at the text right under the camera.',5000);
+  else toast('Start recording on your phone, then press Play or Space and read.',5000);
+}
+function closePrompter(){
+  if(T.mr && T.mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; stopRec(); }
+  pause(); cancelAnimationFrame(T.raf); closeCamera(); wakeOff();
+  updateScript(s=>{ s.pos=T.pos; });
+  try{ screen.orientation?.unlock?.(); }catch{}
+  try{ document.fullscreenElement && document.exitFullscreen(); }catch{}
+  $('prompter').classList.add('hidden'); $('after').classList.add('hidden'); $('setup').classList.remove('hidden'); $('startbar').classList.remove('hidden');
+}
+$('startBtn').onclick=openPrompter;
+$('closeBtn').onclick=closePrompter;
+window.addEventListener('resize',()=>{ if(!$('prompter').classList.contains('hidden')) applySize(); });
+document.addEventListener('keydown',e=>{
+  if($('prompter').classList.contains('hidden') || !$('after').classList.contains('hidden')) return;
+  const k=e.key;
+  if(k===' ' || k==='Enter'){ e.preventDefault(); if(T.running) pause(); else play(); }
+  else if(k==='ArrowDown' || k==='PageDown' || k==='ArrowRight'){ e.preventDefault(); stepLine(1); }
+  else if(k==='ArrowUp' || k==='PageUp' || k==='ArrowLeft'){ e.preventDefault(); stepLine(-1); }
+  else if(k==='r' || k==='R'){ if(T.audioOnly || T.here){ if(T.mr && T.mr.state==='recording') stopRec(); else startRec(); } }
+  else if(k==='Escape') closePrompter();
+});
+
+/* ---------- start ---------- */
+persist(); modeUI(); recUI();
+const showVals=()=>{ $('speedVal').textContent=$('speed').value; $('sizeVal').textContent=$('size').value; };
+['speed','size'].forEach(id=>$(id).addEventListener('input',showVals)); showVals();
+fillScripts(localStorage.getItem(KEY+'last')||''); openScript(currentId());
+if(!$('site').value && location.protocol==='https:' && !/^(localhost|127\.)/.test(location.hostname)) $('site').value=location.origin+location.pathname;
+if(!IS_PHONE) $('sendBox').open=true;
+receiveFromLink();
+</script>
+</body>
+</html>

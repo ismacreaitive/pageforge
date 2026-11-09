@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<!-- calendar.html — v5 — StoryForge Pack 2 · 📅 Calendar. v5: event title weight bumped to 900 (heaviest) and enlarged on tall + square for readability. Square layout pulled further inward from all edges (safe zone for platform cropping/UI overlap). Wide layout rebuilt entirely as a true two-column landscape design — number left, event name + Hijri right with a divider line — instead of a narrow centered stack floating in the middle of a wide canvas. Tall/square still share one centered-stack layout; wide has its own dedicated rendering. v4: three separate hand-placed layouts, Hijri override removed (fully automatic), two-line header. v3: caveat text removed. v2: automatic Hijri calculation. v1: countdown card, 4 themes, 3 motion effects, ambient sound, PNG + REC, 9:16/16:9/1:1. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Calendar</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=file]{padding:6px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>📅 Calendar <small>v5</small></h1>
+  <small>Countdown card video — "X days to go" style reveal, automatic Hijri date</small>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Event</h2>
+    <small>This counts down to any date you pick — Ramadan, the first 10 days of Dhul Hijjah, Eid, or anything else.</small>
+    <input id="eventName" placeholder="Event name" value="Ramadan" style="margin-top:8px">
+    <div class="row">
+      <input id="targetDate" type="date">
+    </div>
+    <div class="hint" id="countdownPreview"></div>
+    <div class="hint" id="hijriPreview"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="caption" placeholder="Optional short line, e.g. Prepare your heart">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="pulse">Gentle pulse</option><option value="drift">Drifting light</option><option value="shimmer">Shimmer sweep</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview card</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2800); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', text:'#f3ead9', textDim:'#9fcbb0' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', text:'#eef1fb', textDim:'#8e97b8' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', text:'#fbeedd', textDim:'#caa27e' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', text:'#fbe8ee', textDim:'#c993a4' }
+};
+
+/* Tall & square: centered stack layout, hand-tuned. Wide: separate two-column layout below. */
+const TALL = { W:1080, H:1920, cornerPad:70, cornerR:46,
+  line1Y:165, line1Fs:30, line2Y:208, line2Fs:26,
+  numberCY:600, numberFs:370, subtitleY:790, subtitleFs:46,
+  eventY:980, eventFs:180, hijriY:1140, hijriFs:50,
+  captionY:1230, captionFs:42, maxTextW:1080*0.85 };
+
+const SQUARE = { W:1080, H:1080, cornerPad:85, cornerR:36,
+  line1Y:150, line1Fs:26, line2Y:184, line2Fs:22,
+  numberCY:415, numberFs:235, subtitleY:555, subtitleFs:34,
+  eventY:675, eventFs:120, hijriY:768, hijriFs:32,
+  captionY:832, captionFs:28, maxTextW:1080*0.78 };
+
+/* Wide: true two-column landscape layout — number left, title+hijri right, divider between. */
+const WIDE = { W:1920, H:1080, cornerPad:60, cornerR:42,
+  line1Y:110, line1Fs:28, line2Y:145, line2Fs:24,
+  numberCX:500, numberCY:570, numberFs:330, subtitleY:742, subtitleFs:38,
+  dividerX:900, dividerY1:300, dividerY2:860,
+  rightX:980, eventY:460, eventFs:150, hijriY:592, hijriFs:42,
+  captionY:672, captionFs:32, rightMaxW:1920*0.42 };
+
+/* ===== Hijri conversion (tabular/civil Islamic calendar — standard calculated algorithm) ===== */
+const HIJRI_MONTHS=['Muharram',"Safar","Rabi' al-Awwal","Rabi' al-Thani","Jumada al-Awwal","Jumada al-Thani","Rajab","Sha'ban","Ramadan","Shawwal","Dhul-Qa'dah","Dhul-Hijjah"];
+function gregorianToJDN(y,m,d){
+  const a=Math.floor((14-m)/12);
+  const y2=y+4800-a;
+  const m2=m+12*a-3;
+  return d+Math.floor((153*m2+2)/5)+365*y2+Math.floor(y2/4)-Math.floor(y2/100)+Math.floor(y2/400)-32045;
+}
+function jdnToHijri(jdn){
+  let l=jdn-1948440+10632;
+  const n=Math.floor((l-1)/10631);
+  l=l-10631*n+354;
+  const j=Math.floor((10985-l)/5316)*Math.floor((50*l)/17719)+Math.floor(l/5670)*Math.floor((43*l)/15238);
+  l=l-Math.floor((30-j)/15)*Math.floor((17719*j)/50)-Math.floor(j/16)*Math.floor((15238*j)/43)+29;
+  const month=Math.floor((24*l)/709);
+  const day=l-Math.floor((709*month)/24);
+  const year=30*n+j-30;
+  return {year, month, day};
+}
+function hijriStringFor(dateObj){
+  const jdn=gregorianToJDN(dateObj.getFullYear(), dateObj.getMonth()+1, dateObj.getDate());
+  const h=jdnToHijri(jdn);
+  return h.day+' '+HIJRI_MONTHS[h.month-1]+' '+h.year+' AH';
+}
+function targetDateObj(){
+  const val=$('targetDate').value;
+  if(!val) return null;
+  return new Date(val+'T00:00:00');
+}
+
+(function initDefaultDate(){
+  const d=new Date(); d.setDate(d.getDate()+30);
+  $('targetDate').value = d.toISOString().slice(0,10);
+})();
+
+function daysLeft(){
+  const t=targetDateObj();
+  if(!t) return null;
+  const today=new Date(); today.setHours(0,0,0,0);
+  return Math.round((t-today)/86400000);
+}
+function updateCountdownPreview(){
+  const d=daysLeft();
+  let msg;
+  if(d===null) msg='Pick a target date to see the countdown';
+  else if(d>1) msg='→ '+d+' days away';
+  else if(d===1) msg='→ 1 day away';
+  else if(d===0) msg='→ Today!';
+  else msg='→ '+Math.abs(d)+' day'+(Math.abs(d)===1?'':'s')+' ago';
+  $('countdownPreview').textContent=msg;
+}
+function updateHijriPreview(){
+  const t=targetDateObj();
+  $('hijriPreview').textContent = t ? ('Hijri date: '+hijriStringFor(t)) : '';
+}
+$('targetDate').addEventListener('input', ()=>{ updateCountdownPreview(); updateHijriPreview(); });
+updateCountdownPreview();
+updateHijriPreview();
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+function todayGregorianStr(){
+  return new Date().toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+function todayHijriStr(){
+  return hijriStringFor(new Date());
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+function drawStar(ctx,cx,cy,r,points,color,alpha){
+  ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=color; ctx.lineWidth=Math.max(1,r*0.05);
+  ctx.beginPath();
+  for(let i=0;i<=points*2;i++){
+    const ang=(Math.PI*i)/points;
+    const rad= i%2===0 ? r : r*0.45;
+    const x=cx+rad*Math.sin(ang), y=cy-rad*Math.cos(ang);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+function wrapCenteredText(ctx,text,cx,y,maxW,lineH){
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  const startY = y - (lines.length-1)*lineH/2;
+  lines.forEach((l,i)=> ctx.fillText(l, cx, startY+i*lineH));
+}
+function wrapLeftText(ctx,text,x,y,maxW,lineH){
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  lines.forEach((l,i)=> ctx.fillText(l, x, y+i*lineH));
+  return lines.length;
+}
+
+let particles=[];
+function initParticles(W,H){
+  particles=[];
+  for(let i=0;i<24;i++){
+    particles.push({ x:Math.random()*W, y:Math.random()*H, r:(Math.random()*1.5+0.6)*(W*0.003), speed:(Math.random()*0.6+0.3)*(H/1920), alpha:Math.random()*0.5+0.2 });
+  }
+}
+function drawDriftParticles(ctx,W,H,color){
+  particles.forEach(p=>{
+    p.y -= p.speed;
+    if(p.y<-10){ p.y=H+10; p.x=Math.random()*W; }
+    ctx.save(); ctx.globalAlpha=p.alpha; ctx.fillStyle=color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+    ctx.restore();
+  });
+}
+
+/* ===== ambient sound ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], padGains=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[]; padGains=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o); padGains.push(g);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+
+let cv,ctx,W,H,rafId;
+let mr,chunks=[],blob,pngBlob;
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  const th=THEMES[settings.theme];
+  const shapeKey=$('shape').value;
+  const L = shapeKey==='tall' ? TALL : shapeKey==='square' ? SQUARE : WIDE;
+
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  drawStar(ctx, L.cornerPad, L.cornerPad, L.cornerR, 8, th.accent, 0.4);
+  drawStar(ctx, W-L.cornerPad, L.cornerPad, L.cornerR, 8, th.accent, 0.4);
+  drawStar(ctx, L.cornerPad, H-L.cornerPad, L.cornerR, 8, th.accent, 0.4);
+  drawStar(ctx, W-L.cornerPad, H-L.cornerPad, L.cornerR, 8, th.accent, 0.4);
+
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.globalAlpha=0.92; ctx.fillStyle=th.text;
+  ctx.font='700 '+L.line1Fs+'px system-ui';
+  ctx.fillText(todayGregorianStr(), W/2, L.line1Y);
+  ctx.fillStyle=th.accent;
+  ctx.font='600 '+L.line2Fs+'px system-ui';
+  ctx.fillText(todayHijriStr(), W/2, L.line2Y);
+  ctx.globalAlpha=1;
+
+  const motion=$('motion').value;
+  let scale=1, shimmerProgress=null;
+  if(motion==='pulse') scale=1+0.035*Math.sin(ts/900);
+  if(motion==='shimmer') shimmerProgress=(ts%3000)/3000;
+
+  const days=daysLeft();
+  let bigText, subText;
+  if(days===null){ bigText='—'; subText='PICK A DATE'; }
+  else if(days>1){ bigText=String(days); subText='DAYS TO GO'; }
+  else if(days===1){ bigText='1'; subText='DAY TO GO'; }
+  else if(days===0){ bigText='TODAY'; subText=''; }
+  else { bigText=String(Math.abs(days)); subText=(Math.abs(days)===1?'DAY AGO':'DAYS AGO'); }
+
+  const t=targetDateObj();
+  const eventText=$('eventName').value||'Event';
+  const cap=$('caption').value.trim();
+
+  if(shapeKey==='wide'){
+    const numFs = (bigText==='TODAY') ? Math.round(L.numberFs*0.42) : L.numberFs;
+    ctx.save();
+    ctx.translate(L.numberCX, L.numberCY);
+    ctx.scale(scale,scale);
+    ctx.fillStyle=th.accent;
+    ctx.font='bold '+numFs+'px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(bigText, 0, 0);
+    ctx.restore();
+
+    if(shimmerProgress!==null){
+      ctx.save();
+      ctx.font='bold '+numFs+'px system-ui';
+      const tw=ctx.measureText(bigText).width;
+      const bx=L.numberCX-tw/2-20, by=L.numberCY-numFs*0.6, bw=tw+40, bh=numFs*1.2;
+      ctx.beginPath(); ctx.rect(bx,by,bw,bh); ctx.clip();
+      const sx=bx+shimmerProgress*(bw*1.6)-bw*0.3;
+      const grad=ctx.createLinearGradient(sx-bw*0.15,0,sx+bw*0.15,0);
+      grad.addColorStop(0,'rgba(255,255,255,0)');
+      grad.addColorStop(0.5,'rgba(255,255,255,0.5)');
+      grad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=grad; ctx.fillRect(bx,by,bw,bh);
+      ctx.restore();
+    }
+
+    if(subText){
+      ctx.fillStyle=th.textDim; ctx.font='800 '+L.subtitleFs+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(subText, L.numberCX, L.subtitleY);
+    }
+
+    ctx.save();
+    ctx.strokeStyle=th.accent; ctx.globalAlpha=0.3; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(L.dividerX, L.dividerY1); ctx.lineTo(L.dividerX, L.dividerY2); ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign='left';
+    ctx.fillStyle=th.text; ctx.font='900 '+L.eventFs+'px system-ui';
+    wrapLeftText(ctx, eventText, L.rightX, L.eventY, L.rightMaxW, L.eventFs*1.08);
+
+    if(t){
+      ctx.fillStyle=th.accent; ctx.font='700 '+L.hijriFs+'px system-ui';
+      ctx.fillText(hijriStringFor(t), L.rightX, L.hijriY);
+    }
+    if(cap){
+      ctx.fillStyle=th.textDim; ctx.font='italic 500 '+L.captionFs+'px system-ui';
+      wrapLeftText(ctx, cap, L.rightX, L.captionY, L.rightMaxW*0.95, L.captionFs*1.3);
+    }
+  } else {
+    const numFs = (bigText==='TODAY') ? Math.round(L.numberFs*0.5) : L.numberFs;
+    ctx.save();
+    ctx.translate(W/2, L.numberCY);
+    ctx.scale(scale,scale);
+    ctx.fillStyle=th.accent;
+    ctx.font='bold '+numFs+'px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(bigText, 0, 0);
+    ctx.restore();
+
+    if(shimmerProgress!==null){
+      ctx.save();
+      ctx.font='bold '+numFs+'px system-ui';
+      const tw=ctx.measureText(bigText).width;
+      const bx=W/2-tw/2-20, by=L.numberCY-numFs*0.6, bw=tw+40, bh=numFs*1.2;
+      ctx.beginPath(); ctx.rect(bx,by,bw,bh); ctx.clip();
+      const sx=bx+shimmerProgress*(bw*1.6)-bw*0.3;
+      const grad=ctx.createLinearGradient(sx-bw*0.15,0,sx+bw*0.15,0);
+      grad.addColorStop(0,'rgba(255,255,255,0)');
+      grad.addColorStop(0.5,'rgba(255,255,255,0.5)');
+      grad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=grad; ctx.fillRect(bx,by,bw,bh);
+      ctx.restore();
+    }
+
+    if(subText){
+      ctx.fillStyle=th.textDim; ctx.font='800 '+L.subtitleFs+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(subText, W/2, L.subtitleY);
+    }
+
+    ctx.fillStyle=th.text; ctx.font='900 '+L.eventFs+'px system-ui'; ctx.textAlign='center';
+    wrapCenteredText(ctx, eventText, W/2, L.eventY, L.maxTextW, L.eventFs*1.08);
+
+    if(t){
+      ctx.fillStyle=th.accent; ctx.font='700 '+L.hijriFs+'px system-ui'; ctx.textAlign='center';
+      ctx.fillText(hijriStringFor(t), W/2, L.hijriY);
+    }
+    if(cap){
+      ctx.fillStyle=th.textDim; ctx.font='italic 500 '+L.captionFs+'px system-ui'; ctx.textAlign='center';
+      wrapCenteredText(ctx, cap, W/2, L.captionY, L.maxTextW*0.9, L.captionFs*1.3);
+    }
+  }
+
+  if(motion==='drift') drawDriftParticles(ctx,W,H,th.accent);
+}
+
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  initParticles(W,H);
+  $('player').classList.add('show');
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'calendar-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

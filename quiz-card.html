@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<!-- quiz-card.html — v2.0 — StoryForge Formats · Pack 1 · ❓ Islamic Quiz Card.
+v2.0: (1) Added Square 1:1 shape (Instagram/Facebook post) — the Q&A body already auto-fits to whatever
+height is available, so no change was needed there; only the header/intro/outro chrome text needed its own
+sizing (previously a binary tall/wide check, which would have sized square's header off Wide's ratios —
+tuned for a 1920px canvas — on a 1080px-wide square, making it render too small). Replaced the tall/wide
+ternary with a proper 3-way lookup (tall/wide/square), each hand-tuned. (2) Fixed a stuck-UI bug: if the
+curated-question fetch or the Qur'an API failed, the "Loading questions…" button stayed permanently
+disabled with no explanation. It now shows a retry prompt. (3) Added a small built-in fallback question set
+(12 general, widely-known facts) used automatically if the live curated source can't be reached, and Qur'an
+mode now falls back to curated questions if the Qur'an API is totally unreachable — so the tool never ends
+up with zero questions. Nothing else changed; all existing behaviour (intro/outro pages, floating emojis,
+mix/curated/Qur'an sourcing, smart countdown, 4 themes, 3 motion effects, PNG+REC) is untouched.
+v1.9: on-screen countdowns/tap-hints during questions removed (timers still run, just not drawn); outro
+counter removed. v1.8: source band removed from quiz pages — plain question → answer → next. v1.7: dedicated
+intro/outro pages with floating emojis, smart countdown, upload-your-own-sound + synthesised fallback. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>StoryForge — Quiz Card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Rubik:wght@400;500;600;700;800;900&display=swap">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#E9C46A;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,"Segoe UI",Roboto,Arial,sans-serif}
+.hidden{display:none !important}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+#setup{max-width:720px;margin:0 auto;padding:14px 14px 160px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header .logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;font-size:20px}
+header b{font-size:18px}
+header small{display:block;color:var(--muted);font-size:12px}
+header a{margin-left:auto;color:var(--muted);font-size:13px;text-decoration:none}
+.ver{display:inline-block;background:var(--accent);color:#111;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number],input[type=range]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+input[type=range]{padding:0;height:38px;accent-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;flex:none}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--accent);color:#111;border-color:var(--accent)}
+.big{width:100%;padding:16px;font-size:18px;font-weight:800;border-radius:14px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.hint b{color:var(--text)}
+.hint a{color:var(--accent);text-decoration:none}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#111;border-color:var(--accent)}
+.pills .p.custom.loaded{background:rgba(95,211,141,0.2);border-color:var(--ok);color:var(--ok)}
+.preview{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;display:none}
+.preview.show{display:block}
+.preview .q{font-size:15px;line-height:1.5;margin:0 0 8px;font-weight:600}
+.preview .opt{font-size:14px;line-height:1.5;margin:0 0 4px;padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:6px}
+.preview .opt.correct{background:rgba(95,211,141,.18);color:var(--ok)}
+.preview .src{font-size:12px;color:var(--muted);margin-top:8px;font-style:italic}
+.preview .dur{font-size:11px;color:var(--accent);font-weight:700;margin-top:4px}
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.themes label{position:relative;display:block;cursor:pointer}
+.themes label input{position:absolute;opacity:0;pointer-events:none}
+.themes .sw{height:52px;border-radius:10px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;text-align:center;padding:4px}
+.themes input:checked+.sw{border-color:var(--accent);box-shadow:0 0 0 2px rgba(233,196,106,.25)}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 35%);display:flex;justify-content:center}
+.startbar .big{max-width:720px}
+#player{position:fixed;inset:0;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column}
+#stage{position:relative;max-width:100%;max-height:100%;background:#000}
+#stage canvas{display:block;width:100%;height:auto;max-width:100vw;max-height:calc(100vh - 120px);cursor:pointer}
+#ptop{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;z-index:6;pointer-events:none}
+.pill{background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 10px;font-size:13px;display:flex;gap:6px;align-items:center;color:#fff;max-width:72vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#recDot{width:10px;height:10px;border-radius:50%;background:var(--bad);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+#pbar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;z-index:6}
+.cbtn{width:52px;height:52px;border-radius:50%;background:rgba(20,26,38,.9);border:1px solid rgba(255,255,255,.25);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;padding:0;flex:none}
+.cbtn svg{width:22px;height:22px;display:block}
+.cbtn.gold{background:var(--accent);color:#111;border-color:#fff;font-weight:800;font-size:12px;width:62px;height:62px}
+.cbtn.rec{width:62px;height:62px;background:var(--bad);border-color:#fff;font-weight:800}
+.cbtn.rec.on{border-radius:18px}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:140px;font-weight:800;color:#fff;text-shadow:0 0 30px #000;pointer-events:none;z-index:7}
+#after{position:absolute;inset:0;background:rgba(0,0,0,.94);z-index:8;display:flex;flex-direction:column;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow:auto}
+#after video{width:100%;max-height:52vh;border-radius:12px;background:#000}
+#after img{max-width:100%;max-height:52vh;border-radius:12px;align-self:center;background:#000}
+#after .row .btn{flex:1}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(0,0,0,.72);z-index:9;color:#fff;font-size:15px;text-align:center;padding:20px}
+.spin{width:34px;height:34px;border:4px solid rgba(255,255,255,.25);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+#fileIn{display:none}
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <header><div class="logo">❓</div><div><b>Quiz Card <span class="ver">v2.0</span></b><small>Intro + outro pages · kid-friendly · 5 pages total</small></div><a href="index.html">← All tools</a></header>
+
+  <div class="card">
+    <h2>📚 Question source</h2>
+    <div class="pills" id="src">
+      <div class="p on" data-v="mix">🎲 Mix (recommended)</div>
+      <div class="p" data-v="curated">📘 Curated (verified MCQs)</div>
+      <div class="p" data-v="quran">📖 Quran: Which surah is this ayah?</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎯 Round</h2>
+    <div><div class="label">Questions per card</div>
+      <div class="pills" id="nQ">
+        <div class="p" data-v="1">1 (quick)</div>
+        <div class="p on" data-v="3">3 (best engagement)</div>
+        <div class="p" data-v="5">5 (longer)</div>
+      </div>
+    </div>
+    <div><div class="label">Reveal mode</div>
+      <div class="pills" id="rvl">
+        <div class="p on" data-v="auto">⏱ Auto after countdown</div>
+        <div class="p" data-v="tap">👆 Tap to reveal</div>
+      </div>
+    </div>
+    <div id="autoBox">
+      <div class="label">Countdown length</div>
+      <div class="pills" id="cnt">
+        <div class="p on" data-v="smart">🧠 Smart (auto per question)</div>
+        <div class="p" data-v="3">3s</div><div class="p" data-v="5">5s</div><div class="p" data-v="10">10s</div><div class="p" data-v="15">15s</div><div class="p" data-v="20">20s</div>
+      </div>
+      <div class="label" style="margin-top:8px">Countdown style (shown during each question)</div>
+      <div class="pills" id="cntStyle">
+        <div class="p on" data-v="bar">📊 Progress bar only (the line)</div>
+        <div class="p" data-v="num">🔢 Big number only (20, 19, 18…)</div>
+        <div class="p" data-v="alt">🔀 Alternate per question</div>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="tSource" checked> Show the source (ayah / hadith) after reveal</label>
+    <label class="check"><input type="checkbox" id="tCat" checked> Show the category badge</label>
+    <button class="btn" id="reloadBtn">🔄 Reload a new set of questions</button>
+    <div class="preview" id="prev"><div id="prevInner"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>🎬 Intro &amp; outro pages</h2>
+    <div><div class="label">Intro page duration (buys back time eaten by WhatsApp/Instagram load screens)</div>
+      <div class="pills" id="introHold">
+        <div class="p" data-v="2">2s</div>
+        <div class="p on" data-v="4">4s</div>
+        <div class="p" data-v="6">6s</div>
+        <div class="p" data-v="manual">Only when I tap</div>
+      </div>
+    </div>
+    <div><div class="label">Delay from last question's reveal to outro</div>
+      <div class="pills" id="outroDelay">
+        <div class="p" data-v="2">2s</div>
+        <div class="p on" data-v="3">3s</div>
+        <div class="p" data-v="5">5s</div>
+        <div class="p" data-v="manual">Only when I tap</div>
+      </div>
+    </div>
+    <div><div class="label">How long the outro page stays</div>
+      <div class="pills" id="outroHold">
+        <div class="p" data-v="3">3s</div>
+        <div class="p on" data-v="5">5s</div>
+        <div class="p" data-v="8">8s</div>
+        <div class="p" data-v="manual">Until I stop recording</div>
+      </div>
+    </div>
+    <div class="hint">Flow: 🎬 INTRO → ❓ Q1 → ❓ Q2 → ❓ Q3 → 🎉 OUTRO. Each is its own dedicated page — kid-friendly, bouncy emojis, zero overlap.</div>
+  </div>
+
+  <div class="card">
+    <h2>🔊 Background sound</h2>
+    <div class="pills" id="amb">
+      <div class="p on" data-v="silent">🔇 Silent</div>
+      <div class="p custom" id="customPill" data-v="custom">📁 Your own sound (click to pick)</div>
+      <div class="p" data-v="ocean">🌊 Ocean</div>
+      <div class="p" data-v="rain">🌧 Rain</div>
+      <div class="p" data-v="wind">🌬 Wind</div>
+      <div class="p" data-v="mihrab">🕌 Mihrab (soft drone)</div>
+    </div>
+    <input type="file" id="fileIn" accept="audio/*">
+    <div><div class="label">Volume: <span id="volLbl">40%</span></div><input type="range" id="vol" min="0" max="100" value="40"></div>
+    <div class="hint"><b>Best engagement: use a vocals-only nasheed loop.</b> Free sources: <a href="https://pixabay.com/music/search/nasheed/" target="_blank">Pixabay</a>, <a href="https://muslimcentral.com/" target="_blank">Muslim Central</a>, <a href="https://www.islamway.net/collection?id=49" target="_blank">Islamway Anasheed</a>.</div>
+  </div>
+
+  <div class="card">
+    <h2>✨ Motion</h2>
+    <label class="check"><input type="checkbox" id="mPart" checked> 🌟 Gold particles</label>
+    <label class="check"><input type="checkbox" id="mBubbles"> 💧 Water bubbles</label>
+    <label class="check"><input type="checkbox" id="mGlow" checked> ✨ Corner glow pulses</label>
+  </div>
+
+  <div class="card">
+    <h2>🎨 Look</h2>
+    <div class="row">
+      <div><div class="label">Shape</div><select id="shape">
+        <option value="tall">Tall 9:16 — WhatsApp · Reels · Stories · TikTok · Shorts</option>
+        <option value="square">Square 1:1 — Instagram post · Facebook post</option>
+        <option value="wide">Wide 16:9 — YouTube · Facebook feed</option>
+      </select></div>
+    </div>
+    <div><div class="label">Theme</div>
+      <div class="themes" id="themes">
+        <label><input type="radio" name="theme" value="dark" checked><div class="sw" style="background:linear-gradient(135deg,#0b0f17,#1a2333);color:#E9C46A">Dark &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="cream"><div class="sw" style="background:linear-gradient(135deg,#f5efe0,#e8ddc3);color:#2d4a3a">Cream &amp; Green</div></label>
+        <label><input type="radio" name="theme" value="navy"><div class="sw" style="background:linear-gradient(135deg,#0f2744,#1a3a5c);color:#E9C46A">Navy &amp; Gold</div></label>
+        <label><input type="radio" name="theme" value="emerald"><div class="sw" style="background:linear-gradient(135deg,#0d2a24,#1a4038);color:#f0d78c">Emerald</div></label>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="mic" checked> Record my voice with the video</label>
+    <label class="check"><input type="checkbox" id="countOn" checked> Count down 3 · 2 · 1 before recording</label>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold big" id="openBtn" disabled>Loading questions…</button></div>
+
+<div id="player" class="hidden">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="ptop">
+    <span class="pill hidden" id="recPill"><span id="recDot"></span><span id="recTime">0:00</span></span>
+    <span class="pill" id="infoPill">Ready</span>
+  </div>
+  <div id="pbar">
+    <button class="cbtn" id="closeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="cbtn gold" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+    <button class="cbtn" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+  </div>
+  <div id="count" class="hidden">3</div>
+  <div id="busy"><div class="spin"></div><div id="busyTxt">Drawing the card…</div></div>
+  <div id="after" class="hidden">
+    <b style="font-size:18px">✓ Your quiz card is ready</b>
+    <video id="takeVid" class="hidden" controls playsinline></video>
+    <img id="takeImg" class="hidden" alt="">
+    <div class="hint" id="takeInfo"></div>
+    <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button><button class="btn hidden" id="shareTake">📤 Share</button></div>
+    <div class="row"><button class="btn" id="againBtn">Back to the card</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const KEY='forge:qz:';
+function toast(m,ms){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms||3400); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+const CURATED_URL='https://gist.githubusercontent.com/Muhammed-Rahif/aa3c2d77e2bc218e2a1b8658f8a6633d/raw';
+const QURAN_API='https://api.alquran.cloud/v1/';
+const INTRO_EMOJIS=['🌙','⭐','✨','😊','🤲','📿','💫','🕌','🌟','😄','🎯'];
+const OUTRO_EMOJIS=['🎉','🌟','💚','✨','🎊','😊','🤲','🕌','💫','⭐','🌙','🤔'];
+
+/* v2.0 — built-in backup set, used only if the live curated-question source can't be reached, so the
+   tool never ends up with zero questions. General, widely-known facts only — no literal ayah/hadith text. */
+const FALLBACK_CURATED=[
+  { question:"How many pillars does Islam have?", answers:["3","4","5","6"], answerIndex:2, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"What is the Islamic declaration of faith called?", answers:["Salah","Shahada","Zakat","Sawm"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"In which city is the Hajj pilgrimage performed?", answers:["Madinah","Jerusalem","Makkah","Damascus"], answerIndex:2, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
+  { question:"What is the Islamic holy book called?", answers:["Torah","Bible","Qur'an","Zabur"], answerIndex:2, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
+  { question:"What is the call to prayer called?", answers:["Iqamah","Adhan","Khutbah","Dua"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"Which month is the Islamic fasting month?", answers:["Shawwal","Rajab","Ramadan","Muharram"], answerIndex:2, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
+  { question:"What must a Muslim perform before prayer for purification?", answers:["Ghusl","Wudu","Tayammum only","Zakat"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"Who is considered the final prophet in Islam?", answers:["Isa (Jesus)","Musa (Moses)","Muhammad ﷺ","Ibrahim (Abraham)"], answerIndex:2, source:"General Islamic knowledge", cat:'PROPHETS', kind:'curated' },
+  { question:"Which prophet is associated with the story of the ark and the flood?", answers:["Nuh (Noah)","Yusuf (Joseph)","Dawud (David)","Sulaiman (Solomon)"], answerIndex:0, source:"General Islamic knowledge", cat:'PROPHETS', kind:'curated' },
+  { question:"What is the charity given to the poor called?", answers:["Sawm","Hajj","Zakat","Shahada"], answerIndex:2, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"What is the Friday congregational prayer called?", answers:["Eid","Jumu'ah","Tarawih","Witr"], answerIndex:1, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
+  { question:"What is the Islamic place of worship called?", answers:["Church","Mosque","Temple","Synagogue"], answerIndex:1, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' }
+];
+
+let CURATED=[], SURAHS=[];
+let settings={ src:'mix', nQ:3, rvl:'auto', cnt:'smart', cntStyle:'bar', amb:'silent', vol:40, introHold:'4', outroDelay:'3', outroHold:'5' };
+let questions=[];
+/* phase: 'intro' | 'q' | 'r' | 'outro' */
+let state={ qi:0, phase:'intro', timeLeft:0, outroLeft:0, introLeft:0 };
+let customBuffer=null, customName='';
+let floatEmojis=[]; let floatPhase=0;
+
+function catOf(q){
+  const s=String(q.source||'').toLowerCase();
+  if(/al-?bukhari|muslim|tirmidhi|abu\s*dawud|nasa|ibn\s*majah|ahmad|riyad/i.test(s)) return 'HADITH';
+  if(/quran|qur'an|surah|surat|aya|verse/i.test(s)) return 'QURAN';
+  if(/prophet|nabi|rasul|musa|isa|ibrahim|yusuf|dawud|sulaiman/i.test(q.question+' '+s)) return 'PROPHETS';
+  if(/pillar|salah|prayer|fast|zakat|hajj|iman|belief|shirk/i.test(q.question+' '+s)) return 'BELIEF';
+  return 'ISLAM';
+}
+function smartSeconds(q){
+  const score=(q.question||'').length + (q.ar||'').length*1.6 + (q.answers||[]).reduce((s,a)=>s+String(a).length,0)*0.9;
+  if(score<120) return 5; if(score<220) return 8; if(score<380) return 12; return 18;
+}
+function questionDuration(q){ if(settings.cnt==='smart') return smartSeconds(q); return +settings.cnt || 5; }
+
+/* v2.0 — falls back to the built-in question set if the live Gist is unreachable or returns nothing,
+   instead of leaving CURATED empty and silently breaking question generation. */
+async function loadCurated(){
+  if(CURATED.length) return CURATED;
+  try{
+    const r=await fetch(CURATED_URL); const j=await r.json();
+    const mapped=j.map(q=>({ question:q.question, answers:q.answers, answerIndex:q.answerIndex, source:q.source, cat:catOf(q), kind:'curated' }));
+    if(!mapped.length) throw new Error('empty response');
+    CURATED=mapped;
+    return CURATED;
+  }catch(e){
+    toast('Could not reach the curated question list — using a built-in backup set.',5000);
+    CURATED=FALLBACK_CURATED.slice();
+    return CURATED;
+  }
+}
+async function loadSurahs(){ if(SURAHS.length) return SURAHS;
+  try{ const r=await fetch(QURAN_API+'surah'); const j=await r.json();
+    SURAHS=(j.data||[]).map(s=>({ n:s.number, en:s.englishName, ar:s.name, ayahs:s.numberOfAyahs })); return SURAHS; }catch(e){ return []; } }
+async function genQuranQ(){
+  if(!SURAHS.length) await loadSurahs(); if(!SURAHS.length) return null;
+  const target=pick(SURAHS.filter(s=>s.ayahs>=3 && s.ayahs<=50));
+  const ayahNum=1+Math.floor(Math.random()*target.ayahs);
+  try{
+    const r=await fetch(QURAN_API+'ayah/'+target.n+':'+ayahNum+'/en.sahih'); if(!r.ok) return null;
+    const j=await r.json(); const ayah=j.data; if(!ayah||!ayah.text) return null;
+    const ar=await fetch(QURAN_API+'ayah/'+target.n+':'+ayahNum+'/ar.alafasy').then(x=>x.ok?x.json():null).catch(()=>null);
+    const arText=(ar&&ar.data&&ar.data.text)||'';
+    const wrong=shuffle(SURAHS.filter(s=>s.n!==target.n)).slice(0,3);
+    const opts=shuffle([target,...wrong]); const correct=opts.findIndex(o=>o.n===target.n);
+    return { question:'Which Surah is this ayah from?', ar:arText, ayahText:ayah.text,
+      answers:opts.map(o=>o.en+' ('+o.ar+')'), answerIndex:correct,
+      source:'Qur\'an '+target.n+':'+ayahNum+' — '+target.en, cat:'QURAN', kind:'quran' };
+  }catch(e){ return null; }
+}
+async function buildQuestions(){
+  const out=[]; const want=settings.nQ; const cur=await loadCurated();
+  if(settings.src==='curated'){ out.push(...shuffle(cur.slice()).slice(0,want)); }
+  else if(settings.src==='quran'){
+    for(let i=0;i<want;i++){ const q=await genQuranQ(); if(q) out.push(q); }
+    if(!out.length){
+      /* v2.0 — Qur'an API totally unreachable: fall back to curated rather than leaving the quiz empty. */
+      out.push(...shuffle(cur.slice()).slice(0,want));
+    }
+  }
+  else {
+    for(let i=0;i<want;i++){ if(Math.random()<0.5 && cur.length) out.push(pick(cur));
+      else { const q=await genQuranQ(); if(q) out.push(q); else if(cur.length) out.push(pick(cur)); } }
+    const seen=new Set(), dedup=[]; for(const q of out){ if(!seen.has(q.question)){ seen.add(q.question); dedup.push(q); } }
+    while(dedup.length<want && cur.length){ const q=pick(cur); if(!seen.has(q.question)){ seen.add(q.question); dedup.push(q); } }
+    out.length=0; out.push(...dedup.slice(0,want));
+  }
+  questions=out; renderPreview();
+}
+function renderPreview(){
+  const el=$('prevInner'); el.innerHTML='';
+  if(!questions.length){
+    /* v2.0 — previously left the button stuck on "Loading questions…" forever with no explanation. */
+    $('prev').classList.remove('show');
+    $('openBtn').disabled=false;
+    $('openBtn').textContent='⚠ Could not load questions — tap to retry';
+    $('openBtn').onclick=()=>{ $('openBtn').disabled=true; $('openBtn').textContent='Loading questions…'; buildQuestions(); };
+    return;
+  }
+  for(let i=0;i<questions.length;i++){
+    const q=questions[i]; let html='<div class="q">'+(i+1)+'. '+esc(q.question)+'</div>';
+    if(q.ar) html+='<div style="font-family:\'Amiri Quran\',Amiri,serif;direction:rtl;text-align:right;font-size:17px;margin:4px 0 8px;line-height:1.9">'+esc(q.ar)+'</div>';
+    for(let j=0;j<q.answers.length;j++) html+='<div class="opt '+(j===q.answerIndex?'correct':'')+'">'+String.fromCharCode(65+j)+'. '+esc(q.answers[j])+'</div>';
+    if(q.source) html+='<div class="src">📎 '+esc(q.source)+'</div>';
+    if(settings.rvl==='auto') html+='<div class="dur">⏱ '+questionDuration(q)+'s to think</div>';
+    if(i<questions.length-1) html+='<hr style="border:none;border-top:1px solid var(--line);margin:10px 0">';
+    el.insertAdjacentHTML('beforeend',html);
+  }
+  $('prev').classList.add('show'); $('openBtn').disabled=false; $('openBtn').textContent='Make the quiz card'; $('openBtn').onclick=openPlayer;
+}
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    if(key==='amb' && p.dataset.v==='custom' && !customBuffer){ $('fileIn').click(); return; }
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=key==='nQ'?+p.dataset.v:p.dataset.v;
+    localStorage.setItem(KEY+key,p.dataset.v);
+    if(key==='rvl') $('autoBox').style.display=settings.rvl==='auto'?'':'none';
+    if(['src','nQ'].includes(key)) buildQuestions();
+    if(key==='cnt' || key==='rvl') renderPreview();
+    if(key==='amb') setAmbient(settings.amb);
+  });
+  const v=localStorage.getItem(KEY+key);
+  if(v){ [...box.children].forEach(c=>c.classList.toggle('on',c.dataset.v===v)); settings[key]=key==='nQ'?+v:v; }
+}
+bindPills('src','src'); bindPills('nQ','nQ'); bindPills('rvl','rvl'); bindPills('cnt','cnt'); bindPills('amb','amb');
+bindPills('introHold','introHold'); bindPills('outroDelay','outroDelay'); bindPills('outroHold','outroHold'); bindPills('cntStyle','cntStyle'); bindPills('cntStyle','cntStyle'); bindPills('cntStyle','cntStyle');
+$('autoBox').style.display=settings.rvl==='auto'?'':'none';
+$('reloadBtn').onclick=()=>buildQuestions();
+(function(){ const sv=localStorage.getItem(KEY+'vol'); if(sv!==null){ settings.vol=+sv; $('vol').value=sv; $('volLbl').textContent=sv+'%'; } })();
+$('vol').addEventListener('input',()=>{ settings.vol=+$('vol').value; $('volLbl').textContent=settings.vol+'%'; localStorage.setItem(KEY+'vol',settings.vol); if(masterGain) masterGain.gain.value=settings.vol/100*0.6; });
+
+$('fileIn').addEventListener('change',async e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAudio();
+  try{
+    const buf=await f.arrayBuffer(); const decoded=await actx.decodeAudioData(buf);
+    customBuffer=decoded; customName=f.name;
+    const pill=$('customPill'); pill.classList.add('loaded'); pill.textContent='📁 '+(f.name.length>24?f.name.slice(0,22)+'…':f.name)+' ✓';
+    [...$('amb').children].forEach(c=>c.classList.remove('on')); pill.classList.add('on');
+    settings.amb='custom'; localStorage.setItem(KEY+'amb','custom'); setAmbient('custom');
+    toast('✓ Sound loaded.',4000);
+  }catch(err){ toast('Could not read this file.',5000); }
+});
+
+/* ============ WEB AUDIO ============ */
+let actx=null, masterGain=null, mixDest=null, ambientNode=null, ambientSources=[];
+function ensureAudio(){ if(actx) return actx;
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  masterGain=actx.createGain(); masterGain.gain.value=settings.vol/100*0.6;
+  mixDest=actx.createMediaStreamDestination();
+  masterGain.connect(actx.destination); masterGain.connect(mixDest);
+  return actx; }
+function stopAmbient(){ if(ambientNode){ try{ ambientNode.disconnect(); }catch{} ambientNode=null; }
+  for(const s of ambientSources){ try{ s.stop(); }catch{} try{ s.disconnect(); }catch{} } ambientSources=[]; }
+function makeNoiseBuffer(dur,type){
+  const sr=actx.sampleRate, len=Math.floor(sr*dur);
+  const buf=actx.createBuffer(1,len,sr); const d=buf.getChannelData(0);
+  if(type==='brown'){ let last=0; for(let i=0;i<len;i++){ const w=Math.random()*2-1; d[i]=(last+0.02*w)/1.02; last=d[i]; d[i]*=3.2; } }
+  else if(type==='pink'){ let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for(let i=0;i<len;i++){ const w=Math.random()*2-1;
+      b0=.99886*b0+w*.0555179; b1=.99332*b1+w*.0750759; b2=.969*b2+w*.153852; b3=.8665*b3+w*.3104856; b4=.55*b4+w*.5329522; b5=-.7616*b5-w*.016898;
+      d[i]=(b0+b1+b2+b3+b4+b5+b6+w*.5362)*.11; b6=w*.115926; } }
+  else { for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*0.4; }
+  const src=actx.createBufferSource(); src.buffer=buf; src.loop=true; return src;
+}
+function setAmbient(kind){
+  if(!actx) return; stopAmbient();
+  if(kind==='silent' || !kind) return;
+  const g=actx.createGain(); g.gain.value=1; ambientNode=g;
+  if(kind==='custom'){ if(!customBuffer){ toast('Pick a sound file first.',3500); return; }
+    const src=actx.createBufferSource(); src.buffer=customBuffer; src.loop=true; src.connect(g); src.start(); ambientSources.push(src);
+  } else if(kind==='ocean'){
+    const n=makeNoiseBuffer(10,'brown'); const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=400; f.Q.value=.5;
+    const lfo=actx.createOscillator(); lfo.frequency.value=.12; const lg=actx.createGain(); lg.gain.value=250;
+    lfo.connect(lg).connect(f.frequency); n.connect(f).connect(g); lfo.start(); n.start(); ambientSources.push(n,lfo);
+  } else if(kind==='rain'){
+    const n=makeNoiseBuffer(10,'pink'); const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2200; f.Q.value=1.2;
+    const g2=actx.createGain(); g2.gain.value=1.8; n.connect(f).connect(g2).connect(g); n.start(); ambientSources.push(n);
+  } else if(kind==='wind'){
+    const n=makeNoiseBuffer(10,'pink'); const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=600; f.Q.value=2.2;
+    const lfo=actx.createOscillator(); lfo.frequency.value=.08; const lg=actx.createGain(); lg.gain.value=400;
+    lfo.connect(lg).connect(f.frequency); n.connect(f).connect(g); lfo.start(); n.start(); ambientSources.push(n,lfo);
+  } else if(kind==='mihrab'){
+    const o1=actx.createOscillator(); o1.type='sine'; o1.frequency.value=110; const g1=actx.createGain(); g1.gain.value=.35; o1.connect(g1).connect(g);
+    const o2=actx.createOscillator(); o2.type='sine'; o2.frequency.value=165; const g2=actx.createGain(); g2.gain.value=.22; o2.connect(g2).connect(g);
+    const o3=actx.createOscillator(); o3.type='sine'; o3.frequency.value=220; const g3=actx.createGain(); g3.gain.value=.08; o3.connect(g3).connect(g);
+    const lfo=actx.createOscillator(); lfo.frequency.value=.25; const lg=actx.createGain(); lg.gain.value=.05; lfo.connect(lg).connect(g3.gain);
+    o1.start(); o2.start(); o3.start(); lfo.start(); ambientSources.push(o1,o2,o3,lfo);
+  }
+  g.connect(masterGain);
+}
+
+const THEMES={
+  dark:{ bg1:'#0b0f17', bg2:'#1a2333', text:'#f5f5f0', sub:'#c8d0dc', accent:'#E9C46A', opt:'rgba(255,255,255,0.08)', optBorder:'rgba(255,255,255,0.18)', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(130,180,220,0.25)' },
+  cream:{ bg1:'#f5efe0', bg2:'#e8ddc3', text:'#1f2d26', sub:'#4a5c54', accent:'#2d4a3a', opt:'rgba(45,74,58,0.08)', optBorder:'rgba(45,74,58,0.2)', ornament:'rgba(45,74,58,0.14)', bubble:'rgba(60,120,100,0.22)' },
+  navy:{ bg1:'#0f2744', bg2:'#1a3a5c', text:'#f5f5f0', sub:'#bcd0e8', accent:'#E9C46A', opt:'rgba(255,255,255,0.08)', optBorder:'rgba(255,255,255,0.18)', ornament:'rgba(233,196,106,0.18)', bubble:'rgba(140,200,230,0.3)' },
+  emerald:{ bg1:'#0d2a24', bg2:'#1a4038', text:'#f5efe0', sub:'#b9d4cc', accent:'#f0d78c', opt:'rgba(255,255,255,0.08)', optBorder:'rgba(255,255,255,0.18)', ornament:'rgba(240,215,140,0.18)', bubble:'rgba(140,210,180,0.28)' }
+};
+const currentTheme=()=>THEMES[document.querySelector('input[name=theme]:checked').value];
+/* v2.0 — added square. */
+const currentShape=()=>{
+  const v=$('shape').value;
+  if(v==='square') return [1080,1080];
+  if(v==='wide') return [1920,1080];
+  return [1080,1920];
+};
+/* v2.0 — derives shape kind from actual canvas dimensions (not the DOM select), so draw functions that
+   already have W/H in scope don't need to re-query anything. Used to pick the right font-ratio table. */
+function shapeKind(W,H){ if(W===H) return 'square'; return H>W?'tall':'wide'; }
+function wrapWords(ctx,text,maxW){ const words=String(text).split(/\s+/).filter(Boolean); const lines=[]; let cur=[]; for(const w of words){ const trial=cur.concat([w]).join(' '); if(ctx.measureText(trial).width<=maxW || !cur.length) cur.push(w); else { lines.push(cur); cur=[w]; } } if(cur.length) lines.push(cur); return lines; }
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function cornerOrnaments(ctx,W,H,c){ ctx.save(); ctx.strokeStyle=c.ornament; ctx.lineWidth=Math.round(Math.min(W,H)*0.004); const r=Math.min(W,H)*0.09;
+  for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94]]){ ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.stroke(); ctx.beginPath(); ctx.arc(cx,cy,r*0.66,0,6.283); ctx.stroke();
+    for(let k=0;k<8;k++){ const a=k*Math.PI/4; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r*0.5,cy+Math.sin(a)*r*0.5); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); ctx.stroke(); } } ctx.restore(); }
+const anim={ particles:[], bubbles:[], glowPhase:0, lastW:0, lastH:0 };
+function resetParticles(W,H){ anim.lastW=W; anim.lastH=H; anim.particles=[]; const n=Math.round((W*H)/36000);
+  for(let i=0;i<n;i++) anim.particles.push({ x:Math.random()*W, y:Math.random()*H, r:1+Math.random()*2.5, vx:(Math.random()-.5)*0.25, vy:-0.15-Math.random()*0.25, a:0.3+Math.random()*0.5, ph:Math.random()*6.283 }); anim.bubbles=[]; }
+function stepMotion(ctx,W,H,c,dt){ if(anim.lastW!==W||anim.lastH!==H) resetParticles(W,H); anim.glowPhase+=dt;
+  if($('mGlow').checked){ for(const [cx,cy] of [[W*0.07,H*0.06],[W*0.93,H*0.94],[W*0.93,H*0.06],[W*0.07,H*0.94]]){
+      const ph=(Math.sin(anim.glowPhase*1.3+(cx+cy)*0.001)+1)/2; const r=W*(0.06+ph*0.05); const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      g.addColorStop(0,'rgba(233,196,106,'+(0.18*ph).toFixed(3)+')'); g.addColorStop(1,'rgba(233,196,106,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.fill(); } }
+  if($('mPart').checked){ for(const p of anim.particles){ p.x+=p.vx; p.y+=p.vy; p.ph+=dt*1.5;
+      if(p.y<-10){ p.y=H+10; p.x=Math.random()*W; } if(p.x<-10) p.x=W+10; if(p.x>W+10) p.x=-10;
+      const tw=0.7+0.3*Math.sin(p.ph); ctx.fillStyle='rgba(233,196,106,'+(p.a*tw*0.6).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill(); } }
+  if($('mBubbles').checked){ if(Math.random()<0.08) anim.bubbles.push({ x:Math.random()*W, y:H+20, r:4+Math.random()*8, vy:-(0.6+Math.random()*0.9), vx:(Math.random()-.5)*0.2, a:0.3+Math.random()*0.4, wob:Math.random()*6.283 });
+    anim.bubbles=anim.bubbles.filter(b=>b.y>-20);
+    for(const b of anim.bubbles){ b.y+=b.vy; b.wob+=dt*2; b.x+=Math.sin(b.wob)*0.3+b.vx;
+      ctx.strokeStyle=c.bubble; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,6.283); ctx.stroke();
+      ctx.fillStyle=c.bubble.replace(/0\.\d+/,'0.1'); ctx.fill(); } } }
+
+/* ============ FLOATING EMOJIS (for intro + outro) ============ */
+function initFloaters(W,H,set){
+  floatEmojis=[];
+  const count=Math.round(W*H/120000)+8;
+  for(let i=0;i<count;i++){
+    floatEmojis.push({
+      ch: set[i%set.length],
+      x: Math.random()*W,
+      y: Math.random()*H,
+      vx: (Math.random()-0.5)*0.6,
+      vy: -0.3 - Math.random()*0.8,
+      size: W*(0.025 + Math.random()*0.045),
+      ph: Math.random()*6.283,
+      spin: (Math.random()-0.5)*0.5
+    });
+  }
+}
+function drawFloaters(ctx,W,H,dt){
+  floatPhase += dt;
+  for(const e of floatEmojis){
+    e.x += e.vx; e.y += e.vy; e.ph += dt*2;
+    if(e.y < -e.size){ e.y = H + e.size; e.x = Math.random()*W; }
+    if(e.x < -e.size) e.x = W + e.size;
+    if(e.x > W + e.size) e.x = -e.size;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(Math.sin(e.ph)*0.15);
+    ctx.font = Math.round(e.size*(0.9 + 0.1*Math.sin(e.ph)))+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(e.ch, 0, 0);
+    ctx.restore();
+  }
+}
+
+/* ============ measurement + body fitter ============ */
+function measureBody(ctx,W,innerW,qText,arText,opts,showAr,scale){
+  const qFs=Math.max(10,Math.round(W*0.045*scale));
+  const arFs=Math.max(10,Math.round(W*0.045*scale));
+  const optFs=Math.max(10,Math.round(W*0.034*scale));
+  let h=0;
+  ctx.font='700 '+qFs+'px Rubik,sans-serif';
+  const qL=wrapWords(ctx,qText,innerW); h += qL.length*qFs*1.35 + qFs*0.4;
+  let aL=null;
+  if(showAr && arText){ ctx.font=arFs+'px "Amiri Quran",Amiri,serif'; aL=wrapWords(ctx,arText,innerW); h += aL.length*arFs*1.9 + arFs*0.4; }
+  const optWraps=[];
+  for(const o of opts){
+    ctx.font=optFs+'px Rubik,sans-serif';
+    const oL=wrapWords(ctx,o,innerW-W*0.11);
+    const oH=Math.max(optFs*2.1,oL.length*optFs*1.4+optFs*0.6);
+    optWraps.push({ oL, oH }); h += oH + Math.round(W*0.014);
+  }
+  return { qFs, arFs, optFs, h, qL, aL, optWraps };
+}
+function measureSource(ctx,W,innerW,srcText){
+  const srcFs=Math.max(10,Math.round(W*0.023));
+  ctx.font='400 italic '+srcFs+'px Rubik,sans-serif';
+  const sLines=wrapWords(ctx,'📎 '+srcText,innerW-W*0.04);
+  const sH=sLines.length*srcFs*1.4+srcFs*0.6;
+  return { srcFs, sLines, sH };
+}
+function fitBody(ctx,W,maxH,innerW,qText,arText,opts,showAr){
+  let lo=0.4, hi=1.5; let best=measureBody(ctx,W,innerW,qText,arText,opts,showAr,hi);
+  if(best.h<=maxH) return { scale:hi, m:best };
+  for(let it=0;it<16;it++){
+    const mid=(lo+hi)/2; const m=measureBody(ctx,W,innerW,qText,arText,opts,showAr,mid);
+    if(m.h<=maxH){ best=m; lo=mid; } else { hi=mid; }
+    if(hi-lo<0.02) break;
+  }
+  return { scale:lo, m:best };
+}
+
+/* ============ DRAW ROUTER ============ */
+function drawFrame(ctx,W,H,dt){
+  if(state.phase==='intro') drawIntroPage(ctx,W,H,dt);
+  else if(state.phase==='outro') drawOutroPage(ctx,W,H,dt);
+  else drawQuizPage(ctx,W,H,dt);
+}
+function drawCommonBg(ctx,W,H,c,dt){
+  const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,c.bg1); g.addColorStop(1,c.bg2); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  cornerOrnaments(ctx,W,H,c); stepMotion(ctx,W,H,c,dt||0.016);
+}
+
+/* v2.0 — per-shape font ratio tables (replaces the old binary tall?X:Y check, which would have sized
+   Square's chrome off Wide's numbers — tuned for a 1920px canvas — making it render too small on a
+   1080px-wide square). Each shape hand-tuned; Square sits between Tall and Wide, scaled for its tighter
+   vertical space despite sharing Tall's width. */
+const INTRO_FS={ tall:{title:.070,sub:.038,big:.095,tag:.032,cd:.14}, square:{title:.062,sub:.034,big:.082,tag:.028,cd:.12}, wide:{title:.052,sub:.028,big:.070,tag:.024,cd:.10} };
+const QUIZ_FS ={ tall:{badge:.028,prog:.025,num:.075}, square:{badge:.026,prog:.023,num:.068}, wide:{badge:.022,prog:.019,num:.055} };
+const OUTRO_FS={ tall:{head:.055,big:.072,sub:.040,micro:.028}, square:{head:.050,big:.062,sub:.036,micro:.026}, wide:{head:.042,big:.050,sub:.030,micro:.022} };
+
+/* ============ INTRO PAGE ============ */
+function drawIntroPage(ctx,W,H,dt){
+  const c=currentTheme();
+  drawCommonBg(ctx,W,H,c,dt);
+  drawFloaters(ctx,W,H,dt);
+  const kind=shapeKind(W,H), R=INTRO_FS[kind], safeTop=Math.round(H*0.08), safeBot=Math.round(H*0.08);
+
+  /* header title */
+  const titleFs=Math.round(W*R.title);
+  const bounce = 1 + Math.sin(floatPhase*3)*0.04;
+  ctx.save();
+  ctx.font='900 '+Math.round(titleFs*bounce)+'px Rubik,sans-serif';
+  ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.shadowColor='rgba(233,196,106,0.5)'; ctx.shadowBlur=20;
+  ctx.fillText('🎉  ISLAMIC QUIZ  🎉', W/2, safeTop+Math.round(H*0.04));
+  ctx.restore();
+
+  /* subtitle */
+  const subFs=Math.round(W*R.sub);
+  ctx.save();
+  ctx.font='700 '+subFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('✨ Time to shine! ✨', W/2, safeTop+Math.round(H*0.04)+titleFs*1.3);
+  ctx.restore();
+
+  /* center block: "Can you get X/X?" */
+  const cy = H/2;
+  const bigQFs=Math.round(W*R.big);
+  ctx.save();
+  const pulse = 1 + Math.sin(floatPhase*2)*0.08;
+  ctx.font='900 '+Math.round(bigQFs*pulse)+'px Rubik,sans-serif';
+  ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(233,196,106,0.7)'; ctx.shadowBlur=25;
+  ctx.fillText('Can you get', W/2, cy - bigQFs*0.6);
+  ctx.fillText(questions.length+'/'+questions.length+'? 🤔', W/2, cy + bigQFs*0.6);
+  ctx.restore();
+
+  /* small taglines */
+  const tagFs=Math.round(W*R.tag);
+  ctx.save();
+  ctx.font='700 '+tagFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Test your knowledge 📿', W/2, cy + bigQFs*1.4 + tagFs*0.5);
+  ctx.font='600 '+Math.round(tagFs*0.85)+'px Rubik,sans-serif'; ctx.fillStyle=c.sub;
+  ctx.fillText('👆 Save & share with family 💚', W/2, cy + bigQFs*1.4 + tagFs*2);
+  ctx.restore();
+
+  /* bottom: countdown (last 3 seconds of intro) */
+  /* v1.9 — intro keeps the big 3-2-1 countdown (prep time, as you said). Small subtext removed. */
+  if(settings.introHold!=='manual'){
+    const remain = Math.ceil(state.introLeft);
+    if(remain<=3 && remain>0){
+      const cFs=Math.round(W*R.cd);
+      const scale=1 + (1-((state.introLeft%1)||0))*0.5;
+      ctx.save();
+      ctx.font='900 '+Math.round(cFs*scale)+'px Rubik,sans-serif';
+      ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.shadowColor='rgba(233,196,106,0.8)'; ctx.shadowBlur=30;
+      ctx.globalAlpha=0.7+0.3*Math.sin(floatPhase*8);
+      ctx.fillText(remain+'', W/2, H-safeBot);
+      ctx.restore();
+    }
+  }
+}
+
+function drawQuizPage(ctx,W,H,dt){
+  const c=currentTheme();
+  drawCommonBg(ctx,W,H,c,dt);
+  const kind=shapeKind(W,H), R=QUIZ_FS[kind];
+  const padX=Math.round(W*0.07), innerW=W-padX*2, safeTop=Math.round(H*0.08), safeBot=Math.round(H*0.08);
+  const q=questions[state.qi]; if(!q) return;
+  const revealed=state.phase==='r';
+  const showAr=!!q.ar;
+
+
+  const badgeFs=Math.round(W*R.badge);
+  ctx.save(); ctx.font='700 '+badgeFs+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+  const catTxt=$('tCat').checked ? ('❓  ISLAMIC QUIZ  ·  '+q.cat) : '❓  ISLAMIC QUIZ';
+  ctx.fillText(catTxt, W/2, safeTop);
+  ctx.strokeStyle=c.accent; ctx.lineWidth=Math.max(2,W*0.003);
+  const bLY=safeTop+badgeFs+Math.round(W*0.012), bLW=Math.min(innerW*0.3, W*0.22);
+  ctx.beginPath(); ctx.moveTo(W/2-bLW/2,bLY); ctx.lineTo(W/2+bLW/2,bLY); ctx.stroke(); ctx.restore();
+  const progFs=Math.round(W*R.prog);
+  ctx.save(); ctx.font='600 '+progFs+'px Rubik,sans-serif'; ctx.fillStyle=c.sub; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('Question '+(state.qi+1)+' / '+questions.length, W/2, bLY+Math.round(W*0.025)); ctx.restore();
+  const headerBottom=safeTop+badgeFs*1.3+Math.round(W*0.012)+Math.round(W*0.025)+progFs*1.4;
+
+  /* v1.8 — source band REMOVED. Quiz pages are now plain: question → answer → next. */
+  const gap=Math.round(H*0.022);
+  const hintH=Math.round(H*0.05);
+  const hintTop=H-safeBot-hintH;
+  const footerTop = hintTop - gap;
+
+  const bodyTop=headerBottom+Math.round(W*0.02);
+  const bodyMaxH=footerTop - bodyTop;
+  const fit=fitBody(ctx,W,bodyMaxH,innerW,q.question,q.ar||'',q.answers,showAr);
+  drawBodyPacked(ctx,W,H,c,padX,innerW,bodyTop,bodyMaxH,q,showAr,fit.m);
+
+  /* v1.9 — all on-screen countdowns and tap-hints removed. Timers still run; just not drawn. */
+    if(!revealed && settings.rvl==='auto'){
+    const dur=questionDuration(q);
+    const prog=clamp(state.timeLeft/dur,0,1);
+    let style=settings.cntStyle;
+    if(style==='alt') style = (state.qi%2===0) ? 'bar' : 'num';
+    if(style==='bar'){
+      const barY=H-safeBot-Math.round(W*0.012);
+      ctx.fillStyle='rgba(255,255,255,0.08)';
+      roundRect(ctx,padX,barY,innerW,Math.round(W*0.008),Math.round(W*0.004)); ctx.fill();
+      ctx.fillStyle=c.accent;
+      roundRect(ctx,padX,barY,innerW*prog,Math.round(W*0.008),Math.round(W*0.004)); ctx.fill();
+    } else {
+      const nFs=Math.round(W*R.num);
+      ctx.save();
+      ctx.font='900 '+nFs+'px Rubik,sans-serif';
+      ctx.fillStyle=c.accent;
+      ctx.shadowColor='rgba(233,196,106,0.7)'; ctx.shadowBlur=20;
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText(Math.ceil(state.timeLeft)+'', W/2, H-safeBot);
+      ctx.restore();
+    }
+  } else if(!revealed && settings.rvl==='tap'){
+    const hFs=Math.round(W*0.024);
+    ctx.save(); ctx.font='600 '+hFs+'px Rubik,sans-serif'; ctx.fillStyle=c.sub; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.globalAlpha=0.85;
+    ctx.fillText('👆 Tap anywhere to reveal', W/2, H-safeBot); ctx.restore();
+  } else if(revealed && state.qi<questions.length-1 && settings.rvl==='tap'){
+    const hFs=Math.round(W*0.022);
+    ctx.save(); ctx.font='600 '+hFs+'px Rubik,sans-serif'; ctx.fillStyle=c.sub; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.globalAlpha=0.85;
+    ctx.fillText('👆 Tap for next question', W/2, H-safeBot); ctx.restore();
+  } else if(revealed && state.qi===questions.length-1 && settings.outroDelay==='manual'){
+    const hFs=Math.round(W*0.022);
+    ctx.save(); ctx.font='600 '+hFs+'px Rubik,sans-serif'; ctx.fillStyle=c.sub; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.globalAlpha=0.85;
+    ctx.fillText('👆 Tap for the outro', W/2, H-safeBot); ctx.restore();
+  }
+}
+
+function drawBodyPacked(ctx,W,H,c,padX,innerW,bodyTop,bodyMaxH,q,showAr,m){
+  const totalH=m.h;
+  let y = bodyTop + Math.max(0,(bodyMaxH-totalH)/2);
+  ctx.save(); ctx.font='700 '+m.qFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.direction='ltr'; ctx.textAlign='center'; ctx.textBaseline='top';
+  for(const ln of m.qL){ ctx.fillText(ln.join(' '),W/2,y); y+=m.qFs*1.35; } ctx.restore(); y+=m.qFs*0.4;
+  if(showAr && m.aL){ ctx.save(); ctx.font='500 '+m.arFs+'px "Amiri Quran",Amiri,serif'; ctx.fillStyle=c.text; ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='top';
+    for(const ln of m.aL){ ctx.fillText(ln.join(' '),W/2,y); y+=m.arFs*1.9; } ctx.restore(); y+=m.arFs*0.4; }
+  const letter=['A','B','C','D','E'];
+  for(let i=0;i<q.answers.length;i++){
+    const wrap=m.optWraps[i]; const oH=wrap.oH;
+    const isCorrect=state.phase==='r' && i===q.answerIndex, isWrong=state.phase==='r' && i!==q.answerIndex;
+    let bg=c.opt, bd=c.optBorder, fg=c.text;
+    if(isCorrect){ bg='rgba(95,211,141,0.28)'; bd='#5fd38d'; fg='#eaffea'; }
+    else if(isWrong){ bg='rgba(255,255,255,0.03)'; bd='rgba(255,255,255,0.08)'; fg=c.sub; }
+    ctx.fillStyle=bg; roundRect(ctx,padX,y,W-padX*2,oH,oH*0.18); ctx.fill();
+    ctx.strokeStyle=bd; ctx.lineWidth=Math.max(1,W*0.0022); ctx.stroke();
+    const lx=padX+m.optFs*1.1, ly=y+oH/2;
+    ctx.save(); ctx.fillStyle=isCorrect?'#5fd38d':c.accent; ctx.beginPath(); ctx.arc(lx,ly,m.optFs*0.75,0,6.283); ctx.fill();
+    ctx.fillStyle=isCorrect?'#0b2b17':'#111'; ctx.font='800 '+Math.round(m.optFs*0.85)+'px Rubik,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(letter[i],lx,ly); ctx.restore();
+    ctx.save(); ctx.fillStyle=fg; ctx.font=(isCorrect?'700 ':'')+m.optFs+'px Rubik,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    const tx=padX+m.optFs*2.3;
+    if(wrap.oL.length===1) ctx.fillText(wrap.oL[0].join(' '),tx,ly);
+    else { let ty=y+m.optFs*0.9; for(const ln of wrap.oL){ ctx.fillText(ln.join(' '),tx,ty); ty+=m.optFs*1.4; } } ctx.restore();
+    y+=oH+Math.round(W*0.014);
+  }
+}
+function drawSourceBand(ctx,W,H,c,padX,innerW,srcTop,sm){
+  ctx.save();
+  ctx.fillStyle='rgba(233,196,106,0.08)'; roundRect(ctx,padX*0.8,srcTop,W-padX*1.6,sm.sH,sm.srcFs*0.4); ctx.fill();
+  ctx.strokeStyle=c.accent; ctx.globalAlpha=0.35; ctx.stroke(); ctx.globalAlpha=1;
+  ctx.font='400 italic '+sm.srcFs+'px Rubik,sans-serif';
+  ctx.fillStyle=c.text; ctx.textAlign='center'; ctx.textBaseline='top';
+  let sy=srcTop+sm.srcFs*0.5; for(const ln of sm.sLines){ ctx.fillText(ln.join(' '),W/2,sy); sy+=sm.srcFs*1.4; } ctx.restore();
+}
+
+/* ============ OUTRO PAGE ============ */
+function drawOutroPage(ctx,W,H,dt){
+  const c=currentTheme();
+  drawCommonBg(ctx,W,H,c,dt);
+  drawFloaters(ctx,W,H,dt);
+  const kind=shapeKind(W,H), R=OUTRO_FS[kind], safeTop=Math.round(H*0.08), safeBot=Math.round(H*0.08);
+
+  /* header */
+  const headFs=Math.round(W*R.head);
+  const bounce = 1 + Math.sin(floatPhase*3)*0.05;
+  ctx.save();
+  ctx.font='900 '+Math.round(headFs*bounce)+'px Rubik,sans-serif';
+  ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.shadowColor='rgba(233,196,106,0.6)'; ctx.shadowBlur=25;
+  ctx.fillText('🎉  MASHA ALLAH!  🎉', W/2, safeTop+Math.round(H*0.02));
+  ctx.restore();
+
+  const cy = H/2;
+  const bigFs=Math.round(W*R.big);
+  const subFs=Math.round(W*R.sub);
+  const microFs=Math.round(W*R.micro);
+
+  const pulse = 1 + Math.sin(floatPhase*2.5)*0.07;
+  ctx.save();
+  ctx.font='900 '+Math.round(bigFs*pulse)+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(233,196,106,0.6)'; ctx.shadowBlur=20;
+  ctx.fillText('Comment your', W/2, cy - bigFs*1.1);
+  ctx.fillText('score below 👇', W/2, cy - bigFs*0.1);
+  ctx.restore();
+
+  ctx.save();
+  ctx.font='700 '+subFs+'px Rubik,sans-serif'; ctx.fillStyle=c.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Which was your favourite? 🤔', W/2, cy + bigFs*0.9);
+  ctx.restore();
+
+  ctx.save();
+  ctx.font='800 '+Math.round(microFs*1.15)+'px Rubik,sans-serif'; ctx.fillStyle=c.accent; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Share with family 💚', W/2, cy + bigFs*0.9 + subFs*1.6);
+  ctx.font='700 '+microFs+'px Rubik,sans-serif'; ctx.fillStyle=c.sub;
+  ctx.fillText('Follow for more Islamic quizzes 🌙✨', W/2, cy + bigFs*0.9 + subFs*1.6 + microFs*1.6);
+  ctx.restore();
+
+  /* v1.9 — outro counter removed. */
+}
+
+/* ============ player + REC ============ */
+let cv=null, ctx=null, W=0, H=0, mr=null, chunks=[], blob=null, url='', recTimer=0, recT0=0, micStream=null, micSrcNode=null, pngBlob=null, rafId=0, lastT=0;
+function sizeCanvas(){ const [cw,ch]=currentShape(); cv.width=cw; cv.height=ch; W=cw; H=ch; const aw=Math.min(window.innerWidth, (window.innerHeight-140)*(cw/ch)); $('stage').style.width=Math.round(aw)+'px'; resetParticles(W,H); }
+function loop(t){ rafId=requestAnimationFrame(loop); if(!lastT) lastT=t; const dt=Math.min(0.08,(t-lastT)/1000); lastT=t;
+  if(state.phase==='intro' && settings.introHold!=='manual'){ state.introLeft-=dt; if(state.introLeft<=0) startQuiz(); }
+  else if(state.phase==='q' && settings.rvl==='auto'){ state.timeLeft-=dt; if(state.timeLeft<=0) revealNow(); }
+  else if(state.phase==='r' && settings.outroDelay!=='manual' && state.qi===questions.length-1){ state.timeLeft-=dt; if(state.timeLeft<=0) goToOutro(); }
+  else if(state.phase==='outro' && settings.outroHold!=='manual'){ state.outroLeft-=dt; }
+  if(ctx) drawFrame(ctx,W,H,dt);
+}
+function startQuiz(){ state.phase='q'; state.qi=0; state.timeLeft=questionDuration(questions[0]); }
+function revealNow(){
+  state.phase='r';
+  if(state.qi===questions.length-1 && settings.outroDelay!=='manual') state.timeLeft=+settings.outroDelay||3;
+  else state.timeLeft=0;
+}
+function goToOutro(){
+  state.phase='outro';
+  state.outroLeft = settings.outroHold==='manual' ? 999 : (+settings.outroHold||5);
+  initFloaters(W,H,OUTRO_EMOJIS);
+}
+function advance(){
+  if(state.phase==='intro'){ startQuiz(); return; }
+  if(state.phase==='q'){ revealNow(); return; }
+  if(state.phase==='r'){
+    if(state.qi<questions.length-1){ state.qi++; state.phase='q'; state.timeLeft=questionDuration(questions[state.qi]); }
+    else goToOutro();
+    return;
+  }
+}
+
+async function openPlayer(){
+  if(!questions.length){ toast('No questions loaded yet.'); return; }
+  $('player').classList.remove('hidden'); $('busy').classList.remove('hidden');
+  cv=$('cv'); ctx=cv.getContext('2d');
+  await document.fonts.ready; sizeCanvas();
+  state={ qi:0, phase:'intro', timeLeft:0, outroLeft:0, introLeft: settings.introHold==='manual'?999:(+settings.introHold||4) };
+  initFloaters(W,H,INTRO_EMOJIS);
+  $('infoPill').textContent='Intro → '+questions.length+' Q → Outro';
+  $('busy').classList.add('hidden');
+  cancelAnimationFrame(rafId); lastT=0; rafId=requestAnimationFrame(loop);
+  ensureAudio(); if(actx.state==='suspended'){ try{ await actx.resume(); }catch{} }
+  setAmbient(settings.amb);
+  try{ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({navigationUI:'hide'}); }catch{}
+}
+function closePlayer(){ if(mr && mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; stopRec(); }
+  cancelAnimationFrame(rafId); stopAmbient();
+  try{ document.fullscreenElement && document.exitFullscreen(); }catch{}
+  $('player').classList.add('hidden'); $('after').classList.add('hidden'); }
+$('openBtn').onclick=openPlayer; $('closeBtn').onclick=closePlayer; $('backBtn').onclick=closePlayer;
+window.addEventListener('resize',()=>{ if(!$('player').classList.contains('hidden')) sizeCanvas(); });
+document.addEventListener('click',e=>{ if(e.target && e.target.tagName==='CANVAS') advance(); });
+for(const id of ['tSource','tCat','shape','mPart','mBubbles','mGlow']) $(id).addEventListener('change',()=>{ if(ctx) sizeCanvas(); });
+
+function baseName(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'quiz-'+questions.length+'q-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function dl(file){ const u=URL.createObjectURL(file),a=document.createElement('a'); a.href=u; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); }
+$('pngBtn').onclick=()=>{ if(!cv) return; cv.toBlob(b=>{ if(!b){ toast('Could not make the picture.'); return; } pngBlob=b; blob=null; showAfter('image'); },'image/png'); };
+function pickType(){ const t=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']; return t.find(x=>window.MediaRecorder && MediaRecorder.isTypeSupported(x))||''; }
+async function startRec(){
+  if(!cv){ toast('The card is not ready.'); return; }
+  if(!window.MediaRecorder){ toast('This browser cannot record. Use Google Chrome.'); return; }
+  let stream; try{ stream=cv.captureStream(30); }catch{ toast('This browser cannot record the card.'); return; }
+  ensureAudio();
+  if($('mic').checked){
+    try{ micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+      micSrcNode=actx.createMediaStreamSource(micStream); micSrcNode.connect(mixDest);
+    }catch{ toast('Microphone not allowed — recording without voice.',4000); } }
+  mixDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  if($('countOn').checked){ const c=$('count'); c.classList.remove('hidden'); for(const n of [3,2,1]){ c.textContent=n; await sleep(900); } c.classList.add('hidden'); }
+  state={ qi:0, phase:'intro', timeLeft:0, outroLeft:0, introLeft: settings.introHold==='manual'?999:(+settings.introHold||4) };
+  initFloaters(W,H,INTRO_EMOJIS);
+  const mt=pickType(); try{ mr=new MediaRecorder(stream,{mimeType:mt||undefined,videoBitsPerSecond:7000000,audioBitsPerSecond:192000}); }catch{ mr=new MediaRecorder(stream); }
+  chunks=[]; mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video');
+    if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; } if(micSrcNode){ try{ micSrcNode.disconnect(); }catch{} micSrcNode=null; } };
+  mr.start(500); recT0=performance.now();
+  $('recBtn').classList.add('on'); $('recBtn').textContent='STOP'; $('recPill').classList.remove('hidden');
+  clearInterval(recTimer); recTimer=setInterval(()=>{ const s=Math.floor((performance.now()-recT0)/1000); $('recTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+}
+function stopRec(){ if(mr && mr.state!=='inactive') mr.stop(); clearInterval(recTimer); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; $('recPill').classList.add('hidden'); }
+$('recBtn').onclick=()=>{ if(mr && mr.state==='recording') stopRec(); else startRec(); };
+function takeFile(){ if(pngBlob) return new File([pngBlob], baseName()+'.png', {type:'image/png'}); const ext=/mp4/.test(blob.type)?'.mp4':'.webm'; return new File([blob], baseName()+ext, {type:blob.type}); }
+function showAfter(kind){ if(url) URL.revokeObjectURL(url); const file=takeFile(); url=URL.createObjectURL(file);
+  $('takeVid').classList.toggle('hidden',kind!=='video'); $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video') $('takeVid').src=url; else $('takeImg').src=url;
+  const mb=(file.size/1048576).toFixed(1); $('takeInfo').textContent=file.name+' · '+(kind==='video'?(/mp4/.test(file.type)?'MP4':'WebM'):'PNG')+' · '+mb+' MB';
+  let can=false; try{ can=!!(navigator.canShare && navigator.canShare({files:[file]})); }catch{}
+  $('shareTake').classList.toggle('hidden',!can); $('after').classList.remove('hidden'); }
+$('saveTake').onclick=()=>{ dl(takeFile()); toast('✓ Saved to your Downloads folder',4000); };
+$('shareTake').onclick=async()=>{ try{ await navigator.share({files:[takeFile()], title:'Islamic Quiz'}); }catch(e){ if(e&&e.name!=='AbortError') toast('Sharing did not work. Use Save.'); } };
+$('againBtn').onclick=()=>{ $('after').classList.add('hidden'); if($('takeVid').pause) $('takeVid').pause(); };
+
+(function(){
+  for(const id of ['shape']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.value=v; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.value)); }
+  for(const id of ['tSource','tCat','mPart','mBubbles','mGlow','mic','countOn']){ const el=$(id), v=localStorage.getItem(KEY+id); if(v!==null) el.checked=v==='1'; el.addEventListener('change',()=>localStorage.setItem(KEY+id,el.checked?'1':'0')); }
+  const th=localStorage.getItem(KEY+'theme'); if(th){ const r=document.querySelector('input[name=theme][value='+th+']'); if(r) r.checked=true; }
+  document.querySelectorAll('input[name=theme]').forEach(r=>r.addEventListener('change',()=>localStorage.setItem(KEY+'theme',r.value)));
+})();
+
+buildQuestions();
+</script>
+</body>
+</html>

@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<!-- quiz-reveal.html — v1.1 — StoryForge Pack 2 · ❓ Quiz Reveal.
+Renamed from quiz-card.html to sit alongside the Islamic Quiz Card (the richer, curated+Qur'an-API-sourced
+tool) without any filename collision. This one is the manual/offline counterpart: no live data source, you
+type or paste in any topic's questions yourself (including the copy-prompt-paste-back AI flow), and it works
+for any subject, not just Islamic content.
+v1.1: audit pass, two real fixes before first use.
+(1) Option boxes/grid now auto-fit and vertically centre within the space left after the question and
+timer ring — previously a fixed cap meant short questions or 2-option (True/False) questions left dead
+space at the bottom instead of growing to fill it. Centres an incomplete last row in the Wide/Square grid too.
+(2) parseQuizScript rewritten as a line-by-line reader instead of a strict blank-line block splitter —
+robust whether or not pasted AI output has blank lines between questions.
+v1: presets + "Generate with any AI" copy-prompt/paste-back (no API key) + Q:/A:/B:/C:/D:/Correct: block
+editor + intro/outro/countdown + timer-ring-then-reveal format + PNG/REC + ambient sound. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Quiz Reveal</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:200px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:14px/1.5 system-ui;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.5;cursor:default}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.step{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.step .num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .body{flex:1}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>❓ Quiz Reveal <small>v1.1</small></h1>
+  <small>Multiple-choice reveal video — a timer runs, then the correct answer highlights</small>
+
+  <div class="card">
+    <h2>Start from a preset</h2>
+    <small>Hand-checked, ready to go — pick one, then edit freely below.</small>
+    <div class="pills" id="presetPills" style="margin-top:8px">
+      <div class="p" data-v="pillars">Pillars &amp; Basics</div>
+      <div class="p" data-v="prophets">Prophets &amp; Messengers</div>
+      <div class="p" data-v="ramadan">Ramadan &amp; Fasting</div>
+      <div class="p" data-v="prayer">Prayer (Salah) Basics</div>
+      <div class="p" data-v="general">General Islamic Trivia</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✨ Generate with any AI</h2>
+    <small>No key, no setup. Describe a topic, copy the prompt, paste it into ChatGPT, Gemini, Claude — whichever you already use — then bring the answer back here.</small>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="body">
+        <textarea id="genTopic" style="min-height:50px" placeholder="e.g. Quiz on the Companions of the Prophet"></textarea>
+        <div class="row">
+          <select id="genCount">
+            <option value="3">3 questions</option>
+            <option value="5" selected>5 questions</option>
+            <option value="7">7 questions</option>
+            <option value="10">10 questions</option>
+          </select>
+          <button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="body"><small>Paste that into any AI chat app and send it. Copy its full reply.</small></div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <textarea id="aiPaste" style="min-height:90px" placeholder="Paste the AI's reply here…"></textarea>
+        <div class="row"><button class="btn gold" id="usePasteBtn" type="button">✓ Use this</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Questions — one block per question</h2>
+    <small>Format: <code>Q:</code> then <code>A:</code>/<code>B:</code>/<code>C:</code>/<code>D:</code> then <code>Correct:</code> (the right letter). Blank line between questions is fine but not required. 2-4 options — drop C/D entirely for True/False.</small>
+    <textarea id="script" style="margin-top:8px">Q: How many pillars does Islam have?
+A: 3
+B: 4
+C: 5
+D: 6
+Correct: C
+
+Q: What is the declaration of faith called?
+A: Salah
+B: Shahada
+C: Zakat
+D: Hajj
+Correct: B
+
+Q: In which city is the Hajj pilgrimage performed?
+A: Madinah
+B: Jerusalem
+C: Makkah
+D: Damascus
+Correct: C</textarea>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro (optional)</h2>
+    <small>Loading a preset auto-fills the intro as the quiz title. Leave either off to skip it entirely.</small>
+    <div class="checkrow"><input type="checkbox" id="introEnabled"><label for="introEnabled">Add an intro</label></div>
+    <input id="introText" placeholder="Intro text" class="hidden" style="margin-top:8px">
+    <div class="checkrow" style="margin-top:12px"><input type="checkbox" id="outroEnabled"><label for="outroEnabled">Add an outro</label></div>
+    <input id="outroText" placeholder="Outro text" class="hidden" style="margin-top:8px">
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="steady">Steady</option><option value="pulse">Pulsing timer</option><option value="glow">Glowing reveal</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="timerLen">
+        <option value="4000">Fast — 4s per question</option>
+        <option value="6000" selected>Normal — 6s per question</option>
+        <option value="9000">Slow — 9s per question</option>
+      </select>
+      <select id="countdownMode">
+        <option value="none">No pause before start</option>
+        <option value="pause">Brief ~3s pause (no numbers)</option>
+        <option value="numbers">3-2-1 countdown</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview quiz</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+
+/* ===== presets (hand-written, no API involved, general/widely-known facts only) ===== */
+const PRESETS = {
+  pillars: { title:"Pillars & Basics Quiz", script:
+`Q: How many pillars does Islam have?
+A: 3
+B: 4
+C: 5
+D: 6
+Correct: C
+
+Q: What is the declaration of faith called?
+A: Salah
+B: Shahada
+C: Zakat
+D: Hajj
+Correct: B
+
+Q: What is the charity given to the poor called?
+A: Sawm
+B: Hajj
+C: Zakat
+D: Shahada
+Correct: C
+
+Q: In which city is the Hajj pilgrimage performed?
+A: Madinah
+B: Jerusalem
+C: Makkah
+D: Damascus
+Correct: C
+
+Q: What is the Islamic fast called?
+A: Sawm
+B: Salah
+C: Zakat
+D: Shahada
+Correct: A` },
+  prophets: { title:"Prophets & Messengers Quiz", script:
+`Q: Who is considered the final prophet in Islam?
+A: Isa (Jesus)
+B: Musa (Moses)
+C: Muhammad ﷺ
+D: Ibrahim (Abraham)
+Correct: C
+
+Q: Which prophet is associated with the story of the ark and the flood?
+A: Nuh (Noah)
+B: Yusuf (Joseph)
+C: Dawud (David)
+D: Sulaiman (Solomon)
+Correct: A
+
+Q: Which prophet is known for being thrown into a fire unharmed?
+A: Musa
+B: Ibrahim
+C: Yunus
+D: Ayyub
+Correct: B
+
+Q: Which prophet was swallowed by a whale?
+A: Yunus
+B: Yusuf
+C: Idris
+D: Ilyas
+Correct: A
+
+Q: Which city is linked to the Prophet's ﷺ migration, the Hijrah?
+A: Makkah
+B: Madinah
+C: Ta'if
+D: Jerusalem
+Correct: B` },
+  ramadan: { title:"Ramadan & Fasting Quiz", script:
+`Q: Which month of the Islamic calendar is Ramadan?
+A: 8th
+B: 9th
+C: 10th
+D: 12th
+Correct: B
+
+Q: What is the pre-dawn meal before fasting called?
+A: Iftar
+B: Suhoor
+C: Eid
+D: Tarawih
+Correct: B
+
+Q: What is the meal to break the fast called?
+A: Suhoor
+B: Iftar
+C: Zakat
+D: Witr
+Correct: B
+
+Q: What special night prayers are offered during Ramadan?
+A: Fajr
+B: Tarawih
+C: Witr
+D: Duha
+Correct: B
+
+Q: Which night is described as better than a thousand months?
+A: Laylatul Qadr
+B: Laylatul Isra
+C: Laylatul Baraah
+D: Laylatul Miraj
+Correct: A` },
+  prayer: { title:"Prayer (Salah) Basics Quiz", script:
+`Q: How many obligatory prayers are there each day?
+A: 3
+B: 4
+C: 5
+D: 6
+Correct: C
+
+Q: What direction do Muslims face in prayer?
+A: Jerusalem
+B: Madinah
+C: Makkah
+D: East
+Correct: C
+
+Q: What is the call to prayer called?
+A: Iqamah
+B: Adhan
+C: Khutbah
+D: Dua
+Correct: B
+
+Q: What must a Muslim perform before prayer for purification?
+A: Ghusl
+B: Wudu
+C: Tayammum only
+D: Zakat
+Correct: B
+
+Q: What is the Friday congregational prayer called?
+A: Eid
+B: Jumu'ah
+C: Tarawih
+D: Witr
+Correct: B` },
+  general: { title:"General Islamic Trivia Quiz", script:
+`Q: What is the holy book of Islam called?
+A: Torah
+B: Bible
+C: Qur'an
+D: Zabur
+Correct: C
+
+Q: What is the Islamic place of worship called?
+A: Church
+B: Mosque
+C: Temple
+D: Synagogue
+Correct: B
+
+Q: What does the greeting "Assalamu Alaikum" mean?
+A: Welcome home
+B: Peace be upon you
+C: God is great
+D: Thank you
+Correct: B
+
+Q: What is the Kaaba primarily to Muslims?
+A: A marketplace
+B: The direction of prayer (Qibla)
+C: A burial site
+D: A library
+Correct: B
+
+Q: What does the word "Islam" mean?
+A: Prayer
+B: Submission to God
+C: Charity
+D: Pilgrimage
+Correct: B` }
+};
+$('presetPills').addEventListener('click', e=>{
+  const p=e.target.closest('.p'); if(!p) return;
+  const data=PRESETS[p.dataset.v]; if(!data) return;
+  $('script').value=data.script;
+  $('introEnabled').checked=true;
+  $('introText').classList.remove('hidden');
+  $('introText').value=data.title+'!';
+  toast('✓ Preset loaded — edit freely below');
+});
+
+$('introEnabled').addEventListener('change', ()=>{ $('introText').classList.toggle('hidden', !$('introEnabled').checked); });
+$('outroEnabled').addEventListener('change', ()=>{ $('outroText').classList.toggle('hidden', !$('outroEnabled').checked); });
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+/* ===== manual AI workflow: build prompt → clipboard, no API call of any kind ===== */
+function buildPrompt(){
+  const topic=$('genTopic').value.trim();
+  const count=+$('genCount').value;
+  if(!topic){ return null; }
+  return `You are drafting a multiple-choice quiz about: "${topic}"
+
+Rules — follow exactly:
+1. Write exactly ${count} questions.
+2. Output each question as a block in EXACTLY this format, with a blank line between questions:
+Q: [question text]
+A: [option]
+B: [option]
+C: [option]
+D: [option]
+Correct: [the single correct letter, A, B, C or D]
+3. Use only widely-agreed, well-established facts. Do not invent statistics, dates, or figures you are not confident about.
+4. If the topic is religious, never write the literal wording of a Qur'an ayah or a hadith — describe ideas in your own words only, and do not state a specific ruling as settled fact if it is genuinely debated among scholars.
+5. Keep each question and each option short — one line each.
+6. No intro, no explanation, no markdown code fences, no numbering beyond the Q/A/B/C/D/Correct labels — output only the blocks themselves.`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e2){ return false; }
+  }
+}
+$('copyPromptBtn').onclick=async ()=>{
+  const prompt=buildPrompt();
+  if(!prompt){ toast('Describe a topic first'); return; }
+  const ok=await copyText(prompt);
+  toast(ok ? '✓ Copied — paste it into any AI chat' : 'Could not copy automatically — select and copy manually');
+  if(!ok){
+    $('aiPaste').value='';
+    $('aiPaste').placeholder='Copy failed — here is the prompt, select all and copy it yourself:\n\n'+prompt;
+  }
+};
+$('usePasteBtn').onclick=()=>{
+  let text=$('aiPaste').value.trim();
+  if(!text){ toast('Paste the AI\u2019s reply first'); return; }
+  text=text.replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
+  $('script').value=text;
+  toast('✓ Loaded into Questions — review before recording');
+};
+
+/* ===== parsing: line-by-line reader — a new "Q:" line always starts a fresh question, so it's
+   robust whether or not the pasted text has blank lines between questions. ===== */
+function parseQuizScript(){
+  const lines=$('script').value.split('\n');
+  const out=[]; let skipped=0;
+  let cur=null;
+  function commit(){
+    if(!cur) return;
+    const options=['A','B','C','D'].map(l=>({letter:l,text:cur.opts[l]})).filter(o=>o.text);
+    const correctValid=options.some(o=>o.letter===cur.correct);
+    if(cur.q && options.length>=2 && correctValid){ out.push({ q:cur.q, options, correct:cur.correct }); }
+    else if(cur.q || options.length){ skipped++; }
+    cur=null;
+  }
+  lines.forEach(raw=>{
+    const line=raw.trim();
+    if(!line) return;
+    const m=line.match(/^(Q|A|B|C|D|Correct)\s*:\s*(.*)$/i);
+    if(!m) return;
+    const key=m[1].toUpperCase(), val=m[2].trim();
+    if(key==='Q'){
+      commit();
+      cur={ q:val, opts:{A:'',B:'',C:'',D:''}, correct:'' };
+    } else {
+      if(!cur) return;
+      if(key==='CORRECT') cur.correct=val.replace(/[^A-Da-d]/g,'').toUpperCase().charAt(0);
+      else cur.opts[key]=val;
+    }
+  });
+  commit();
+  return { questions:out, skipped };
+}
+
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function fitWrappedLines(ctx, text, maxW, maxLines, startFs, minFs, weight){
+  let fs=startFs;
+  if(!text) return {fs:startFs, lines:[]};
+  while(fs>minFs){
+    const font=weight+' '+Math.round(fs)+'px system-ui';
+    const lines=wrapText(ctx, text, maxW, font);
+    if(lines.length<=maxLines) return {fs:Math.round(fs), lines};
+    fs-=2;
+  }
+  const font=weight+' '+Math.round(minFs)+'px system-ui';
+  return {fs:Math.round(minFs), lines:wrapText(ctx, text, maxW, font).slice(0,maxLines)};
+}
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+/* ===== ambient sound + reveal chime ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+function playRevealChime(){
+  if(!audioCtx || !ambientGain) return;
+  const now=audioCtx.currentTime;
+  [784,988].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+    const g=audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.2/(i+1), now+0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
+    o.connect(g); g.connect(ambientGain);
+    o.start(now); o.stop(now+0.55);
+  });
+}
+
+/* ===== intro/outro card + 3-2-1 countdown (same proven pattern as top-countdown) ===== */
+const FADE_CARD=300;
+function drawTitleCard(localT, th, text){
+  const alpha=Math.min(1, localT/FADE_CARD);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const fs=Math.round(Math.min(W,H)*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, text, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdownNumbers(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save(); ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.direction='ltr';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+
+/* ===== quiz-specific drawing primitives ===== */
+function drawTimerRing(cx, cy, R, th, frac, secondsLeft){
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.lineWidth=R*0.14;
+  ctx.strokeStyle=hexAlpha(th.line,0.5);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
+  ctx.fillStyle=th.text; ctx.font='800 '+Math.round(R*0.7)+'px system-ui';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(String(secondsLeft), 0, 2);
+  ctx.restore();
+}
+function drawOptionBox(ctx, x, y, w, h, th, opt, revealed, isCorrect, fontSize){
+  ctx.save();
+  const r=Math.min(18, h*0.22);
+  if(revealed && isCorrect){ ctx.fillStyle=hexAlpha(th.accent,0.95); }
+  else if(revealed){ ctx.fillStyle=hexAlpha(th.line,0.35); }
+  else{ ctx.fillStyle=hexAlpha(th.line,0.55); }
+  roundRectPath(ctx,x,y,w,h,r); ctx.fill();
+  ctx.strokeStyle=(revealed&&isCorrect)?th.accent:hexAlpha(th.line,0.9);
+  ctx.lineWidth=2; roundRectPath(ctx,x,y,w,h,r); ctx.stroke();
+
+  const badgeR=h*0.3;
+  const badgeX=x+badgeR+14, badgeY=y+h/2;
+  ctx.beginPath(); ctx.arc(badgeX,badgeY,badgeR,0,Math.PI*2);
+  ctx.fillStyle=(revealed&&isCorrect)?th.bg1:th.accent;
+  ctx.fill();
+  ctx.fillStyle=(revealed&&isCorrect)?th.accent:th.bg1;
+  ctx.font='800 '+Math.round(badgeR*1.05)+'px system-ui';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(opt.letter, badgeX, badgeY+1);
+
+  ctx.textAlign='left';
+  ctx.fillStyle=(revealed&&isCorrect)?th.bg1:th.text;
+  ctx.font='700 '+Math.round(fontSize)+'px system-ui';
+  const textX=badgeX+badgeR+16;
+  const maxW=Math.max(40, x+w-textX-16);
+  const lines=wrapText(ctx, opt.text, maxW, ctx.font);
+  const lh=fontSize*1.18;
+  let ty=y+h/2-((lines.length-1)*lh)/2+fontSize*0.3;
+  lines.slice(0,2).forEach(l=>{ ctx.fillText(l, textX, ty); ty+=lh; });
+
+  if(revealed && isCorrect){
+    ctx.strokeStyle=th.bg1; ctx.lineWidth=Math.max(3,h*0.05); ctx.lineCap='round'; ctx.lineJoin='round';
+    const cx2=x+w-h*0.32, cy2=y+h*0.32, s=h*0.13;
+    ctx.beginPath();
+    ctx.moveTo(cx2-s, cy2);
+    ctx.lineTo(cx2-s*0.2, cy2+s*0.8);
+    ctx.lineTo(cx2+s, cy2-s*0.6);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* TALL (1080x1920) — question stacked top, timer ring centred below it, options stacked vertically,
+   auto-fit + centred. */
+function drawQuizTall(th, q, idx, total, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts){
+  const m=Math.min(W,H)*0.055;
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.textAlign='center'; ctx.direction='ltr';
+
+  ctx.fillStyle=th.accent;
+  ctx.font='700 '+Math.round(W*0.034)+'px system-ui';
+  ctx.fillText('QUESTION '+(idx+1)+' OF '+total, W/2, m+60);
+
+  const qMaxW=W*0.84;
+  const {fs:qFs, lines:qLines}=fitWrappedLines(ctx, q.q, qMaxW, 3, Math.round(W*0.062), Math.round(W*0.042), '800');
+  ctx.font='800 '+qFs+'px system-ui'; ctx.fillStyle=th.text;
+  let qy=m+140; const qlh=qFs*1.22;
+  qLines.forEach(l=>{ qy+=qlh; ctx.fillText(l, W/2, qy); });
+  qy+=qFs*0.3;
+
+  const ringR=Math.min(W,H)*0.085;
+  const ringCy=qy+ringR+30;
+  if(!revealed){
+    const pulseScale=(motionStyle==='pulse')?1+0.06*Math.abs(Math.sin(ts/280)):1;
+    ctx.save(); ctx.translate(W/2,ringCy); ctx.scale(pulseScale,pulseScale);
+    drawTimerRing(0,0,ringR,th,timerFrac,secondsLeft);
+    ctx.restore();
+  }
+
+  const optTop=ringCy+ringR+50, optBottom=H-m-40;
+  const n=q.options.length, optGap=22;
+  const availH=optBottom-optTop;
+  const idealOptH=(availH-(n-1)*optGap)/n;
+  const optH=Math.max(90, Math.min(170, idealOptH));
+  const totalOptH=n*optH+(n-1)*optGap;
+  const optStartY=optTop+Math.max(0,(availH-totalOptH)/2);
+  const optW=W-m*2-20, optX=m+10;
+  const optFs=Math.max(24,Math.min(34,optH*0.32));
+
+  q.options.forEach((opt,i)=>{
+    const oy=optStartY+i*(optH+optGap);
+    const isCorrect=opt.letter===q.correct;
+    if(motionStyle==='glow' && revealed && isCorrect){
+      ctx.save(); ctx.shadowColor=th.accent; ctx.shadowBlur=28;
+      drawOptionBox(ctx,optX,oy,optW,optH,th,opt,revealed,isCorrect,optFs);
+      ctx.restore();
+    } else {
+      drawOptionBox(ctx,optX,oy,optW,optH,th,opt,revealed,isCorrect,optFs);
+    }
+  });
+  ctx.restore();
+}
+
+/* WIDE (1920x1080) — grid auto-fits/centres; incomplete last row centres under the row above. */
+function drawQuizWide(th, q, idx, total, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts){
+  const m=Math.min(W,H)*0.055;
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.textAlign='center'; ctx.direction='ltr';
+
+  ctx.fillStyle=th.accent;
+  ctx.font='700 '+Math.round(H*0.034)+'px system-ui';
+  ctx.fillText('QUESTION '+(idx+1)+' OF '+total, W/2, m+50);
+
+  const qMaxW=W*0.7;
+  const {fs:qFs, lines:qLines}=fitWrappedLines(ctx, q.q, qMaxW, 2, Math.round(H*0.1), Math.round(H*0.06), '800');
+  ctx.font='800 '+qFs+'px system-ui'; ctx.fillStyle=th.text;
+  let qy=m+120; const qlh=qFs*1.2;
+  qLines.forEach(l=>{ qy+=qlh; ctx.fillText(l, W/2, qy); });
+  qy+=qFs*0.25;
+
+  const ringR=Math.min(W,H)*0.075;
+  const ringCy=qy+ringR+22;
+  if(!revealed){
+    const pulseScale=(motionStyle==='pulse')?1+0.06*Math.abs(Math.sin(ts/280)):1;
+    ctx.save(); ctx.translate(W/2,ringCy); ctx.scale(pulseScale,pulseScale);
+    drawTimerRing(0,0,ringR,th,timerFrac,secondsLeft);
+    ctx.restore();
+  }
+
+  const gridTop=ringCy+ringR+34, gridBottom=H-m-30;
+  const n=q.options.length, cols=2, rows=Math.ceil(n/cols);
+  const gridW=W*0.74, gridX=(W-gridW)/2, colGap=20, rowGap=20;
+  const cellW=(gridW-(cols-1)*colGap)/cols;
+  const availH=gridBottom-gridTop;
+  const idealCellH=(availH-(rows-1)*rowGap)/rows;
+  const cellH=Math.max(80, Math.min(150, idealCellH));
+  const totalGridH=rows*cellH+(rows-1)*rowGap;
+  const gridStartY=gridTop+Math.max(0,(availH-totalGridH)/2);
+  const optFs=Math.max(22,Math.min(30,cellH*0.3));
+  const itemsInLastRow=n-(rows-1)*cols;
+
+  q.options.forEach((opt,i)=>{
+    const row=Math.floor(i/cols), col=i-row*cols;
+    const isLastRow=row===rows-1;
+    const itemsThisRow=isLastRow?itemsInLastRow:cols;
+    const rowW=itemsThisRow*cellW+(itemsThisRow-1)*colGap;
+    const rowX=gridX+(gridW-rowW)/2;
+    const ox=rowX+col*(cellW+colGap);
+    const oy=gridStartY+row*(cellH+rowGap);
+    const isCorrect=opt.letter===q.correct;
+    if(motionStyle==='glow' && revealed && isCorrect){
+      ctx.save(); ctx.shadowColor=th.accent; ctx.shadowBlur=28;
+      drawOptionBox(ctx,ox,oy,cellW,cellH,th,opt,revealed,isCorrect,optFs);
+      ctx.restore();
+    } else {
+      drawOptionBox(ctx,ox,oy,cellW,cellH,th,opt,revealed,isCorrect,optFs);
+    }
+  });
+  ctx.restore();
+}
+
+/* SQUARE (1080x1080) — own numbers, tighter grid than Wide. */
+function drawQuizSquare(th, q, idx, total, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts){
+  const m=Math.min(W,H)*0.055;
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.textAlign='center'; ctx.direction='ltr';
+
+  ctx.fillStyle=th.accent;
+  ctx.font='700 '+Math.round(W*0.03)+'px system-ui';
+  ctx.fillText('QUESTION '+(idx+1)+' OF '+total, W/2, m+46);
+
+  const qMaxW=W*0.82;
+  const {fs:qFs, lines:qLines}=fitWrappedLines(ctx, q.q, qMaxW, 3, Math.round(W*0.058), Math.round(W*0.04), '800');
+  ctx.font='800 '+qFs+'px system-ui'; ctx.fillStyle=th.text;
+  let qy=m+100; const qlh=qFs*1.2;
+  qLines.forEach(l=>{ qy+=qlh; ctx.fillText(l, W/2, qy); });
+  qy+=qFs*0.25;
+
+  const ringR=Math.min(W,H)*0.07;
+  const ringCy=qy+ringR+18;
+  if(!revealed){
+    const pulseScale=(motionStyle==='pulse')?1+0.06*Math.abs(Math.sin(ts/280)):1;
+    ctx.save(); ctx.translate(W/2,ringCy); ctx.scale(pulseScale,pulseScale);
+    drawTimerRing(0,0,ringR,th,timerFrac,secondsLeft);
+    ctx.restore();
+  }
+
+  const gridTop=ringCy+ringR+26, gridBottom=H-m-26;
+  const n=q.options.length, cols=2, rows=Math.ceil(n/cols);
+  const gridW=W*0.84, gridX=(W-gridW)/2, colGap=16, rowGap=16;
+  const cellW=(gridW-(cols-1)*colGap)/cols;
+  const availH=gridBottom-gridTop;
+  const idealCellH=(availH-(rows-1)*rowGap)/rows;
+  const cellH=Math.max(70, Math.min(120, idealCellH));
+  const totalGridH=rows*cellH+(rows-1)*rowGap;
+  const gridStartY=gridTop+Math.max(0,(availH-totalGridH)/2);
+  const optFs=Math.max(20,Math.min(26,cellH*0.28));
+  const itemsInLastRow=n-(rows-1)*cols;
+
+  q.options.forEach((opt,i)=>{
+    const row=Math.floor(i/cols), col=i-row*cols;
+    const isLastRow=row===rows-1;
+    const itemsThisRow=isLastRow?itemsInLastRow:cols;
+    const rowW=itemsThisRow*cellW+(itemsThisRow-1)*colGap;
+    const rowX=gridX+(gridW-rowW)/2;
+    const ox=rowX+col*(cellW+colGap);
+    const oy=gridStartY+row*(cellH+rowGap);
+    const isCorrect=opt.letter===q.correct;
+    if(motionStyle==='glow' && revealed && isCorrect){
+      ctx.save(); ctx.shadowColor=th.accent; ctx.shadowBlur=24;
+      drawOptionBox(ctx,ox,oy,cellW,cellH,th,opt,revealed,isCorrect,optFs);
+      ctx.restore();
+    } else {
+      drawOptionBox(ctx,ox,oy,cellW,cellH,th,opt,revealed,isCorrect,optFs);
+    }
+  });
+  ctx.restore();
+}
+
+/* ===== phase assembly ===== */
+function computePhases(){
+  const introText=$('introEnabled').checked?$('introText').value.trim():'';
+  const outroText=$('outroEnabled').checked?$('outroText').value.trim():'';
+  const countdownMode=$('countdownMode').value;
+  return {
+    introText, outroText, countdownMode,
+    introMs: introText?2600:0,
+    countdownMs: countdownMode==='none'?0:3000
+  };
+}
+function buildQuestionTimeline(questions, timerMs){
+  const revealHoldMs=1800, fadeOutMs=450;
+  const durations=questions.map(()=> timerMs+revealHoldMs+fadeOutMs);
+  const offsets=[]; let acc=0;
+  durations.forEach(d=>{ offsets.push(acc); acc+=d; });
+  return { durations, offsets, total:acc, revealHoldMs, fadeOutMs };
+}
+
+let cv,ctx,W,H,rafId,startTs=null,questions=[],PH=null,QT=null,TIMER_MS=6000,lastSoundKey='';
+let mr,chunks=[],blob,pngBlob;
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  const elapsed=ts-startTs;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  if(elapsed<PH.introMs){ drawTitleCard(elapsed, th, PH.introText); return; }
+  let rem=elapsed-PH.introMs;
+  if(rem<PH.countdownMs){
+    if(PH.countdownMode==='numbers') drawCountdownNumbers(rem, th);
+    return;
+  }
+  rem-=PH.countdownMs;
+
+  if(rem<QT.total){
+    let qi=QT.offsets.findIndex((off,i)=> rem < off+QT.durations[i]);
+    if(qi===-1) qi=questions.length-1;
+    const localT=rem-QT.offsets[qi];
+    const revealed=localT>=TIMER_MS;
+    const revealT=localT-TIMER_MS;
+    let alpha=Math.min(1, localT/400);
+    if(revealed && revealT>QT.revealHoldMs){ alpha=Math.min(alpha, Math.max(0, 1-(revealT-QT.revealHoldMs)/QT.fadeOutMs)); }
+    const timerFrac=revealed?0:Math.max(0,1-localT/TIMER_MS);
+    const secondsLeft=revealed?0:Math.max(0,Math.ceil((TIMER_MS-localT)/1000));
+
+    const soundKey='reveal'+qi;
+    if(revealed && revealT<120 && lastSoundKey!==soundKey){ playRevealChime(); lastSoundKey=soundKey; }
+
+    const shapeKey=$('shape').value, motionStyle=$('motion').value;
+    if(shapeKey==='wide') drawQuizWide(th, questions[qi], qi, questions.length, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts);
+    else if(shapeKey==='square') drawQuizSquare(th, questions[qi], qi, questions.length, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts);
+    else drawQuizTall(th, questions[qi], qi, questions.length, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts);
+    return;
+  }
+  rem-=QT.total;
+  if(PH.outroText){ drawTitleCard(rem, th, PH.outroText); }
+}
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const parsed=parseQuizScript();
+  questions=parsed.questions;
+  if(!questions.length){ toast('Add at least one valid question block (needs Q, at least 2 options, and a matching Correct letter)'); return; }
+  if(parsed.skipped>0){ toast(parsed.skipped+' block(s) skipped — check Q/options/Correct are all present'); }
+  TIMER_MS=+$('timerLen').value;
+  startTs=null; lastSoundKey='';
+  PH=computePhases();
+  QT=buildQuestionTimeline(questions, TIMER_MS);
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  ensureAmbientGraph();
+  $('player').classList.add('show');
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{ cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png'); };
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'quizreveal-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); } else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

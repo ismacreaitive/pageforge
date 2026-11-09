@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>n8n Forge: Code to n8n JSON</title>
+<style>
+:root{--bg:#0e1116;--panel:#151a21;--panel2:#1c222b;--line:#262d38;--text:#e6e9ef;--muted:#8a94a6;--accent:#5b8cff;--accent2:#7c5cff;--warn:#f5b84a;--err:#ff6b6b;--ok:#7ee2a0;--mono:ui-monospace,Consolas,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;margin-right:auto}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font:600 12px var(--mono)}
+.brand small{color:var(--muted);font-weight:500}
+input[type=text]{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;width:200px}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;font-weight:600}
+label.t{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+main{flex:1;display:flex;min-height:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+#left{width:48%;border-right:1px solid var(--line)}
+#right{flex:1;background:#0b0d11}
+.head{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:var(--panel)}
+#editor{flex:1;width:100%;resize:none;border:none;outline:none;background:var(--bg);color:var(--text);font:13px/1.6 var(--mono);padding:16px;tab-size:2;white-space:pre;overflow:auto}
+#out{flex:1;overflow:auto;padding:14px 16px;font:12.5px/1.55 var(--mono)}
+.banner{padding:10px 14px;border-radius:8px;margin-bottom:10px;font:600 14px system-ui}
+.ok{background:#12351f;color:var(--ok)}.no{background:#3a1717;color:#ff9b9b}
+.bad{color:#ff9b9b}.fix{color:var(--warn)}
+pre{white-space:pre-wrap;word-break:break-word;margin-top:12px;color:#cfd6e4}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:860px){main{flex-direction:column}#left{width:100%;height:50%;border-right:none;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">{ }</div>n8n Forge <small>code → n8n workflow JSON</small></div>
+  <label class="t"><input type="checkbox" id="live" checked> Live</label>
+  <button id="run">▶ Convert</button>
+  <button id="sample">Sample</button>
+  <button id="clear">Clear</button>
+  <input type="text" id="fname" placeholder="file name (optional)">
+  <button id="copy">Copy JSON</button>
+  <button id="dl" class="primary">⬇ Download .json</button>
+</header>
+<main>
+  <section class="pane" id="left">
+    <div class="head"><span>INPUT · workflow code (or raw JSON to validate) · drop a file</span><span id="stats"></span></div>
+    <textarea id="editor" spellcheck="false" placeholder="Paste workflow code here..."></textarea>
+  </section>
+  <section class="pane" id="right">
+    <div class="head"><span id="kind">Output</span><span>Ctrl+Enter to convert</span></div>
+    <div id="out"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="text/plain" id="sampleData">
+// Fixed version of the Day 2 KPI workflow: the four sheet reads run one after another,
+// so the Code node can read all of them. The week is calculated, not hardcoded.
+workflow("Reporting - Dashboard Data");
+
+const SHEET = "1useujq78_l3lQ8_eHwLyftj_FtgdUETTSAd_syURvEo";
+const readTab = (tab) => ({
+  resource: "sheet", operation: "getAll",
+  documentId: { __rl: true, mode: "list", value: SHEET, cachedResultName: "BohnenWerk Dashboard Data" },
+  sheetName: { __rl: true, mode: "list", value: tab, cachedResultName: tab },
+  options: {}
+});
+
+node("Webhook", "webhook", { httpMethod: "GET", path: "live-kpis", responseMode: "responseNode", options: { allowedOrigins: "*" } });
+node("Read Leads", "googleSheets", readTab("leads"));
+node("Read Campaigns", "googleSheets", readTab("campaigns"));
+node("Read Receipts", "googleSheets", readTab("receipts"));
+node("Read Tickets", "googleSheets", readTab("tickets"));
+
+node("Count This Week", "code", { jsCode: `
+const now = new Date();
+const day = (now.getUTCDay() + 6) % 7;
+const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
+const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3600 * 1000 - 1);
+
+function countThisWeek(items) {
+  return items.filter(item => {
+    const raw = item.json.Date || item.json.date;
+    if (!raw) return false;
+    const d = new Date(raw);
+    return d >= weekStart && d <= weekEnd;
+  }).length;
+}
+
+return [{ json: {
+  leads: countThisWeek($('Read Leads').all()),
+  campaigns: countThisWeek($('Read Campaigns').all()),
+  receipts: countThisWeek($('Read Receipts').all()),
+  tickets: countThisWeek($('Read Tickets').all()),
+  updated: new Date().toISOString()
+} }];
+` });
+
+node("Send Numbers Back", "respondToWebhook", { respondWith: "firstIncomingItem", options: {} });
+
+chain("Webhook", "Read Leads", "Read Campaigns", "Read Receipts", "Read Tickets", "Count This Week", "Send Numbers Back");
+</script>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var editor = $('editor'), out = $('out'), timer, last = null;
+var STORE = 'n8nforge:draft';
+var PH = { id: 'PLACEHOLDER_REASSIGN_ON_IMPORT', name: 'Reassign after import' };
+
+/* Short names -> [n8n type, typeVersion, credential type or null]. Edit freely. */
+var CAT = {
+  webhook:['n8n-nodes-base.webhook',2],
+  respondToWebhook:['n8n-nodes-base.respondToWebhook',1.1],
+  code:['n8n-nodes-base.code',2],
+  googleSheets:['n8n-nodes-base.googleSheets',4.5,'googleSheetsOAuth2Api'],
+  httpRequest:['n8n-nodes-base.httpRequest',4.2],
+  set:['n8n-nodes-base.set',3.4],
+  if:['n8n-nodes-base.if',2.2],
+  switch:['n8n-nodes-base.switch',3.2],
+  merge:['n8n-nodes-base.merge',3],
+  manualTrigger:['n8n-nodes-base.manualTrigger',1],
+  scheduleTrigger:['n8n-nodes-base.scheduleTrigger',1.2],
+  splitInBatches:['n8n-nodes-base.splitInBatches',3],
+  wait:['n8n-nodes-base.wait',1.1],
+  noOp:['n8n-nodes-base.noOp',1],
+  gmail:['n8n-nodes-base.gmail',2.1,'gmailOAuth2'],
+  slack:['n8n-nodes-base.slack',2.3,'slackApi']
+};
+
+function uid(){ return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, function(){ return (Math.random()*16|0).toString(16); }); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove('show'); },1800); }
+
+function stripFences(s){
+  var m = s.match(/```[\w-]*[^\n]*\n([\s\S]*?)```/);
+  return m ? m[1] : s;
+}
+
+/* ---------- build workflow from code ---------- */
+function fromCode(src){
+  var wf = { name:'My workflow', nodes:[], links:[], notes:[], problems:[] };
+  var byName = {};
+
+  function node(name, type, params, opts){
+    opts = opts || {};
+    if(!name) throw new Error('node() needs a name');
+    if(byName[name]) throw new Error('Duplicate node name: ' + name);
+    var cat = CAT[type], t, v, cred = null;
+    if(cat){ t = cat[0]; v = cat[1]; cred = cat[2]; }
+    else if(typeof type === 'string' && type.indexOf('.') > -1){ t = type; v = 1; }
+    else throw new Error('Unknown node type "' + type + '". Use a full n8n type like "n8n-nodes-base.xyz", or one of: ' + Object.keys(CAT).join(', '));
+    var n = { parameters: params || {}, id: opts.id || uid(), name: name, type: t, typeVersion: opts.typeVersion || v, position: opts.position || null };
+    if(t === 'n8n-nodes-base.webhook') n.webhookId = n.id;
+    if(opts.credentials) n.credentials = opts.credentials;
+    else if(cred){ n.credentials = {}; n.credentials[cred] = { id: PH.id, name: PH.name }; }
+    if(opts.disabled) n.disabled = true;
+    if(opts.notes) n.notes = opts.notes;
+    byName[name] = n; wf.nodes.push(n);
+    return n;
+  }
+  function connect(a, b, o){
+    o = o || {};
+    wf.links.push({ from:a, to:b, out:o.output || 0, inp:o.input || 0 });
+  }
+  function chain(){
+    var a = Array.prototype.slice.call(arguments);
+    for(var i = 0; i < a.length - 1; i++) connect(a[i], a[i+1]);
+  }
+  function workflow(name){ wf.name = name; }
+
+  new Function('workflow','node','connect','chain', stripFences(src))(workflow, node, connect, chain);
+
+  /* validate links */
+  wf.links.forEach(function(l){
+    if(!byName[l.from]) wf.problems.push('connect: unknown source node "' + l.from + '"');
+    if(!byName[l.to]) wf.problems.push('connect: unknown target node "' + l.to + '"');
+  });
+  if(!wf.nodes.length) wf.problems.push('No nodes defined. Use node("Name", "type", {params})');
+
+  /* layout: depth = longest path from a root */
+  var depth = {}; wf.nodes.forEach(function(n){ depth[n.name] = 0; });
+  for(var k = 0; k < wf.nodes.length; k++){
+    wf.links.forEach(function(l){
+      if(byName[l.from] && byName[l.to] && depth[l.to] < depth[l.from] + 1) depth[l.to] = depth[l.from] + 1;
+    });
+  }
+  var cols = {};
+  wf.nodes.forEach(function(n){ (cols[depth[n.name]] = cols[depth[n.name]] || []).push(n); });
+  Object.keys(cols).forEach(function(d){
+    var c = cols[d];
+    c.forEach(function(n, i){
+      if(!n.position) n.position = [240 + d * 220, Math.round(300 + (i - (c.length - 1) / 2) * 160)];
+    });
+  });
+
+  /* connections object */
+  var conns = {};
+  wf.links.forEach(function(l){
+    if(!byName[l.from] || !byName[l.to]) return;
+    var c = conns[l.from] = conns[l.from] || { main: [] };
+    while(c.main.length <= l.out) c.main.push([]);
+    c.main[l.out].push({ node: l.to, type: 'main', index: l.inp });
+  });
+
+  /* warnings */
+  var linked = {};
+  wf.links.forEach(function(l){ linked[l.from] = 1; linked[l.to] = 1; });
+  if(wf.nodes.length > 1) wf.nodes.forEach(function(n){ if(!linked[n.name]) wf.notes.push('Node "' + n.name + '" is not connected to anything'); });
+  wf.nodes.forEach(function(n){ if(n.credentials) wf.notes.push('Reconnect credentials on "' + n.name + '" after import'); });
+
+  return { json: { name: wf.name, nodes: wf.nodes, connections: conns, pinData: {}, settings: { executionOrder: 'v1' }, staticData: null, meta: { templateCredsSetupCompleted: false } },
+           notes: wf.notes, problems: wf.problems };
+}
+
+/* ---------- validate raw JSON ---------- */
+function fromJson(src){
+  var s = stripFences(src).trim(), a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if(a === -1 || b < a) throw new Error('No JSON object found');
+  var w = JSON.parse(s.slice(a, b + 1)), notes = [], problems = [], names = {};
+  if(!Array.isArray(w.nodes)) problems.push('Missing "nodes" array');
+  else w.nodes.forEach(function(n, i){
+    if(!n.name){ n.name = 'Node ' + (i + 1); notes.push('Named node #' + (i + 1)); }
+    if(names[n.name]) problems.push('Duplicate node name: ' + n.name);
+    names[n.name] = 1;
+    if(!n.type) problems.push('Node "' + n.name + '" has no type');
+    if(!n.id){ n.id = uid(); notes.push('Added id to "' + n.name + '"'); }
+    if(!n.typeVersion){ n.typeVersion = 1; notes.push('Set typeVersion on "' + n.name + '"'); }
+    if(!Array.isArray(n.position)){ n.position = [240 + i * 220, 300]; notes.push('Added position to "' + n.name + '"'); }
+    if(!n.parameters) n.parameters = {};
+  });
+  if(!w.name){ w.name = 'My workflow'; notes.push('Added workflow name'); }
+  if(!w.connections){ w.connections = {}; notes.push('Added empty connections'); }
+  Object.keys(w.connections).forEach(function(k){
+    if(!names[k]) problems.push('connections: unknown source "' + k + '"');
+    ((w.connections[k] && w.connections[k].main) || []).forEach(function(arr){
+      (arr || []).forEach(function(c){ if(c && !names[c.node]) problems.push('connections: "' + k + '" points to unknown "' + c.node + '"'); });
+    });
+  });
+  if(!w.settings){ w.settings = { executionOrder: 'v1' }; notes.push('Added settings'); }
+  if(!w.pinData) w.pinData = {};
+  return { json: w, notes: notes, problems: problems };
+}
+
+/* ---------- run ---------- */
+function convert(){
+  var src = editor.value;
+  try { localStorage.setItem(STORE, src); } catch(e){}
+  $('stats').textContent = (src ? src.split('\n').length : 0) + ' lines';
+  if(!src.trim()){ last = null; out.innerHTML = '<div class="fix">Paste workflow code on the left.</div>'; $('kind').textContent = 'Output'; return; }
+  var r, mode;
+  try {
+    mode = /^\s*(```json\s*)?\{[\s\S]*"nodes"\s*:/.test(src) ? 'json' : 'code';
+    r = mode === 'json' ? fromJson(src) : fromCode(src);
+  } catch(e){
+    last = null;
+    $('kind').textContent = 'Output · error';
+    out.innerHTML = '<div class="banner no">✖ Could not convert</div><div class="bad">' + esc(e.message) + '</div>';
+    return;
+  }
+  var text = JSON.stringify(r.json, null, 2), ok = !r.problems.length;
+  last = { text: text, ok: ok, name: r.json.name };
+  $('kind').textContent = 'Output · ' + (mode === 'json' ? 'JSON checked' : 'code converted') + ' · ' + (r.json.nodes ? r.json.nodes.length : 0) + ' nodes';
+  var list = function(a, c, m){ return a.map(function(x){ return '<div class="' + c + '">' + m + ' ' + esc(x) + '</div>'; }).join(''); };
+  out.innerHTML = '<div class="banner ' + (ok ? 'ok' : 'no') + '">' + (ok ? '✔ Ready to import into n8n' : '✖ Needs attention') + '</div>'
+    + list(r.problems, 'bad', '✖') + list(r.notes, 'fix', '•') + '<pre>' + esc(text) + '</pre>';
+}
+function schedule(){ if(!$('live').checked) return; clearTimeout(timer); timer = setTimeout(convert, 400); }
+function slug(){
+  var n = ($('fname').value || (last && last.name) || 'workflow').trim().replace(/\.json$/i, '').replace(/[^\w.-]+/g, '-');
+  return n + '.json';
+}
+
+editor.addEventListener('input', schedule);
+editor.addEventListener('keydown', function(e){
+  if(e.key === 'Tab'){ e.preventDefault(); editor.setRangeText('  ', editor.selectionStart, editor.selectionEnd, 'end'); schedule(); }
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); convert(); }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); $('dl').click(); }
+});
+editor.addEventListener('dragover', function(e){ e.preventDefault(); });
+editor.addEventListener('drop', function(e){
+  e.preventDefault(); var f = e.dataTransfer.files[0]; if(!f) return;
+  f.text().then(function(t){ editor.value = t; convert(); toast('Loaded ' + f.name); });
+});
+
+$('run').onclick = convert;
+$('sample').onclick = function(){ editor.value = $('sampleData').textContent.trim(); convert(); };
+$('clear').onclick = function(){ editor.value = ''; convert(); editor.focus(); };
+$('live').onchange = function(){ if($('live').checked) convert(); };
+$('copy').onclick = function(){
+  if(!last) return toast('Nothing to copy yet');
+  if(navigator.clipboard) navigator.clipboard.writeText(last.text).then(function(){ toast('JSON copied. Paste with Ctrl+V on the n8n canvas'); }, function(){ toast('Copy blocked'); });
+  else toast('Copy not supported');
+};
+$('dl').onclick = function(){
+  if(!last) return toast('Nothing to download yet');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([last.text], { type: 'application/json;charset=utf-8' }));
+  a.download = slug();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  toast(last.ok ? 'Downloaded ' + slug() : 'Downloaded, but it has problems');
+};
+
+var saved = null; try { saved = localStorage.getItem(STORE); } catch(e){}
+editor.value = saved || $('sampleData').textContent.trim();
+convert();
+})();
+</script>
+</body>
+</html>

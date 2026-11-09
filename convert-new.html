@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<!-- convert.html — v1.8 — StoryForge Converter. NEW in v1.8: pictures go to Gemini 4 at a time, smaller, with Gemini's "thinking" switched off (much faster); if Gemini is slow the batch is split and tried again instead of giving up; one failed picture no longer stops the rest; "empty" answers are not remembered (tried again next time, words inside the drawing used meanwhile); the model that works is remembered; files sorted in course order (Day, then theory, deck, practical, quiz, game); text fixes: ".json" keeps its space, &rsquo; &mdash; etc. shown as real characters. v1.7: progress line + Stop. v1.6: checklist backgrounds. v1.5: checklist. v1.4: AQ. keys. v1.3: key box. v1.2: pictures explained. v1.1: Live Server. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryForge — Converter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#E9C46A;--ok:#5fd38d;--bad:#ff6b6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,"Segoe UI",Roboto,Arial,sans-serif}
+.hidden{display:none !important}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+header .logo{width:40px;height:40px;border-radius:10px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800}
+header b{font-size:19px}
+header small{display:block;color:var(--muted);font-size:12px}
+header a{margin-left:auto;color:var(--muted);font-size:13px;text-decoration:none}
+.ver{display:inline-block;background:var(--accent);color:#111;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle}
+.grid{display:grid;grid-template-columns:400px 1fr;gap:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.card h2{margin:0;font-size:15px}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:var(--panel2)}
+.drop.over,.drop:hover{border-color:var(--accent)}
+.drop b{display:block;font-size:16px;margin-bottom:4px}
+.hint{font-size:13px;color:var(--muted);line-height:1.55}
+.hint b{color:var(--text)}
+.hint .ok{color:var(--ok);font-weight:600}
+.hint .bad{color:var(--bad);font-weight:600}
+.label{font-size:12px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=password],textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+select:focus,textarea:focus,input:focus{border-color:var(--accent)}
+#pasteIn{min-height:120px;resize:vertical;font-size:14px;line-height:1.45}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-weight:600}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--accent);color:#111;border-color:var(--accent)}
+.btn.green{background:#1f5c3a;border-color:#2f8a57;color:#eafff2}
+.btn.red{background:#5c1f1f;border-color:#8a2f2f;color:#ffecec}
+.big{width:100%;padding:14px;font-size:17px;font-weight:800;border-radius:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.keyrow{display:flex;gap:8px;align-items:center}
+.keyrow input{flex:1;min-width:0}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.check input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.star{border:1px solid var(--accent);border-radius:10px;padding:8px;background:rgba(233,196,106,.07);display:flex;flex-direction:column;gap:8px}
+.prog{display:flex;gap:10px;align-items:center;border:1px solid var(--accent);border-radius:10px;padding:9px 10px;background:rgba(233,196,106,.08);font-size:14px;line-height:1.4}
+.prog span{flex:1;min-width:0}
+.prog .spin{flex:none;width:16px;height:16px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.files{display:flex;flex-direction:column;gap:6px}
+.file{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:7px 9px;background:var(--panel2);font-size:13px}
+.file .n{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#111;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;font-size:12px}
+.file .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .st{color:var(--muted);font-size:12px;white-space:nowrap}
+.file .st.ok{color:var(--ok)}.file .st.bad{color:var(--bad)}
+.file button{padding:3px 7px;border-radius:7px;background:transparent;border:1px solid var(--line);font-size:12px}
+#out{min-height:520px;font-family:Consolas,"Courier New",monospace;font-size:13px;line-height:1.5;white-space:pre;resize:vertical}
+#stats{font-size:13px;color:var(--muted)}
+#stats b{color:var(--text)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="logo">⇄</div><div><b>StoryForge Converter <span class="ver">v1.8</span></b><small>Course files → one Markdown for NotebookLM · checklists you can tick off · runs in your browser</small></div><a href="index.html">← All tools</a></header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>✅ Quick checklist</h2>
+        <textarea id="pasteIn" spellcheck="false" placeholder="Paste anything here: what you want to do today, what you are reading, a checklist you copied… One line = one task. Headings (like WEEK CARD) become sections."></textarea>
+        <div class="row">
+          <button class="btn green" id="pasteCheck">✅ Make checklist and download</button>
+          <button class="btn" id="pasteAdd">➕ Add as a file</button>
+        </div>
+        <div class="hint">You get a page you open in Chrome (computer or phone) and tick off line by line. Your ticks stay saved. Choose the background (Dark, White, Cream or Navy) on the checklist page.</div>
+      </div>
+
+      <div class="card">
+        <h2>1 · Your files</h2>
+        <label class="drop" id="drop"><input type="file" id="fileIn" multiple hidden accept=".html,.htm,.md,.markdown,.txt,.docx,.csv,.tsv,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.bmp"><b>Drop your files here</b><span class="hint">HTML (theory, quiz, mini-game, deck), Markdown, Word (.docx), text, CSV, JSON · several at once · also the picture files your pages use (.png .jpg .svg)</span></label>
+        <div class="files" id="files"></div>
+        <div class="hint" id="fileHint">The order here is the order in the Markdown: by day, then theory, deck, practical, quiz, game. Use ↑ ↓ to change it.</div>
+        <div class="row"><button class="btn" id="clearBtn">Remove all</button></div>
+      </div>
+
+      <div class="card">
+        <h2>2 · What to make</h2>
+        <div><div class="label">Make</div><select id="mode">
+          <option value="pack">ONE Markdown with all files together (for NotebookLM)</option>
+          <option value="each">One Markdown per file</option>
+          <option value="check">✅ Checklist I can tick off</option>
+          <option value="html">Styled HTML page (from Markdown, Word, text, CSV, JSON)</option>
+          <option value="pdf">PDF (opens the print window → choose "Save as PDF")</option>
+        </select></div>
+        <div id="mdOpts" style="display:flex;flex-direction:column;gap:8px">
+          <div class="star">
+            <label class="check"><input type="checkbox" id="optVis" checked> <span><b>Explain every picture, drawing and icon</b> with Gemini, written right where it sits on the page (the pictures are sent to Google Gemini; marked clearly as AI)</span></label>
+            <div class="keyrow"><input type="password" id="gemKey" placeholder="Paste your Gemini key here (starts with AQ. or AIza)" autocomplete="off" spellcheck="false"><button class="btn gold" id="keySave">Save key</button></div>
+            <div class="hint" id="keyHint"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="optCode" checked> Include quiz and game content that is hidden inside the code (questions, all options, the correct answer, feedback, game levels)</label>
+          <label class="check"><input type="checkbox" id="optImg" checked> Also use the picture labels already inside the file</label>
+          <label class="check"><input type="checkbox" id="optLinks" checked> Keep web links</label>
+          <label class="check"><input type="checkbox" id="optToc" checked> List of files at the top</label>
+          <label class="check"><input type="checkbox" id="optAI"> <span>Extra check: Gemini reads all the code too <b>(slow — usually not needed)</b></span></label>
+        </div>
+        <button class="btn gold big" id="goBtn">⇄ Convert</button>
+        <div class="prog hidden" id="prog"><i class="spin"></i><span id="progTxt">Starting…</span><button class="btn red" id="stopBtn">■ Stop</button></div>
+        <div class="hint" id="modeHint"></div>
+      </div>
+      <div class="hint">Pictures take time: Gemini looks at 4 pictures at a time, and a free key allows only a few requests per minute. The same picture is never asked twice: the converter remembers every description, so the second run is fast.<br>Coming in v2: PDF, PowerPoint (.pptx) and Excel (.xlsx) as input, PDF → pictures / PowerPoint, and a description → HTML slides.</div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>3 · Result</h2>
+        <div id="stats">Drop your files, then press Convert. Or paste text in the Quick checklist box.</div>
+        <textarea id="out" spellcheck="false" placeholder="The Markdown appears here. You can read and change it before you download."></textarea>
+        <div class="row">
+          <button class="btn gold" id="dlMd">⬇ Download .md</button>
+          <button class="btn" id="dlTxt">⬇ Download as .txt</button>
+          <button class="btn" id="copyBtn">📋 Copy</button>
+          <button class="btn green" id="dlCheck">✅ Download as checklist</button>
+          <button class="btn" id="dlHtml">⬇ As styled HTML</button>
+          <button class="btn" id="pdfOut">🖨 As PDF</button>
+        </div>
+        <div class="hint">For NotebookLM: add the downloaded <b>.md</b> file as a source. If it does not accept .md, use <b>.txt</b> (same content) or paste the text with <b>Copy</b>.<br><b>✅ Download as checklist</b> turns whatever is in the box above into a checklist page. You can change the text first.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script>
+'use strict';
+/* NOTE: closing page tags are written in pieces below (e.g. '</bo'+'dy>') so that VS Code Live Server does not insert its reload code inside this script. */
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function toast(m,ms){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms||3500); }
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+const oneLine=s=>String(s||'').replace(/\s*\n+\s*/g,' ').replace(/[ \t]{2,}/g,' ').trim();
+const ENT_BOX=document.createElement('textarea');
+function decodeEnt(s){ s=String(s||''); if(!/&(#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i.test(s)) return s; ENT_BOX.innerHTML=s; return ENT_BOX.value; }
+const stripTags=s=>decodeEnt(String(s||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,' ')).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+function hash(s){ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36)+'.'+s.length.toString(36); }
+
+/* ---------- progress + stop ---------- */
+let STOP=false;
+function status(m){ $('stats').textContent=m; $('progTxt').textContent=m; }
+async function waitS(ms,label){
+  const end=Date.now()+ms;
+  while(Date.now()<end){
+    if(STOP) return;
+    if(label) status(label.replace('{s}',Math.ceil((end-Date.now())/1000)));
+    await sleep(250);
+  }
+}
+$('stopBtn').onclick=()=>{ STOP=true; status('Stopping… keeping everything done so far'); };
+
+/* ---------- saved options ---------- */
+const OPTS=['mode','optVis','optCode','optImg','optLinks','optToc','optAI'];
+if(localStorage.getItem('forge:cv:v17')!=='1'){ localStorage.setItem('forge:cv:optAI','0'); localStorage.setItem('forge:cv:v17','1'); }
+for(const id of OPTS){
+  const el=$(id), v=localStorage.getItem('forge:cv:'+id);
+  if(v!==null){ if(el.type==='checkbox') el.checked=v==='1'; else el.value=v; }
+  el.addEventListener('change',()=>{ localStorage.setItem('forge:cv:'+id, el.type==='checkbox' ? (el.checked ? '1' : '0') : el.value); modeUI(); });
+}
+function modeUI(){
+  const m=$('mode').value;
+  $('mdOpts').classList.toggle('hidden',!(m==='pack' || m==='each'));
+  $('modeHint').textContent={ pack:'All files become ONE Markdown file: a heading for each file, only the content (no code), with every picture and icon explained where it sits.', each:'Each file becomes its own Markdown file.', check:'Your files (and anything you added from the paste box) become ONE checklist page you can tick off. Headings become sections, every line becomes a task.', html:'Markdown, Word, text, CSV and JSON files become clean, readable HTML pages. (HTML files are already HTML.)', pdf:'Each file opens in a new tab with the print window. Choose "Save as PDF". HTML files print exactly as they look on screen.' }[m]||'';
+}
+
+/* ---------- Gemini key on this page (new format AQ.… and old format AIza…) ---------- */
+const KEY_RE=/^(AIza[0-9A-Za-z_\-]{35}|AQ\.[0-9A-Za-z_\-.]{30,200})$/;
+const KEY_SCAN=/AIza[0-9A-Za-z_\-]{35}|AQ\.[0-9A-Za-z_\-.]{30,200}/g;
+const BAD_KEYS=new Set();
+function keyUI(){
+  const k=geminiKeys();
+  const own=localStorage.getItem('forge:cv:gemkey');
+  $('keyHint').innerHTML=k.length
+    ? '<span class="ok">✓ Gemini key ready</span> (ends with …'+esc(k[0].slice(-4))+')'+(own ? ' · your saved key is used' : '')+'. To change it, paste a new one and press Save key.'
+    : '<span class="bad">No Gemini key on this page yet.</span> Paste your key above and press <b>Save key</b>. You get one free at <b>aistudio.google.com</b> → <b>Get API key</b>.';
+}
+$('keySave').onclick=()=>{
+  const v=$('gemKey').value.trim().replace(/^["']|["']$/g,'').replace(/\s+/g,'');
+  if(!v) return toast('Paste your Gemini key in the box first');
+  if(!KEY_RE.test(v)) return toast('This does not look like a Gemini key. New keys start with AQ. and old keys start with AIza. Copy the whole key again.',7000);
+  localStorage.setItem('forge:cv:gemkey',v); BAD_KEYS.delete(v);
+  $('gemKey').value=''; keyUI(); toast('✓ Key saved on this computer');
+};
+$('gemKey').addEventListener('keydown',e=>{ if(e.key==='Enter') $('keySave').click(); });
+
+/* =====================================================================
+   CHECKLIST: text → sections and tasks → a page you can tick off
+   ===================================================================== */
+function clClean(t){
+  return String(t||'')
+    .replace(/\*\*([^*]+)\*\*/g,'$1').replace(/__([^_]+)__/g,'$1')
+    .replace(/(^|[\s(])\*([^*\s][^*]*)\*/g,'$1$2')
+    .replace(/`([^`]+)`/g,'$1')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'$1 ($2)')
+    .replace(/\s{2,}/g,' ').trim();
+}
+function clParseLine(s){
+  let bullet=false, done=false, m;
+  if((m=s.match(/^([-*+•·▪◦‣–])\s+/))){ bullet=true; s=s.slice(m[0].length); }
+  else if((m=s.match(/^(\d{1,3}|[a-zA-Z])[.)]\s+/))){ bullet=true; s=s.slice(m[0].length); }
+  if((m=s.match(/^\[([ xX✓✔]?)\]\s*/))){ bullet=true; done=/[xX✓✔]/.test(m[1]); s=s.slice(m[0].length); }
+  else if((m=s.match(/^(☐|□|◻|☑|☒|✅|✔️|✔|✓)\s*/u))){ bullet=true; done=!/☐|□|◻/.test(m[1]); s=s.slice(m[0].length); }
+  return { s:s.trim(), bullet, done };
+}
+function clIsCaps(s){
+  const h=s.replace(/\([^)]*\)/g,'').split(/\s[—–-]\s|:/)[0];
+  const letters=h.replace(/[^\p{L}]/gu,'');
+  return letters.length>=3 && /\p{Lu}/u.test(letters) && letters===letters.toUpperCase();
+}
+function toChecklist(text,fallbackTitle){
+  const L=[]; let inCode=false;
+  for(const r of String(text||'').replace(/\r/g,'').split('\n')){
+    if(/^\s*```/.test(r)){ inCode=!inCode; continue; }
+    const line=r.replace(/\t/g,'    ');
+    const indent=line.match(/^ */)[0].length;
+    let s=line.trim().replace(/^>\s?/,'');
+    if(!s || /^(-{3,}|\*{3,}|_{3,})$/.test(s)){ L.push(null); continue; }
+    if(/^\|?\s*:?-{3,}/.test(s)) continue;
+    if(/^\|.*\|$/.test(s)) s=s.replace(/^\||\|$/g,'').split('|').map(x=>x.trim()).filter(Boolean).join(' · ');
+    let head=0; const hm=s.match(/^(#{1,6})\s+(.*)$/); if(hm){ head=hm[1].length; s=hm[2]; }
+    const p=head ? { s, bullet:false, done:false } : clParseLine(s);
+    L.push({ indent, head, text:clClean(p.s), bullet:p.bullet, done:p.done });
+  }
+  for(let i=0;i<L.length;i++){
+    const x=L[i]; if(!x || x.head || x.bullet || !x.text) continue;
+    const prev=L[i-1], next=L.slice(i+1).find(y=>y);
+    if(x.text.length<=90 && (clIsCaps(x.text) || /:$/.test(x.text))){ x.head=2; continue; }
+    if(next && next.bullet && !prev && x.text.length<=90) x.head=2;
+  }
+  let title=''; const sections=[]; let cur=null;
+  const first=L.find(y=>y);
+  for(const x of L){
+    if(!x || !x.text) continue;
+    if(x.head){
+      const t=x.text.replace(/:$/,'').trim();
+      if(!title && x===first && (x.head===1 || clIsCaps(x.text))){ title=t; continue; }
+      cur={ h:t, items:[] }; sections.push(cur); continue;
+    }
+    if(!cur){ cur={ h:'', items:[] }; sections.push(cur); }
+    const l=x.bullet ? (x.indent>=6 ? 2 : x.indent>=2 ? 1 : 0) : 0;
+    cur.items.push({ t:x.text, d:x.done, l });
+  }
+  return { title:title||fallbackTitle, sections:sections.filter(s=>s.items.length) };
+}
+function checklistMd(m){
+  let md='# '+m.title+'\n';
+  for(const s of m.sections){ md+='\n'+(s.h ? '## '+s.h+'\n\n' : ''); for(const it of s.items) md+='  '.repeat(it.l)+'- ['+(it.d ? 'x' : ' ')+'] '+it.t+'\n'; }
+  return md;
+}
+/* the checklist page: 4 backgrounds (Dark, White, Cream, Navy) */
+const CL_CSS='*{box-sizing:border-box}'
+ +':root{--bg:#1f1f1e;--fg:#ece9e2;--mut:#9a968c;--line:#34332f;--btn:#2b2a27;--btnb:#45433e;--hov:#2a2926;--box:#77736a;--done:#8a867c;--ok:#3fbf75;--okc:#ffffff;--acc:#E9C46A}'
+ +'body.t-light{--bg:#ffffff;--fg:#1d2433;--mut:#6b7280;--line:#e5e7eb;--btn:#f3f4f6;--btnb:#d1d5db;--hov:#f5f7fa;--box:#9ca3af;--done:#9ca3af;--ok:#22a861;--acc:#d9a521}'
+ +'body.t-cream{--bg:#f7f1e3;--fg:#3b3127;--mut:#8a7a66;--line:#e3d7bf;--btn:#efe5cf;--btnb:#d8c9a8;--hov:#f0e7d4;--box:#a8977c;--done:#a3957f;--ok:#2e9e5e;--acc:#c98f1e}'
+ +'body.t-navy{--bg:#0f1b2d;--fg:#e8eef8;--mut:#93a1b8;--line:#22324a;--btn:#17263d;--btnb:#2c4060;--hov:#152238;--box:#6b7c96;--done:#7d8ba3;--ok:#3fbf75;--acc:#E9C46A}'
+ +'body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.5 Georgia,"Times New Roman",serif;transition:background .2s,color .2s}'
+ +'#app{max-width:820px;margin:0 auto;padding:22px 16px 70px}h1{font-size:23px;font-weight:600;margin:0 0 4px;line-height:1.3}'
+ +'.sub{color:var(--mut);font:13px/1.4 system-ui,Segoe UI,Roboto,sans-serif}'
+ +'.bar{height:9px;background:var(--line);border-radius:6px;margin:14px 0 6px;overflow:hidden}.fill{height:100%;width:0;background:var(--acc);transition:width .3s}'
+ +'.count{font:600 14px system-ui,Segoe UI,Roboto,sans-serif;color:var(--mut)}.count.all{color:var(--ok)}'
+ +'.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:2}'
+ +'button{font:600 14px system-ui,Segoe UI,Roboto,sans-serif;background:var(--btn);color:var(--fg);border:1px solid var(--btnb);border-radius:9px;padding:8px 12px;cursor:pointer}'
+ +'.themes{display:flex;gap:7px;align-items:center;margin-left:auto;font:13px system-ui,Segoe UI,Roboto,sans-serif;color:var(--mut)}'
+ +'.sw{width:28px;height:28px;padding:0;border-radius:50%;border:2px solid var(--btnb)}.sw.on{outline:3px solid var(--acc);outline-offset:2px}'
+ +'.sec{margin-top:22px}.sh{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px}'
+ +'h2{font-size:17px;letter-spacing:.02em;margin:0;font-weight:600}.sc{color:var(--mut);font:13px system-ui,Segoe UI,Roboto,sans-serif}'
+ +'.plus{margin-left:auto;padding:2px 11px}ul{list-style:none;margin:8px 0 0;padding:0}'
+ +'.item{display:flex;gap:12px;align-items:flex-start;padding:8px 6px;border-radius:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}'
+ +'.item:hover{background:var(--hov)}.box{flex:none;width:22px;height:22px;margin-top:2px;border:2px solid var(--box);border-radius:5px;display:flex;align-items:center;justify-content:center;font:800 15px system-ui,sans-serif;color:var(--okc)}'
+ +'.item.on .box{background:var(--ok);border-color:var(--ok)}.item.on .tx{text-decoration:line-through;color:var(--done)}'
+ +'.tx{flex:1;min-width:0;overflow-wrap:anywhere}.lv1{margin-left:30px}.lv2{margin-left:60px}'
+ +'.del{border:none;background:none;color:var(--mut);padding:0 6px}'
+ +'@media print{body{background:#fff;color:#000}.tools,.plus,.del,.bar{display:none}.box{border-color:#000;color:#000}.item.on .box{background:#fff}.item.on .tx{color:#555}.sh{border-color:#ccc}}';
+function CL_APP(){
+  var D=window.CL_DATA;
+  var THEMES=[['dark','#1f1f1e','Dark'],['light','#ffffff','White'],['cream','#f7f1e3','Cream'],['navy','#0f1b2d','Navy']];
+  function hashStr(s){ var h=2166136261>>>0; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36); }
+  var KEY='sfcl:'+hashStr(D.made+'|'+D.title+'|'+JSON.stringify(D.sections));
+  var st=null; try{ st=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+  if(!st){ st={ c:{}, add:{}, hide:false }; D.sections.forEach(function(s,si){ s.items.forEach(function(it,ii){ if(it.d) st.c[si+'-'+ii]=1; }); }); }
+  if(!D.sections.length) D.sections.push({ h:'', items:[] });
+  var theme='dark'; try{ theme=localStorage.getItem('sfcl:theme')||'dark'; }catch(e){}
+  function applyTheme(){ document.body.className=theme==='dark' ? '' : 't-'+theme; }
+  applyTheme();
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(st)); }catch(e){} }
+  function el(tag,cls,txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  var app=document.getElementById('app');
+  function addTo(si){ var t=window.prompt('New task'); if(!t || !t.trim()) return; (st.add[si]=st.add[si]||[]).push({ id:'a'+Date.now(), t:t.trim() }); save(); render(); }
+  function render(){
+    var y=window.scrollY;
+    app.textContent='';
+    var total=0, done=0;
+    app.appendChild(el('h1',null,D.title));
+    app.appendChild(el('div','sub','Made '+D.made+' · tap a line to tick it off · your ticks are saved on this device'));
+    var bar=el('div','bar'), fill=el('div','fill'); bar.appendChild(fill); app.appendChild(bar);
+    var cnt=el('div','count'); app.appendChild(cnt);
+    var tools=el('div','tools');
+    var bAdd=el('button',null,'+ Add task'); bAdd.onclick=function(){ addTo(D.sections.length-1); };
+    var bHide=el('button',null,st.hide ? 'Show done' : 'Hide done'); bHide.onclick=function(){ st.hide=!st.hide; save(); render(); };
+    var bReset=el('button',null,'Untick all'); bReset.onclick=function(){ if(window.confirm('Untick every line?')){ st.c={}; save(); render(); } };
+    var bPrint=el('button',null,'Print'); bPrint.onclick=function(){ window.print(); };
+    [bAdd,bHide,bReset,bPrint].forEach(function(b){ tools.appendChild(b); });
+    var th=el('div','themes'); th.appendChild(el('span',null,'Background'));
+    THEMES.forEach(function(t){
+      var b=el('button','sw'+(theme===t[0] ? ' on' : ''));
+      b.style.background=t[1]; b.title=t[2]; b.setAttribute('aria-label',t[2]+' background');
+      b.onclick=function(){ theme=t[0]; try{ localStorage.setItem('sfcl:theme',theme); }catch(e){} applyTheme(); render(); };
+      th.appendChild(b);
+    });
+    tools.appendChild(th);
+    app.appendChild(tools);
+    D.sections.forEach(function(s,si){
+      var items=s.items.map(function(it,ii){ return { id:si+'-'+ii, t:it.t, l:it.l||0, added:false }; })
+        .concat((st.add[si]||[]).map(function(a){ return { id:a.id, t:a.t, l:0, added:true }; }));
+      var sd=0; items.forEach(function(x){ if(st.c[x.id]) sd++; });
+      total+=items.length; done+=sd;
+      var sec=el('section','sec'), sh=el('div','sh');
+      sh.appendChild(el('h2',null,s.h || (D.sections.length>1 ? 'Tasks' : 'To do')));
+      sh.appendChild(el('span','sc',sd+' / '+items.length));
+      var plus=el('button','plus','+'); plus.title='Add a task here'; plus.onclick=function(){ addTo(si); }; sh.appendChild(plus);
+      sec.appendChild(sh);
+      var ul=el('ul');
+      items.forEach(function(x){
+        var on=!!st.c[x.id];
+        if(on && st.hide) return;
+        var li=el('li','item lv'+x.l+(on ? ' on' : ''));
+        li.appendChild(el('span','box',on ? '✓' : ''));
+        li.appendChild(el('span','tx',x.t));
+        li.onclick=function(){ if(st.c[x.id]) delete st.c[x.id]; else st.c[x.id]=1; save(); render(); };
+        if(x.added){
+          var del=el('button','del','✕'); del.title='Remove this task';
+          del.onclick=function(ev){ ev.stopPropagation(); st.add[si]=(st.add[si]||[]).filter(function(a){ return a.id!==x.id; }); delete st.c[x.id]; save(); render(); };
+          li.appendChild(del);
+        }
+        ul.appendChild(li);
+      });
+      sec.appendChild(ul);
+      app.appendChild(sec);
+    });
+    fill.style.width=(total ? Math.round(done/total*100) : 0)+'%';
+    cnt.textContent=done+' of '+total+' done'+(total && done===total ? ' · ✓ All done!' : '');
+    if(total && done===total) cnt.className='count all';
+    window.scrollTo(0,y);
+  }
+  render();
+}
+function checklistPage(m){
+  const data=JSON.stringify({ title:m.title, sections:m.sections, made:dateStr() }).replace(/</g,'\\u003c');
+  const H='he'+'ad', B='bo'+'dy', HT='ht'+'ml', S='scr'+'ipt';
+  return '<!DOCTYPE '+HT+'><'+HT+' lang="en"><'+H+'><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>'+esc(m.title)+'</title><style>'+CL_CSS+'</style></'+H+'><'+B+'><div id="app"></div><'+S+'>window.CL_DATA='+data+';('+CL_APP.toString()+')();</'+S+'></'+B+'></'+HT+'>';
+}
+function slug(t){ return (String(t||'').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-+|-+$/g,'').slice(0,50))||'list'; }
+function downloadChecklist(m){
+  const n=m.sections.reduce((a,s)=>a+s.items.length,0);
+  download(new Blob([checklistPage(m)],{ type:'text/html' }),'Checklist-'+slug(m.title)+'.html');
+  $('stats').innerHTML='✓ Checklist with <b>'+n+'</b> tasks in <b>'+m.sections.length+'</b> section'+(m.sections.length>1 ? 's' : '')+' downloaded. Open the file in Chrome and tap each line to tick it off. Change the text below and press <b>✅ Download as checklist</b> to make a new one.';
+  return n;
+}
+function makeChecklist(text,title){
+  const m=toChecklist(text,title||'Checklist · '+dateStr());
+  if(!m.sections.length){ toast('No lines found to make a checklist'); return false; }
+  $('out').value=checklistMd(m);
+  LAST={ name:'Checklist-'+slug(m.title) };
+  downloadChecklist(m);
+  return true;
+}
+$('pasteCheck').onclick=()=>{
+  const t=$('pasteIn').value;
+  if(!t.trim()) return toast('Paste your text in the box first');
+  if(makeChecklist(t)) toast('✓ Checklist downloaded. Open it to tick off as you go.',5000);
+};
+$('dlCheck').onclick=()=>{
+  const t=$('out').value;
+  if(!t.trim()) return toast('There is nothing in the result box yet');
+  const m=toChecklist(t,'Checklist · '+dateStr());
+  if(!m.sections.length) return toast('No lines found to make a checklist');
+  downloadChecklist(m); toast('✓ Checklist downloaded',4000);
+};
+let PASTED=0;
+$('pasteAdd').onclick=()=>{
+  const t=$('pasteIn').value;
+  if(!t.trim()) return toast('Paste your text in the box first');
+  PASTED++;
+  const lines=t.split('\n').filter(x=>x.trim()).length;
+  FILES.push({ id:Math.random().toString(36).slice(2), file:null, name:'Pasted text '+PASTED+'.txt', kind:'txt', state:'✓ ready', md:t, html:'', text:t, scripts:[], info:lines+' lines' });
+  $('pasteIn').value=''; renderFiles();
+  toast('Added to your files. Choose what to make, then press Convert.',4500);
+};
+
+/* =====================================================================
+   HTML → Markdown (content only)
+   ===================================================================== */
+const SKIP=new Set(['SCRIPT','STYLE','NOSCRIPT','TEMPLATE','CANVAS','IFRAME','OBJECT','EMBED','INPUT','SELECT','OPTION','TEXTAREA','VIDEO','AUDIO','LINK','META','HEAD','MATH','DIALOG']);
+const BLOCK=new Set(['P','DIV','SECTION','ARTICLE','MAIN','HEADER','FOOTER','ASIDE','NAV','UL','OL','LI','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH','H1','H2','H3','H4','H5','H6','PRE','BLOCKQUOTE','HR','FIGURE','FIGCAPTION','DETAILS','SUMMARY','DL','DT','DD','FORM','FIELDSET','BODY','CENTER','ADDRESS','LABEL','LEGEND','CAPTION']);
+const ANSWERISH=/option|answer|choice|antwort|auswahl|quiz|card|tile|item/i;
+let CTX={ images:true, links:true, slide:0, vision:false, pics:[], near:'', css:'' };
+function isSlide(el){ return el.classList && [...el.classList].some(c=>/^(slide|deck-slide|page-slide)$/i.test(c)); }
+
+/* ---------- pictures, drawings and icons ---------- */
+const FA_SKIP=/^(solid|regular|light|thin|duotone|brands|sharp|fw|lg|xs|sm|xl|2xs|xxs|[0-9]+x|spin|pulse|beat|fade|bounce|flip|shake|border|inverse|pull-left|pull-right|rotate-\d+|rotate-by|flip-horizontal|flip-vertical|flip-both|stack|stack-1x|stack-2x|ul|li|layers|swap-opacity)$/i;
+function iconName(n,tag){
+  if(tag!=='I' && tag!=='SPAN') return '';
+  const cls=(n.getAttribute('class')||'').split(/\s+/).filter(Boolean); if(!cls.length) return '';
+  if(cls.some(c=>/^material-(icons|symbols)/i.test(c))){ const t=n.textContent.trim(); return /^[a-z0-9_]+$/.test(t) ? t.replace(/_/g,' ') : ''; }
+  if(n.textContent.trim()) return '';
+  for(const c of cls){
+    const m=c.match(/^(?:fa|bi|lucide|ti|ri|icon|ico|mdi|ion|gg|bx|bxs|bxl)-([a-z0-9-]+)$/i);
+    if(m && !(/^fa-/i.test(c) && FA_SKIP.test(m[1]))) return m[1].replace(/-(line|fill|outline|o|alt|solid|sharp)$/i,'').replace(/-/g,' ');
+  }
+  return '';
+}
+function sizeOf(n){
+  let w=parseFloat(n.getAttribute('data-sfw'))||0, h=parseFloat(n.getAttribute('data-sfh'))||0;
+  if(!(w>0 && h>0)){ const aw=n.getAttribute('width')||'', ah=n.getAttribute('height')||''; if(!/%/.test(aw+ah) && parseFloat(aw)>0 && parseFloat(ah)>0){ w=parseFloat(aw); h=parseFloat(ah); } }
+  if(!(w>0 && h>0)){ const vb=(n.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number); if(vb.length===4 && vb[2]>0 && vb[3]>0){ w=vb[2]; h=vb[3]; } }
+  return [w||0,h||0];
+}
+function pic(p){
+  if(p.w>0 && p.h>0 && Math.max(p.w,p.h)<=4) return '';
+  p.near=CTX.near; p.icon=p.w>0 && p.h>0 && Math.max(p.w,p.h)<=64;
+  CTX.pics.push(p);
+  const tok='⟦PIC'+(CTX.pics.length-1)+'⟧';
+  return p.icon ? ' '+tok+' ' : '\n\n'+tok+'\n\n';
+}
+function svgNode(n){
+  if(!n.querySelector('path,circle,rect,ellipse,line,polyline,polygon,text,image,use,g')) return '';
+  if(n.querySelector('symbol') && !n.querySelector(':scope > :not(defs):not(symbol):not(title):not(desc)')) return '';
+  const txt=oneLine([...n.querySelectorAll('text')].map(x=>x.textContent).join(' ')).slice(0,400);
+  const ttl=oneLine((n.querySelector('title')||{}).textContent||n.getAttribute('aria-label')||'');
+  if(CTX.vision){
+    let svg=''; try{ svg=new XMLSerializer().serializeToString(n); }catch{}
+    if(svg){ const sz=sizeOf(n); return pic({ type:'svg', svg, w:sz[0], h:sz[1], txt, alt:ttl }); }
+  }
+  if(ttl && CTX.images) return ' *[Drawing: '+ttl+']* ';
+  return txt ? ' *[Drawing with the words: '+txt+']* ' : '';
+}
+function imgNode(n){
+  const a=(n.getAttribute('alt')||n.getAttribute('title')||'').trim();
+  const src=n.getAttribute('src')||n.getAttribute('data-src')||'';
+  if(CTX.vision && src){ const sz=sizeOf(n); return pic({ type:'img', src, w:sz[0], h:sz[1], alt:a }); }
+  return CTX.images && a ? ' *[Image: '+a+']* ' : '';
+}
+
+function conv(n){
+  if(n.nodeType===3) return n.nodeValue.replace(/\s+/g,' ');
+  if(n.nodeType!==1) return '';
+  const tag=n.tagName.toUpperCase();
+  if(tag==='SVG') return svgNode(n);
+  if(SKIP.has(tag)) return '';
+  const ic=iconName(n,tag); if(ic) return ' *[Icon: '+ic+']* ';
+  if(tag==='IMG') return imgNode(n);
+  if(n.getAttribute('aria-hidden')==='true' && !n.textContent.trim() && !n.querySelector('svg,img')) return '';
+  const kids=()=>[...n.childNodes].map(conv).join('');
+  switch(tag){
+    case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': {
+      const t=oneLine(kids()); if(!t) return '';
+      CTX.near=t.replace(/⟦PIC\d+⟧/g,'').replace(/\*\[[^\]]*\]\*/g,'').trim();
+      return '\n\n'+'#'.repeat(Math.min(6,+tag[1]+1))+' '+t+'\n\n';
+    }
+    case 'P': { const t=kids().trim(); return t ? '\n\n'+t+'\n\n' : ''; }
+    case 'BR': return '  \n';
+    case 'BUTTON': {
+      /* keep answer buttons (quiz options, cards), skip navigation buttons like "Next" or "Start" */
+      const t=oneLine(n.textContent);
+      const cls=(n.className||'')+' '+((n.parentElement && n.parentElement.className)||'')+' '+(n.getAttribute('data-answer')!=null || n.getAttribute('data-correct')!=null || n.getAttribute('data-option')!=null ? 'answer' : '');
+      if(!t) return '';
+      if(t.length>25 || ANSWERISH.test(cls)) return '\n- '+t+(n.getAttribute('data-correct')==='true' ? ' ✅ *(correct)*' : '')+'\n';
+      return '';
+    }
+    case 'STRONG': case 'B': { const t=kids(); return t.trim() ? '**'+t.trim()+'** ' : ''; }
+    case 'EM': case 'I': { const t=kids(); return t.trim() ? '*'+t.trim()+'* ' : ''; }
+    case 'CODE': case 'KBD': case 'SAMP': { if(n.parentElement && n.parentElement.tagName==='PRE') return n.textContent; const t=n.textContent.trim(); return t ? '`'+t.replace(/`/g,'\'')+'` ' : ''; }
+    case 'PRE': { const t=n.textContent.replace(/\s+$/,''); return t ? '\n\n```\n'+t+'\n```\n\n' : ''; }
+    case 'A': { const t=oneLine(kids()); const h=n.getAttribute('href')||''; if(!t) return ''; return CTX.links && /^https?:\/\//i.test(h) ? '['+t+']('+h+') ' : t+' '; }
+    case 'UL': case 'OL': return '\n\n'+list(n,0)+'\n';
+    case 'TABLE': return table(n);
+    case 'BLOCKQUOTE': { const t=kids().trim(); return t ? '\n\n'+t.split('\n').map(l=>'> '+l).join('\n')+'\n\n' : ''; }
+    case 'HR': return '\n\n---\n\n';
+    case 'SUMMARY': { const t=oneLine(kids()); return t ? '\n\n**'+t+'**\n\n' : ''; }
+    case 'FIGCAPTION': case 'CAPTION': { const t=oneLine(kids()); return t ? '\n\n*'+t+'*\n\n' : ''; }
+    case 'DT': { const t=oneLine(kids()); return t ? '\n\n**'+t+'**\n' : ''; }
+    case 'DD': { const t=oneLine(kids()); return t ? ': '+t+'\n' : ''; }
+    default: {
+      let pre='';
+      if(isSlide(n)){ CTX.slide++; pre='\n\n---\n\n**Slide '+CTX.slide+'**\n\n'; }
+      if(CTX.vision){
+        const st=n.getAttribute('style')||'';
+        const m=st.match(/background(?:-image)?\s*:[^;]*url\(\s*(['"]?)([^'")]+)\1\s*\)/i);
+        if(m) pre+=pic({ type:'img', src:m[2], w:0, h:0, alt:'' });
+      }
+      const t=kids();
+      if(BLOCK.has(tag) || pre) return pre+'\n\n'+t+'\n\n';
+      return t;
+    }
+  }
+}
+function list(el,depth){
+  const ordered=el.tagName==='OL'; let k=+(el.getAttribute('start')||1), out='';
+  for(const li of el.children){
+    if(li.tagName!=='LI') continue;
+    let body='', subs='';
+    for(const c of li.childNodes){
+      if(c.nodeType===1 && (c.tagName==='UL' || c.tagName==='OL')) subs+=list(c,depth+1);
+      else body+=conv(c);
+    }
+    body=oneLine(body.replace(/ {2}\n/g,' ').replace(/\n- /g,' · '));
+    if(!body && !subs) continue;
+    out+='  '.repeat(depth)+(ordered ? (k++)+'. ' : '- ')+body+'\n'+subs;
+  }
+  return out;
+}
+function table(el){
+  const rows=[...el.querySelectorAll('tr')].filter(r=>r.closest('table')===el);
+  if(!rows.length) return '';
+  const grid=rows.map(r=>[...r.children].filter(c=>/^T[HD]$/.test(c.tagName)).map(c=>oneLine(conv(c)).replace(/\|/g,'\\|')));
+  const w=Math.max(...grid.map(r=>r.length)); if(!w) return '';
+  const pad=r=>{ const x=r.slice(); while(x.length<w) x.push(''); return x; };
+  const head=pad(grid[0]), body=grid.slice(1).map(pad);
+  return '\n\n| '+head.join(' | ')+' |\n|'+head.map(()=>' --- ').join('|')+'|\n'+body.map(r=>'| '+r.join(' | ')+' |').join('\n')+'\n\n';
+}
+function tidy(md){
+  return md.replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+(?=[^\s\-*>|0-9`])/g,'\n').replace(/\n{3,}/g,'\n\n').replace(/^\s+|\s+$/g,'')
+    .replace(/\*\*\s+\*\*/g,'').replace(/ +([.,;:!?])(?=\s|$|[)\]*_`])/g,'$1');
+}
+function htmlToMd(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  CTX.slide=0;
+  return tidy(conv(doc.body||doc.documentElement));
+}
+
+/* =====================================================================
+   Open the page in a closed, muted frame so drawings made by its code
+   can be seen too (it cannot touch this page or your saved data)
+   ===================================================================== */
+function SHIM(){
+  function mk(){ var d={}; return { getItem:function(k){ return Object.prototype.hasOwnProperty.call(d,k) ? d[k] : null; }, setItem:function(k,v){ d[k]=String(v); }, removeItem:function(k){ delete d[k]; }, clear:function(){ d={}; }, key:function(i){ return Object.keys(d)[i]||null; }, get length(){ return Object.keys(d).length; } }; }
+  ['localStorage','sessionStorage'].forEach(function(n){ try{ Object.defineProperty(window,n,{ value:mk(), configurable:true }); }catch(e){} });
+  try{ HTMLMediaElement.prototype.play=function(){ return Promise.resolve(); }; }catch(e){}
+  try{ if(window.speechSynthesis) window.speechSynthesis.speak=function(){}; }catch(e){}
+}
+function SNAP(){
+  var PROPS=['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','fill-opacity','stroke-opacity','color','stop-color','stop-opacity','font-size','font-family','font-weight','text-anchor','dominant-baseline'];
+  function size(el){ var r=el.getBoundingClientRect(), w=r.width, h=r.height; if(!(w>0 && h>0) && el.naturalWidth){ w=el.naturalWidth; h=el.naturalHeight; } if(w>0 && h>0){ el.setAttribute('data-sfw',Math.round(w)); el.setAttribute('data-sfh',Math.round(h)); } }
+  function go(){
+    var out=null, i, j, k;
+    try{
+      var uses=document.querySelectorAll('svg use');
+      for(i=0;i<uses.length;i++){
+        var u=uses[i], ref=u.getAttribute('href')||u.getAttribute('xlink:href')||'';
+        if(ref.charAt(0)!=='#') continue;
+        var t=document.getElementById(ref.slice(1)); if(!t) continue;
+        var g=document.createElementNS('http://www.w3.org/2000/svg','g');
+        var tr=u.getAttribute('transform')||'', x=u.getAttribute('x'), y=u.getAttribute('y');
+        if(x || y) tr+=' translate('+(x||0)+','+(y||0)+')';
+        if(tr) g.setAttribute('transform',tr);
+        if(u.getAttribute('class')) g.setAttribute('class',u.getAttribute('class'));
+        var kids=t.tagName.toLowerCase()==='symbol' ? t.childNodes : [t];
+        for(k=0;k<kids.length;k++) g.appendChild(kids[k].cloneNode(true));
+        u.parentNode.replaceChild(g,u);
+      }
+      var svgs=document.querySelectorAll('svg');
+      for(i=0;i<svgs.length;i++){
+        var s=svgs[i]; size(s);
+        var els=s.querySelectorAll('*');
+        for(j=0;j<els.length;j++){
+          var e=els[j], cs=getComputedStyle(e), st='';
+          for(k=0;k<PROPS.length;k++){ var v=cs.getPropertyValue(PROPS[k]); if(v) st+=PROPS[k]+':'+v+';'; }
+          if(st) e.setAttribute('style',(e.getAttribute('style')||'')+';'+st);
+        }
+        var cr=getComputedStyle(s);
+        s.setAttribute('style',(s.getAttribute('style')||'')+';color:'+cr.color+';fill:'+cr.fill+';stroke:'+cr.stroke);
+      }
+      var imgs=document.querySelectorAll('img');
+      for(i=0;i<imgs.length;i++) size(imgs[i]);
+      var cvs=document.querySelectorAll('canvas');
+      for(i=0;i<cvs.length;i++){
+        var c=cvs[i];
+        try{
+          if(c.width*c.height<64) continue;
+          size(c);
+          var im=document.createElement('img');
+          im.setAttribute('src',c.toDataURL('image/png'));
+          im.setAttribute('alt',c.getAttribute('aria-label')||'');
+          im.setAttribute('data-sfw',c.getAttribute('data-sfw')||c.width);
+          im.setAttribute('data-sfh',c.getAttribute('data-sfh')||c.height);
+          c.parentNode.replaceChild(im,c);
+        }catch(err){}
+      }
+      out=document.documentElement.outerHTML;
+    }catch(err){}
+    parent.postMessage({ sfSnap:1, html:out },'*');
+  }
+  function later(){ setTimeout(go,1800); }
+  if(document.readyState==='complete') later(); else addEventListener('load',later);
+}
+function liveSnapshot(html){
+  return new Promise(res=>{
+    const S='<scr'+'ipt>', E='<\/scr'+'ipt>';
+    const shim=S+'('+SHIM.toString()+')();'+E, snap=S+'('+SNAP.toString()+')();'+E;
+    const m=html.match(/<head(\s[^>]*)?>/i);
+    const doc=(m ? html.slice(0,m.index+m[0].length)+shim+html.slice(m.index+m[0].length) : shim+html)+snap;
+    const f=document.createElement('iframe');
+    f.setAttribute('sandbox','allow-scripts'); f.setAttribute('aria-hidden','true');
+    f.style.cssText='position:fixed;left:-20000px;top:0;width:1280px;height:800px;border:0';
+    let t=0;
+    const finish=v=>{ clearTimeout(t); removeEventListener('message',h); try{ f.remove(); }catch{} res(v); };
+    const h=e=>{ if(e.source!==f.contentWindow || !e.data || !e.data.sfSnap) return; finish(e.data.html||null); };
+    addEventListener('message',h); t=setTimeout(()=>finish(null),12000);
+    f.srcdoc=doc; document.body.appendChild(f);
+  });
+}
+
+/* =====================================================================
+   Gemini explains the pictures (4 at a time, small, no "thinking")
+   ===================================================================== */
+const PIC_GREY='#8c8c8c', PIC_BATCH=4, PIC_MAX=640, ICON_MAX=128;
+function rasterUrl(url,icon,cors){
+  return new Promise(res=>{
+    let done=false; const end=v=>{ if(!done){ done=true; res(v); } };
+    const im=new Image(); if(cors) im.crossOrigin='anonymous';
+    im.onload=()=>{
+      try{
+        const w0=im.naturalWidth||300, h0=im.naturalHeight||150, big=Math.max(w0,h0);
+        const s=icon ? ICON_MAX/big : Math.min(1,PIC_MAX/big);
+        const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w0*s)); c.height=Math.max(1,Math.round(h0*s));
+        const g=c.getContext('2d'); g.fillStyle=PIC_GREY; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+        end({ mime:'image/jpeg', data:c.toDataURL('image/jpeg',0.8).split(',')[1] });
+      }catch{ end(null); }
+    };
+    im.onerror=()=>end(null);
+    setTimeout(()=>end(null),8000);
+    im.src=url;
+  });
+}
+function svgToImage(p){
+  const W0=Math.round(p.w||300), H0=Math.round(p.h||150), big=Math.max(W0,H0);
+  const s=p.icon ? ICON_MAX/big : Math.min(PIC_MAX,Math.max(480,big))/big;
+  const W=Math.max(1,Math.round(W0*s)), H=Math.max(1,Math.round(H0*s));
+  const css=(CTX.css||'').replace(/\]\]>/g,'');
+  const extra='<style><![CDATA['+css+'\n:root{display:inline !important;visibility:visible !important;opacity:1 !important}]]></style>';
+  const svg=p.svg.replace(/^<svg\b([^>]*)>/i,(m,a)=>{
+    let at=a.replace(/\s(width|height)="[^"]*"/gi,'');
+    if(!/\sviewBox=/i.test(at)) at+=' viewBox="0 0 '+W0+' '+H0+'"';
+    return '<svg'+at+' width="'+W+'" height="'+H+'">'+extra;
+  });
+  const u=URL.createObjectURL(new Blob([svg],{ type:'image/svg+xml' }));
+  return rasterUrl(u,false,false).then(r=>{ URL.revokeObjectURL(u); return r; });
+}
+function findLocal(src){
+  let name=src.split(/[?#]/)[0].split('/').pop()||'';
+  try{ name=decodeURIComponent(name); }catch{}
+  name=name.toLowerCase(); if(!name) return null;
+  const f=FILES.find(x=>x.kind==='img' && x.name.toLowerCase()===name);
+  if(f) f.used=true;
+  return f||null;
+}
+function prepPic(p){
+  if(p.key) return;
+  if(p.type==='svg'){ p.key=hash(p.svg); return; }
+  let src=p.src.trim(); if(src.startsWith('//')) src='https:'+src; p.src=src;
+  if(/^(data:|blob:|https?:)/i.test(src)){ p.key=p.localKey ? hash(p.localKey) : hash(src); return; }
+  const f=findLocal(src); p.file=f;
+  p.key=hash(f ? 'file:'+f.name+':'+f.file.size : 'rel:'+src);
+}
+async function picData(p){
+  if(p.type==='svg') return await svgToImage(p);
+  if(/^(data:|blob:)/i.test(p.src)) return await rasterUrl(p.src,p.icon,false);
+  if(/^https?:/i.test(p.src)) return await rasterUrl(p.src,p.icon,true);
+  if(p.file){ const u=URL.createObjectURL(p.file.file); const r=await rasterUrl(u,p.icon,false); URL.revokeObjectURL(u); return r; }
+  return null;
+}
+const isEmptyDesc=d=>/^empty\.?$/i.test(String(d||'').trim());
+function picCache(){ try{ return JSON.parse(localStorage.getItem('forge:cv:pics')||'{}')||{}; }catch{ return {}; } }
+function savePicCache(c){
+  const ks=Object.keys(c); if(ks.length>3000) ks.slice(0,ks.length-3000).forEach(k=>delete c[k]);
+  try{ localStorage.setItem('forge:cv:pics',JSON.stringify(c)); }catch{}
+}
+const PIC_PROMPT='You explain pictures from a teaching page for a reader who cannot see them. Below are N pictures, each with a short note. For EACH picture write one description:\n- small icon: 2 to 6 words saying what the icon shows (for example "green check mark", "robot head", "envelope with arrow").\n- drawing or picture: 1 to 3 sentences: what is shown, any words written in it (copy them exactly), and what idea it seems to explain on the page.\nRules: describe only what you see, do not invent, do not name or guess who a real person is, no opinions. If a picture is empty or blank, write exactly: empty. Write in the language of the page (look at the heading and words given; English if unsure).\nAnswer ONLY with a JSON array of exactly N strings, one per picture, in the same order.';
+function parseArr(t){
+  t=String(t||'').trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
+  let v; try{ v=JSON.parse(t); }catch{ const m=t.match(/\[[\s\S]*\]/); if(m){ try{ v=JSON.parse(m[0]); }catch{} } }
+  if(v && !Array.isArray(v) && typeof v==='object') v=Object.values(v).find(Array.isArray)||Object.values(v);
+  return Array.isArray(v) ? v.map(x=>typeof x==='string' ? x : (x && (x.description||x.text))||'') : [];
+}
+async function geminiDescribe(items,pageName){
+  const parts=[{ text:PIC_PROMPT.replace(/N/g,String(items.length))+'\n\nPage: "'+pageName+'".' }];
+  items.forEach((b,i)=>{
+    const p=b.p;
+    parts.push({ text:'Picture '+(i+1)+' ('+(p.icon ? 'small icon' : p.type==='svg' ? 'drawing' : 'picture')+(p.near ? ', under the heading "'+p.near.slice(0,90)+'"' : '')+(p.alt ? ', label in the file: "'+p.alt.slice(0,120)+'"' : '')+(p.txt ? ', words inside it: "'+p.txt.slice(0,200)+'"' : '')+'):' });
+    if(b.data) parts.push({ inlineData:{ mimeType:b.data.mime, data:b.data.data } });
+    else parts.push({ text:'(The picture could not be drawn. Here is its drawing code: '+String(p.svg||'').slice(0,4000)+')' });
+  });
+  return parseArr(await askGeminiParts(parts,true,true));
+}
+const FATAL=/refused the key|no working Gemini key|stopped by you/;
+async function describeBatch(batch,name,cache,st){
+  if(STOP || !batch.length) return;
+  try{
+    const arr=await geminiDescribe(batch,name);
+    batch.forEach((b,j)=>{ const d=String(arr[j]||'').replace(/[\[\]*]/g,'').replace(/\s+/g,' ').trim(); if(d && !isEmptyDesc(d)) cache[b.p.key]=d; });
+    st.done+=batch.length;
+  }catch(e){
+    if(FATAL.test(e.message)) throw e;
+    if(batch.length>1 && /too long|empty answer|could not read|did not answer/i.test(e.message)){
+      const h=Math.ceil(batch.length/2);
+      status('Gemini was slow — trying the pictures in '+name+' in smaller groups…');
+      await describeBatch(batch.slice(0,h),name,cache,st);
+      await describeBatch(batch.slice(h),name,cache,st);
+      return;
+    }
+    st.failed+=batch.length; st.done+=batch.length; st.last=e.message;
+  }
+}
+async function explainPics(md,pics,name){
+  const cache=picCache();
+  pics.forEach(prepPic);
+  const todo=[]; const seen=new Set();
+  for(const p of pics){ if((p.key in cache && !isEmptyDesc(cache[p.key])) || seen.has(p.key)) continue; seen.add(p.key); todo.push(p); }
+  let fail='';
+  const ready=[];
+  for(let i=0;i<todo.length && !STOP;i++){
+    if(i%5===0) status('Preparing the pictures in '+name+': '+(i+1)+' / '+todo.length+'…');
+    const p=todo[i], data=await picData(p);
+    if(data || p.type==='svg') ready.push({ p, data });
+  }
+  const st={ done:0, failed:0, last:'' };
+  const known=pics.length-todo.length;
+  for(let i=0;i<ready.length && !STOP;i+=PIC_BATCH){
+    const left=Math.ceil((ready.length-i)/PIC_BATCH);
+    status('Gemini is explaining the pictures in '+name+': '+st.done+' of '+ready.length+' done · about '+Math.max(1,Math.ceil(left*10/60))+' min left'+(known>0 ? ' ('+known+' already known)' : ''));
+    try{ await describeBatch(ready.slice(i,i+PIC_BATCH),name,cache,st); }
+    catch(e){ fail=e.message; break; }
+    savePicCache(cache);
+    if(i+PIC_BATCH<ready.length) await waitS(2500);
+  }
+  if(!fail && st.failed) fail=st.failed+' picture'+(st.failed>1 ? 's' : '')+' could not be explained ('+st.last+') — press Convert again later to try them';
+  if(STOP && !fail) fail='stopped by you — run again later to explain the rest (the ones already explained are remembered)';
+  let n=0;
+  const out=md.replace(/⟦PIC(\d+)⟧/g,(m,k)=>{
+    const p=pics[+k]; if(!p) return '';
+    const d=cache[p.key];
+    const label=p.icon ? 'Icon' : p.type==='svg' ? 'Drawing' : 'Picture';
+    if(d && !isEmptyDesc(d)){ n++; return '*['+label+': '+d+']*'; }
+    if(p.type==='img' && !/^(data:|blob:|https?:)/i.test(p.src) && !p.file) return '*['+label+': '+(p.alt || p.src.split('/').pop())+' — drop this picture file together with the page to have it explained]*';
+    if(p.alt && CTX.images) return '*[Image: '+p.alt+']*';
+    if(p.txt) return '*[Drawing with the words: '+p.txt+']*';
+    return '';
+  });
+  if(fail && !STOP) toast('Some pictures were not explained: '+fail,9000);
+  return { md:tidy(out)+(fail ? '\n\n> Some pictures were not explained: '+fail+'.\n' : ''), n };
+}
+
+/* =====================================================================
+   Quiz and game content hidden inside the code
+   ===================================================================== */
+/* data in the page's script blocks is read in a closed, sandboxed frame (it cannot touch this page) */
+let EV=null;
+function evaluator(){
+  if(EV) return EV;
+  EV=new Promise(res=>{
+    const f=document.createElement('iframe'); f.setAttribute('sandbox','allow-scripts'); f.style.display='none';
+    f.srcdoc='<scr'+'ipt>addEventListener("message",function(e){var d=e.data,r;try{var v=(new Function("\\"use strict\\";return ("+d.src+")"))();r={id:d.id,ok:true,json:JSON.stringify(v,function(k,x){return typeof x==="function"?undefined:x;})};}catch(err){r={id:d.id,ok:false};}parent.postMessage(r,"*");});<\/scr'+'ipt>';
+    f.onload=()=>res(f);
+    document.body.appendChild(f);
+  });
+  return EV;
+}
+async function evalLiteral(src){
+  const f=await evaluator(); const id=Math.random();
+  return new Promise(res=>{
+    const done=v=>{ removeEventListener('message',h); clearTimeout(t); res(v); };
+    const h=e=>{ if(e.source!==f.contentWindow || !e.data || e.data.id!==id) return; if(!e.data.ok) return done(undefined); try{ done(JSON.parse(e.data.json||'null')); }catch{ done(undefined); } };
+    addEventListener('message',h);
+    const t=setTimeout(()=>{ done(undefined); try{ f.remove(); }catch{} EV=null; },3000);
+    f.contentWindow.postMessage({ id, src },'*');
+  });
+}
+function matchBracket(code,i){
+  let depth=0, inStr=null, escNext=false;
+  for(let j=i;j<code.length;j++){
+    const c=code[j];
+    if(inStr){ if(escNext){ escNext=false; continue; } if(c==='\\'){ escNext=true; continue; } if(c===inStr) inStr=null; continue; }
+    if(c==='"' || c==="'" || c==='`'){ inStr=c; continue; }
+    if(c==='/' && code[j+1]==='/'){ const e=code.indexOf('\n',j); if(e<0) return -1; j=e; continue; }
+    if(c==='/' && code[j+1]==='*'){ const e=code.indexOf('*/',j+2); if(e<0) return -1; j=e+1; continue; }
+    if(c==='[' || c==='{' || c==='(') depth++;
+    else if(c===']' || c==='}' || c===')'){ depth--; if(depth===0) return j; }
+  }
+  return -1;
+}
+function findLiterals(code){
+  const out=[], re=/(?:\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)|\b(?:window|globalThis|self)\.([A-Za-z_$][\w$]*))\s*=\s*(?=[\[{])/g;
+  let m;
+  while((m=re.exec(code))){
+    const start=re.lastIndex, end=matchBracket(code,start);
+    if(end<0) continue;
+    const src=code.slice(start,end+1);
+    if(src.length>=40) out.push({ name:m[1]||m[2], src });
+    re.lastIndex=end+1;
+  }
+  return out;
+}
+const Q_RE=/^(q|question|questiontext|question_text|frage|prompt|stem|ask|statement|text)$/i;
+const OPT_RE=/^(options|choices|answers|antworten|optionen|opts|alternatives|a)$/i;
+const COR_RE=/^(correct|correctindex|correctidx|correctanswer|correct_answer|correctoption|correctoptions|answer|ans|solution|right|richtig|key|loesung|lösung|correctanswerindex)$/i;
+const EXP_RE=/^(explain|explanation|feedback|why|hint|reason|rationale|erklaerung|erklärung|info|tip|tipp|note|correctfeedback|wrongfeedback|feedbackcorrect|feedbackwrong)$/i;
+const TECH_RE=/^(id|key|class|classname|color|colour|bg|background|icon|emoji|img|image|src|url|href|style|x|y|w|h|width|height|size|type|kind|duration|delay|ms|speed|sound|audio|font|anim|animation|css|selector|el|ref|order|index|idx|points|score|max|min|time|timer|seed|layout|theme|variant|lang|slug|path|file)$/i;
+function keep(s){
+  s=String(s).trim();
+  if(s.length<2 || !/\p{L}/u.test(s)) return false;
+  if(/^(https?:|data:|mailto:|#|\.|\/)/i.test(s)) return false;
+  if(/^#?[0-9a-f]{3,8}$/i.test(s)) return false;
+  if(/^[\w-]+$/.test(s) && /[-_]/.test(s) && s.length<30) return false;
+  if(/[{};]\s*$/.test(s) && /[:{]/.test(s)) return false;
+  if(/^(rgba?|hsla?|var|calc|url)\(/i.test(s)) return false;
+  return true;
+}
+function optText(x){
+  if(x==null) return '';
+  if(typeof x==='string' || typeof x==='number') return stripTags(String(x));
+  if(typeof x==='object'){ for(const k of ['text','label','answer','option','title','value','content','name']) if(typeof x[k]==='string') return stripTags(x[k]); }
+  return '';
+}
+function asQuestion(o){
+  if(!o || typeof o!=='object' || Array.isArray(o)) return null;
+  const ks=Object.keys(o);
+  const qk=ks.find(k=>Q_RE.test(k) && typeof o[k]==='string' && o[k].trim().length>1);
+  if(!qk) return null;
+  const ok=ks.find(k=>OPT_RE.test(k) && Array.isArray(o[k]) && o[k].length>=2);
+  const ck=ks.find(k=>COR_RE.test(k) && k!==ok);
+  if(!ok && !(ck && (typeof o[ck]==='string' || typeof o[ck]==='boolean'))) return null;
+  if(qk.toLowerCase()==='text' && !ok) return null;
+  const opts=ok ? o[ok].map(x=>({ t:optText(x), ok:!!(x && typeof x==='object' && (x.correct===true || x.isCorrect===true || x.right===true || x.richtig===true)), fb:x && typeof x==='object' ? stripTags(x.feedback||x.explanation||x.why||x.hint||'') : '' })) : [];
+  let answer='';
+  if(ck){
+    const c=o[ck];
+    if(typeof c==='number'){ let i=c; if(!opts[i] && opts[i-1]) i=i-1; if(opts[i]) opts[i].ok=true; else answer=String(c); }
+    else if(typeof c==='string'){
+      let i=opts.findIndex(p=>norm(p.t)===norm(stripTags(c)));
+      if(i<0 && /^[A-Za-z]$/.test(c.trim())) i=c.trim().toUpperCase().charCodeAt(0)-65;
+      if(i>=0 && opts[i]) opts[i].ok=true; else answer=stripTags(c);
+    }
+    else if(Array.isArray(c)) c.forEach(v=>{ if(typeof v==='number' && opts[v]) opts[v].ok=true; else if(typeof v==='string'){ const i=opts.findIndex(p=>norm(p.t)===norm(v)); if(i>=0) opts[i].ok=true; } });
+    else if(typeof c==='boolean') answer=c ? 'True' : 'False';
+  }
+  const fb=ks.filter(k=>EXP_RE.test(k) && typeof o[k]==='string' && o[k].trim()).map(k=>({ k, t:stripTags(o[k]) }));
+  return { q:stripTags(o[qk]), opts, answer, fb };
+}
+function collect(v,name,acc,dom){
+  const qs=[], lines=[];
+  const walk=(x,depth)=>{
+    if(depth>8 || x==null) return;
+    if(Array.isArray(x)){ x.forEach(y=>walk(y,depth)); return; }
+    if(typeof x==='object'){
+      const q=asQuestion(x); if(q){ qs.push(q); return; }
+      const parts=[], nested=[];
+      for(const [k,y] of Object.entries(x)){
+        if(TECH_RE.test(k)) continue;
+        if(typeof y==='string'){ const s=stripTags(y); if(keep(s)) parts.push((/^\d+$/.test(k) ? '' : k+': ')+s); }
+        else if(y && typeof y==='object') nested.push([k,y]);
+      }
+      if(parts.length) lines.push('  '.repeat(Math.min(depth,4))+'- '+parts.join(' · '));
+      for(const [k,y] of nested){ const before=lines.length; walk(y,depth+1); if(lines.length>before && !/^\d+$/.test(k)) lines.splice(before,0,'  '.repeat(Math.min(depth,4))+'- *'+k+':*'); }
+      return;
+    }
+    if(typeof x==='string'){ const s=stripTags(x); if(keep(s) && !(s.length>=25 && dom.includes(norm(s)))) lines.push('  '.repeat(Math.min(depth,4))+'- '+s); }
+  };
+  walk(v,0);
+  acc.questions.push(...qs);
+  if(lines.length) acc.blocks.push({ name, md:lines.join('\n') });
+}
+function harvest(src,acc,dom){
+  const re=/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g; let m;
+  while((m=re.exec(src))){
+    let s=m[2]; if(m[1]==='`' && /\$\{/.test(s)) s=s.replace(/\$\{[^}]*\}/g,'…');
+    s=stripTags(s.replace(/\\n/g,' ').replace(/\\(['"`\\])/g,'$1'));
+    if(s.length<12 || !/\s/.test(s) || !keep(s)) continue;
+    if(/^[\w$.]+\s*\(|=>|function\s*\(|document\.|querySelector|addEventListener/.test(s)) continue;
+    if(dom.includes(norm(s))) continue;
+    acc.strings.add(s);
+  }
+}
+async function codeContent(scripts,dom){
+  const acc={ questions:[], blocks:[], strings:new Set() };
+  for(const s of scripts){
+    const type=(s.type||'').toLowerCase();
+    if(/json/.test(type)){ try{ collect(JSON.parse(s.code),'JSON data',acc,dom); }catch{} continue; }
+    if(/template|html/.test(type)){ const md=htmlToMd(s.code); if(md && !dom.includes(norm(md).slice(0,60))) acc.blocks.push({ name:'Template', md }); continue; }
+    if(type && !/javascript|ecmascript|module|babel|jsx/.test(type)) continue;
+    for(const L of findLiterals(s.code)){
+      let v;
+      if(!/\b(while|for)\s*\(/.test(L.src)) v=await evalLiteral(L.src);
+      if(v===undefined || v===null) harvest(L.src,acc,dom);
+      else collect(v,L.name,acc,dom);
+    }
+  }
+  const seen=new Set();
+  acc.questions=acc.questions.filter(q=>{ const k=norm(q.q); if(seen.has(k)) return false; seen.add(k); return true; });
+  return acc;
+}
+function codeToMd(acc){
+  let md='';
+  if(acc.questions.length){
+    md+='\n\n## Questions found in the code ('+acc.questions.length+')\n';
+    acc.questions.forEach((q,i)=>{
+      md+='\n**'+(i+1)+'. '+q.q+'**\n';
+      q.opts.forEach((o,j)=>{ md+='- '+String.fromCharCode(65+j)+') '+o.t+(o.ok ? ' ✅ *(correct)*' : '')+'\n'; if(o.fb) md+='  - *Feedback:* '+o.fb+'\n'; });
+      if(q.answer) md+='- *Correct answer:* '+q.answer+'\n';
+      if(q.opts.length && !q.opts.some(o=>o.ok) && !q.answer) md+='- *(No correct answer is marked in the code)*\n';
+      q.fb.forEach(f=>{ md+='- *'+f.k.charAt(0).toUpperCase()+f.k.slice(1)+':* '+f.t+'\n'; });
+    });
+  }
+  if(acc.blocks.length){
+    md+='\n\n## Other content found in the code\n';
+    for(const b of acc.blocks) md+='\n### '+b.name+'\n\n'+b.md+'\n';
+  }
+  if(acc.strings.size){
+    md+='\n\n## Other text found in the code\n\n'+[...acc.strings].map(s=>'- '+s).join('\n')+'\n';
+  }
+  return md;
+}
+
+/* =====================================================================
+   Gemini — your saved key only (other keys found on this computer are
+   used only when no key is saved); refused keys are skipped
+   ===================================================================== */
+function geminiKeys(){
+  const own=(localStorage.getItem('forge:cv:gemkey')||'').trim();
+  if(KEY_RE.test(own)) return BAD_KEYS.has(own) ? [] : [own];
+  const out=new Set();
+  try{ const s=JSON.parse(localStorage.getItem('forge:qs:keys')||'null'); if(s && Array.isArray(s.gem)) s.gem.forEach(k=>{ k=String(k||'').trim(); if(KEY_RE.test(k)) out.add(k); }); }catch{}
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i); if(!k || k==='forge:cv:pics') continue;
+    const v=localStorage.getItem(k)||''; if(v.length>300000) continue;
+    (v.match(KEY_SCAN)||[]).forEach(x=>{ x=x.replace(/\.+$/,''); if(KEY_RE.test(x)) out.add(x); });
+  }
+  return [...out].filter(k=>!BAD_KEYS.has(k)).slice(0,3);
+}
+function retryDelay(j){
+  try{ const d=((j.error||{}).details||[]).find(x=>String(x['@type']||'').includes('RetryInfo')); if(d && d.retryDelay){ const s=parseFloat(d.retryDelay); if(s>0) return s*1000; } }catch{}
+  return 0;
+}
+/* fast list for pictures: thinking switched off; the first one that works is remembered */
+const MODELS_FAST=[['gemini-2.5-flash',{ thinkingBudget:0 }],['gemini-flash-latest',{ thinkingLevel:'low' }],['gemini-flash-latest',null],['gemini-2.0-flash',null]];
+const MODELS_TEXT=[['gemini-flash-latest',null],['gemini-2.5-flash',null],['gemini-2.0-flash',null]];
+let FAST_OK=-1;
+async function askGeminiParts(parts,json,fast){
+  let last='';
+  const list=fast ? (FAST_OK>=0 ? [MODELS_FAST[FAST_OK]].concat(MODELS_FAST.filter((x,i)=>i!==FAST_OK)) : MODELS_FAST) : MODELS_TEXT;
+  for(let round=0;round<6;round++){
+    if(STOP) throw new Error('stopped by you');
+    const keys=geminiKeys();
+    if(!keys.length) throw new Error(last || 'no working Gemini key on this page (paste it in the key box and press Save key)');
+    let busy=false, wait=0;
+    for(const key of keys){
+      for(const [model,think] of list){
+        if(STOP) throw new Error('stopped by you');
+        const ac=new AbortController(), to=setTimeout(()=>ac.abort(),fast ? 75000 : 120000);
+        try{
+          const cfg={ temperature:0.1 }; if(json) cfg.responseMimeType='application/json'; if(think) cfg.thinkingConfig=think;
+          const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{ method:'POST', signal:ac.signal, headers:{ 'Content-Type':'application/json', 'x-goog-api-key':key }, body:JSON.stringify({ contents:[{ role:'user', parts }], generationConfig:cfg }) });
+          clearTimeout(to);
+          if(r.status===404) continue;
+          let j=null; try{ j=await r.json(); }catch{}
+          if(r.status===429 || r.status===503 || r.status===500){ busy=true; wait=Math.max(wait,retryDelay(j||{})); last='Gemini is busy ('+r.status+')'; break; }
+          const why=((j && j.error) || {}).message || '';
+          if(r.status===401 || r.status===403 || (r.status===400 && /api key|api_key|credential|unauthenticated|permission/i.test(why))){
+            BAD_KEYS.add(key); last='Gemini refused the key ending …'+key.slice(-4)+' ('+r.status+(why ? ': '+why.slice(0,140) : '')+'). Check the key, or make a new one at aistudio.google.com'; break;
+          }
+          if(r.status===400){ last='Gemini could not read this request (400'+(why ? ': '+why.slice(0,140) : '')+')'; continue; }
+          if(!r.ok){ last='Gemini answered '+r.status; break; }
+          const t=((((j && j.candidates)||[])[0]||{}).content||{}).parts||[];
+          const txt=t.filter(p=>!p.thought).map(p=>p.text||'').join('').trim();
+          if(txt){ if(fast) FAST_OK=MODELS_FAST.findIndex(x=>x[0]===model && x[1]===think); return txt; }
+          last='Gemini gave an empty answer'; continue;
+        }catch(e){
+          clearTimeout(to);
+          if(e.name==='AbortError') throw new Error('Gemini took too long to answer');
+          last=e.message;
+        }
+      }
+    }
+    if(!busy) break;
+    const ms=Math.min(65000,Math.max(8000,wait||20000));
+    const prev=$('progTxt').textContent;
+    await waitS(ms,'Gemini is busy (a free key allows only a few requests per minute). Trying again in {s} s…');
+    if(!STOP) status(prev);
+  }
+  throw new Error(last||'Gemini did not answer');
+}
+async function askGemini(prompt){ return await askGeminiParts([{ text:prompt }],false,false); }
+async function aiRead(item){
+  const code=item.scripts.map(s=>s.code).join('\n\n').slice(0,120000);
+  if(code.trim().length<200) return '';
+  const prompt='Below is the JavaScript code of a teaching page ("'+item.name+'"). List EVERY piece of learner-facing content that the code contains: quiz questions with all answer options (mark the correct one with ✅), feedback texts, explanations, hints, game levels, tasks, messages shown to the learner. Copy the wording EXACTLY as written in the code. Do not add, explain, translate or invent anything. Skip technical things (colours, CSS, function names). Output clean Markdown only.\n\nCODE:\n'+code;
+  return await askGemini(prompt);
+}
+
+/* =====================================================================
+   Files (sorted by number or Day, then theory, deck, practical, quiz, game)
+   ===================================================================== */
+const FILES=[];
+function kindOf(name){ const e=name.split('.').pop().toLowerCase(); return { html:'html', htm:'html', md:'md', markdown:'md', txt:'txt', docx:'docx', csv:'csv', tsv:'csv', json:'json', png:'img', jpg:'img', jpeg:'img', webp:'img', gif:'img', svg:'img', bmp:'img' }[e]||''; }
+const TYPE_RANK=[[/theory/i,1],[/deck|slides?/i,2],[/practical/i,3],[/quiz/i,4],[/game/i,5]];
+function sortKey(n){
+  const lead=n.match(/^\s*(\d+)/), day=n.match(/day[\s_-]*(\d+)/i);
+  const r=(TYPE_RANK.find(x=>x[0].test(n))||[null,6])[1];
+  return (lead ? +lead[1] : day ? +day[1] : 999)*10+r;
+}
+async function addFiles(list){
+  const fresh=[...list].filter(f=>{ if(!kindOf(f.name)){ toast(f.name+': this file type comes in v2'); return false; } return true; });
+  for(const f of fresh){ const it={ id:Math.random().toString(36).slice(2), file:f, name:f.name, kind:kindOf(f.name), state:'reading…', md:'', html:'', text:'', scripts:[], info:'' }; FILES.push(it); prepare(it); }
+  FILES.sort((a,b)=>(a.kind==='img')-(b.kind==='img') || sortKey(a.name)-sortKey(b.name) || a.name.localeCompare(b.name));
+  renderFiles();
+}
+let MAMMOTH=null;
+function loadMammoth(){ if(window.mammoth) return Promise.resolve(); if(!MAMMOTH) MAMMOTH=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/mammoth@1/mammoth.browser.min.js'; s.onload=res; s.onerror=()=>{ MAMMOTH=null; rej(new Error('the Word reader could not load (check the internet)')); }; document.head.appendChild(s); }); return MAMMOTH; }
+function csvToMd(text,name){
+  const first=text.split('\n')[0]||'';
+  const sep=/\.tsv$/i.test(name) ? '\t' : (first.split(';').length>first.split(',').length ? ';' : ',');
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ cell+='"'; i++; } else q=false; } else cell+=c; continue; }
+    if(c==='"') q=true; else if(c===sep){ row.push(cell); cell=''; } else if(c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; } else if(c!=='\r') cell+=c;
+  }
+  if(cell || row.length){ row.push(cell); rows.push(row); }
+  const g=rows.filter(r=>r.some(x=>x.trim())).map(r=>r.map(x=>oneLine(x).replace(/\|/g,'\\|')));
+  if(!g.length) return '';
+  const w=Math.max(...g.map(r=>r.length)), pad=r=>{ const x=r.slice(); while(x.length<w) x.push(''); return x; };
+  return '| '+pad(g[0]).join(' | ')+' |\n|'+pad(g[0]).map(()=>' --- ').join('|')+'|\n'+g.slice(1).map(r=>'| '+pad(r).join(' | ')+' |').join('\n');
+}
+async function prepare(it){
+  try{
+    if(it.kind==='html'){
+      it.text=await it.file.text();
+      const doc=new DOMParser().parseFromString(it.text,'text/html');
+      it.title=(doc.title||'').trim();
+      it.scripts=[...doc.querySelectorAll('script')].filter(s=>!s.src).map(s=>({ type:s.getAttribute('type')||'', code:s.textContent }));
+      it.html=it.text;
+      const np=doc.querySelectorAll('img,svg,canvas').length;
+      it.state='✓ ready'; it.info=[it.scripts.length ? it.scripts.length+' code block'+(it.scripts.length>1 ? 's' : '') : '', np ? np+' pictures' : ''].filter(Boolean).join(' · ');
+    }else if(it.kind==='md' || it.kind==='txt'){ it.text=await it.file.text(); it.md=it.text; it.state='✓ ready'; }
+    else if(it.kind==='docx'){ await loadMammoth(); const r=await window.mammoth.convertToHtml({ arrayBuffer:await it.file.arrayBuffer() }); it.html=r.value; CTX.images=true; CTX.links=true; CTX.vision=false; it.md=htmlToMd(r.value); it.state='✓ ready'; }
+    else if(it.kind==='csv'){ it.text=await it.file.text(); it.md=csvToMd(it.text,it.name); it.state='✓ ready'; }
+    else if(it.kind==='json'){
+      it.text=await it.file.text(); let v=null; try{ v=JSON.parse(it.text); }catch{}
+      if(v===null) it.md='```\n'+it.text+'\n```';
+      else{ const acc={ questions:[], blocks:[], strings:new Set() }; collect(v,'Data',acc,''); it.md=codeToMd(acc).replace(/^\s*## Other content found in the code\s*/,'').trim() || '```json\n'+JSON.stringify(v,null,2)+'\n```'; }
+      it.state='✓ ready';
+    }
+    else if(it.kind==='img'){ it.state='✓ picture'; }
+  }catch(e){ console.error(e); it.state='✕ '+e.message; }
+  renderFiles();
+}
+function renderFiles(){
+  $('files').innerHTML=FILES.map((f,i)=>'<div class="file" data-id="'+f.id+'"><span class="n">'+(i+1)+'</span><span class="nm" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="st '+(f.state.startsWith('✓') ? 'ok' : f.state.startsWith('✕') ? 'bad' : '')+'">'+esc(f.state)+(f.info ? ' · '+esc(f.info) : '')+'</span><button data-a="up" title="Move up">↑</button><button data-a="down" title="Move down">↓</button><button data-a="pdf" title="Print this file as PDF">🖨</button><button data-a="del" title="Remove">✕</button></div>').join('');
+  $('fileHint').classList.toggle('hidden',!FILES.length);
+}
+$('files').addEventListener('click',e=>{
+  const b=e.target.closest('button'), row=e.target.closest('.file'); if(!b || !row) return;
+  const i=FILES.findIndex(f=>f.id===row.dataset.id); if(i<0) return;
+  if(b.dataset.a==='up' && i>0){ [FILES[i-1],FILES[i]]=[FILES[i],FILES[i-1]]; }
+  if(b.dataset.a==='down' && i<FILES.length-1){ [FILES[i+1],FILES[i]]=[FILES[i],FILES[i+1]]; }
+  if(b.dataset.a==='del') FILES.splice(i,1);
+  if(b.dataset.a==='pdf') printItem(FILES[i]);
+  renderFiles();
+});
+$('clearBtn').onclick=()=>{ FILES.length=0; renderFiles(); $('out').value=''; $('stats').textContent='Drop your files, then press Convert. Or paste text in the Quick checklist box.'; };
+const drop=$('drop');
+$('fileIn').onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); });
+
+/* =====================================================================
+   Converting
+   ===================================================================== */
+let HAS_KEY=false;
+async function imgFileToMd(it,opt){
+  if(!(opt.vis && HAS_KEY) || STOP) return { md:'*[Picture file: '+it.name+']*', count:'' };
+  CTX.images=opt.img;
+  const u=URL.createObjectURL(it.file);
+  CTX.pics=[{ type:'img', src:u, localKey:'file:'+it.name+':'+it.file.size, w:0, h:0, alt:'', near:'', icon:false }];
+  const r=await explainPics('⟦PIC0⟧',CTX.pics,it.name);
+  URL.revokeObjectURL(u);
+  return { md:r.md, count:r.n ? 'picture explained' : '' };
+}
+async function itemToMd(it,opt){
+  if(it.kind==='img') return await imgFileToMd(it,opt);
+  const vision=opt.vis && HAS_KEY && !STOP;
+  if(it.kind!=='html' && !(it.kind==='docx' && vision)) return { md:it.md, count:'' };
+  CTX.images=opt.img; CTX.links=opt.links; CTX.vision=vision; CTX.pics=[]; CTX.near=''; CTX.css='';
+  let src=it.kind==='docx' ? it.html : it.text, live=false;
+  if(vision && it.kind==='html'){
+    status('Opening '+it.name+' to see its pictures and drawings…');
+    const s=await liveSnapshot(it.text);
+    if(s){ src=s; live=true; }
+  }
+  const doc=new DOMParser().parseFromString(src,'text/html');
+  if(vision && !live) CTX.css=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n').slice(0,150000);
+  doc.querySelectorAll('script,style,noscript,template').forEach(n=>n.remove());
+  CTX.slide=0;
+  status('Reading the text of '+it.name+'…');
+  const body=tidy(conv(doc.body||doc.documentElement));
+  const slides=CTX.slide;
+  let code='', nq=0;
+  if(it.kind==='html' && opt.code && it.scripts.length){
+    status('Finding quiz and game content in '+it.name+'…');
+    const acc=await codeContent(it.scripts,norm(doc.body ? doc.body.textContent : ''));
+    nq=acc.questions.length; code=codeToMd(acc);
+  }
+  let ai='';
+  if(it.kind==='html' && opt.ai && HAS_KEY && !STOP){
+    status('Gemini is reading all the code of '+it.name+' (slow)…');
+    try{ const r=await aiRead(it); if(r) ai='\n\n## Gemini reading of the code (check only, written by AI)\n\n> This part was listed by Gemini from the code. Compare it with the content above.\n\n'+r.replace(/^#\s/gm,'### ').replace(/^##\s/gm,'### '); }
+    catch(e){ ai='\n\n> Gemini check skipped: '+e.message+'.\n'; }
+  }
+  let md=body+(code ? '\n'+code : '')+ai, np=0;
+  if(CTX.pics.length){ const r=await explainPics(md,CTX.pics,it.name); md=r.md; np=r.n; }
+  CTX.vision=false;
+  const count=[slides ? slides+' slides' : '', nq ? nq+' questions from the code' : '', np ? np+' pictures and icons explained' : ''].filter(Boolean).join(' · ');
+  return { md, count };
+}
+function header(it,i){
+  const t=it.title && it.title!==it.name ? '\n\n*Page title: '+it.title+'*' : '';
+  return '# File '+(i+1)+': '+it.name+t+'\n\n';
+}
+const AI_NOTE='> Words inside *[Picture: …]*, *[Drawing: …]* and *[Icon: …]* were written by Gemini after looking at the pictures. Everything else is copied from your files.\n';
+function dateStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function baseName(n){ return n.replace(/\.[^.]+$/,''); }
+let LAST={ name:'converted' };
+$('goBtn').onclick=async()=>{
+  if(!FILES.length){
+    if($('mode').value==='check' && $('pasteIn').value.trim()) return $('pasteCheck').click();
+    return toast('Drop your files first (or paste text in the Quick checklist box)');
+  }
+  if(FILES.some(f=>!f.state.startsWith('✓') && !f.state.startsWith('✕'))) return toast('Still reading your files, one moment');
+  const ready=FILES.filter(f=>f.state.startsWith('✓'));
+  if(!ready.length) return toast('None of the files could be read');
+  const mode=$('mode').value, opt={ vis:$('optVis').checked, code:$('optCode').checked, img:$('optImg').checked, links:$('optLinks').checked, toc:$('optToc').checked, ai:$('optAI').checked };
+  if(mode==='check'){
+    const docs=ready.filter(f=>f.kind!=='img');
+    if(!docs.length) return toast('Pictures cannot become a checklist. Add text or files with text.');
+    const parts=docs.map(it=>{
+      let t=it.md;
+      if(it.kind==='html'){ CTX.vision=false; CTX.images=false; CTX.links=false; t=htmlToMd(it.text); }
+      return docs.length>1 ? '# '+baseName(it.name)+'\n\n'+t : t;
+    });
+    const text=(docs.length>1 ? '# Checklist · '+dateStr()+'\n\n' : '')+parts.join('\n\n');
+    if(makeChecklist(text)) toast('✓ Checklist downloaded. Open it to tick off as you go.',5000);
+    return;
+  }
+  HAS_KEY=geminiKeys().length>0;
+  if((opt.vis || opt.ai) && !HAS_KEY && (mode==='pack' || mode==='each')){
+    keyUI(); $('gemKey').focus();
+    return toast('First paste your Gemini key in the box under "Explain every picture" and press Save key. Or untick that box to convert without pictures.',8000);
+  }
+  STOP=false;
+  $('goBtn').disabled=true; $('goBtn').textContent='Converting…';
+  $('prog').classList.remove('hidden'); status('Starting…');
+  try{
+    if(mode==='pack' || mode==='each'){
+      FILES.forEach(f=>f.used=false);
+      const parts=new Array(ready.length), counts=new Array(ready.length);
+      const order=[...ready.keys()].sort((a,b)=>(ready[a].kind==='img')-(ready[b].kind==='img') || a-b);
+      let k=0;
+      for(const i of order){
+        k++;
+        if(ready[i].kind==='img' && ready[i].used){ parts[i]=null; continue; }
+        status('File '+k+' of '+order.length+': '+ready[i].name+'…');
+        const r=await itemToMd(ready[i],opt); parts[i]=r.md; counts[i]=r.count;
+      }
+      const keepIdx=ready.map((f,i)=>i).filter(i=>parts[i]!==null);
+      const anyPics=keepIdx.some(i=>/explained/.test(counts[i]||''));
+      if(mode==='pack'){
+        let md='# Course pack · '+dateStr()+'\n\n> Content only (no code), made with StoryForge Converter v1.8 for review in NotebookLM.\n'+(anyPics ? AI_NOTE : '');
+        if(opt.toc) md+='\n'+keepIdx.map((i,j)=>(j+1)+'. '+ready[i].name+(counts[i] ? ' ('+counts[i]+')' : '')).join('\n')+'\n';
+        keepIdx.forEach((i,j)=>{ md+='\n\n---\n\n'+header(ready[i],j)+parts[i]+'\n'; });
+        $('out').value=tidy(md)+'\n';
+        const first=ready[keepIdx[0]];
+        LAST={ name:'Course-pack-'+(baseName(first.name).replace(/^\d+[_\-\s]*/,'')||'files')+'-'+dateStr() };
+        showStats(keepIdx.map(i=>counts[i]));
+      }else{
+        let lastMd='';
+        for(const i of keepIdx){
+          const one=tidy(header(ready[i],0).replace('File 1: ','')+(/explained/.test(counts[i]||'') ? AI_NOTE+'\n' : '')+parts[i])+'\n';
+          download(new Blob([one],{ type:'text/markdown' }),baseName(ready[i].name)+'.md'); lastMd=one; await sleep(700);
+        }
+        $('out').value=lastMd;
+        LAST={ name:baseName(ready[keepIdx[keepIdx.length-1]].name) };
+        showStats(keepIdx.map(i=>counts[i])); toast('✓ '+keepIdx.length+' Markdown files downloaded (if Chrome asks, allow several downloads)',6000);
+      }
+      if(STOP) toast('Stopped. Your Markdown is ready with everything done so far. Press Convert again later to explain the remaining pictures — the ones already explained are remembered.',9000);
+      else toast('✓ Done',3000);
+    }else if(mode==='html'){
+      let n=0;
+      for(const it of ready){ if(it.kind==='html' || it.kind==='img') continue; download(new Blob([styledHtml(it.md,baseName(it.name))],{ type:'text/html' }),baseName(it.name)+'.html'); n++; await sleep(600); }
+      toast(n ? '✓ '+n+' HTML page'+(n>1 ? 's' : '')+' downloaded' : 'HTML files are already HTML. Choose Markdown or PDF for them.',5000);
+    }else if(mode==='pdf'){
+      for(const it of ready){ printItem(it); await sleep(900); }
+    }
+  }catch(e){ console.error(e); toast('Something went wrong: '+e.message,6000); }
+  finally{ CTX.vision=false; STOP=false; $('prog').classList.add('hidden'); $('goBtn').disabled=false; $('goBtn').textContent='⇄ Convert'; }
+};
+function showStats(counts){
+  const md=$('out').value, words=(md.match(/\S+/g)||[]).length;
+  const extra=counts.filter(Boolean).join(' · ');
+  $('stats').innerHTML='✓ <b>'+words.toLocaleString()+'</b> words · <b>'+(md.length/1024).toFixed(0)+' KB</b>'+(extra ? ' · '+esc(extra) : '')+'. Read it through, change anything you like, then download.';
+}
+
+/* ---------- outputs ---------- */
+function download(blob,name){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); }
+function styledHtml(md,title){
+  const body=window.marked ? window.marked.parse(md) : '<pre>'+esc(md)+'</pre>';
+  const H='he'+'ad', B='bo'+'dy', HT='ht'+'ml';
+  return '<!DOCTYPE '+HT+'><'+HT+' lang="en"><'+H+'><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>'+esc(title)+'</title><style>'
+    +'body{max-width:860px;margin:40px auto;padding:0 22px;font:17px/1.65 "Segoe UI",Roboto,Arial,sans-serif;color:#1d2433;background:#fff}'
+    +'h1,h2,h3,h4{line-height:1.25;color:#0f172a}h1{border-bottom:3px solid #E9C46A;padding-bottom:6px}'
+    +'table{border-collapse:collapse;margin:14px 0;width:100%}td,th{border:1px solid #cfd6e3;padding:7px 10px;vertical-align:top}th{background:#f3f6fb;text-align:left}'
+    +'code{background:#f2f4f8;padding:1px 5px;border-radius:4px;font-size:.92em}pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:8px;overflow:auto}pre code{background:none;color:inherit}'
+    +'blockquote{border-left:4px solid #E9C46A;margin:12px 0;padding:4px 14px;color:#475569;background:#fffbea}img{max-width:100%}hr{border:0;border-top:1px solid #dde3ee;margin:28px 0}'
+    +'@media print{body{margin:0 auto;font-size:12pt}h1,h2,h3{page-break-after:avoid}pre,table,blockquote{page-break-inside:avoid}}'
+    +'</style></'+H+'><'+B+'>'+body+'</'+B+'></'+HT+'>';
+}
+function printHtml(html){
+  const w=window.open(URL.createObjectURL(new Blob([html],{ type:'text/html' })),'_blank');
+  if(!w){ toast('Allow pop-ups for this page (click the icon at the right of the address bar), then try again.',6000); return; }
+  w.addEventListener('load',()=>setTimeout(()=>{ try{ w.focus(); w.print(); }catch{ toast('Press Ctrl + P in the new tab and choose "Save as PDF".',6000); } },700));
+}
+function printItem(it){
+  if(!it || !it.state.startsWith('✓')) return;
+  if(it.kind==='img'){ window.open(URL.createObjectURL(it.file),'_blank'); return; }
+  if(it.kind==='html') printHtml(it.text);
+  else printHtml(styledHtml(it.md,baseName(it.name)));
+}
+$('dlMd').onclick=()=>{ const t=$('out').value; if(!t.trim()) return toast('Convert something first'); download(new Blob([t],{ type:'text/markdown' }),LAST.name+'.md'); };
+$('dlTxt').onclick=()=>{ const t=$('out').value; if(!t.trim()) return toast('Convert something first'); download(new Blob([t],{ type:'text/plain' }),LAST.name+'.txt'); };
+$('dlHtml').onclick=()=>{ const t=$('out').value; if(!t.trim()) return toast('Convert something first'); download(new Blob([styledHtml(t,LAST.name)],{ type:'text/html' }),LAST.name+'.html'); };
+$('pdfOut').onclick=()=>{ const t=$('out').value; if(!t.trim()) return toast('Convert something first'); printHtml(styledHtml(t,LAST.name)); };
+$('copyBtn').onclick=async()=>{ try{ await navigator.clipboard.writeText($('out').value); toast('Copied'); }catch{ $('out').select(); toast('Press Ctrl + C'); } };
+
+modeUI(); renderFiles(); keyUI();
+</script>
+</body>
+</html>

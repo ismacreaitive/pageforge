@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<!-- timeline.html — v4 — StoryForge Pack 2 · 🕰️ Timeline.
+v4: added example presets (Channel growth / 5 Pillars / Steps of Wudu) — clicking one fills every event
+field at once so you can preview immediately instead of staring at blank cards. The 5 Pillars and Wudu
+presets are standard, widely-taught structural knowledge (not verbatim scripture quoting, so no sourcing
+risk the way Dua/Hadith content needs); edit or clear anything after loading. Also removed the 3 default
+blank events on open — now the setup starts empty, pointing you at the presets or "+ Add an event" instead
+of an unexplained blank form.
+v3: reorder (↑/↓), smart date-pattern "Suggest" button, milestone flag (⭐, bigger dot + longer hold),
+auto-pace hold time by content length, live mini-rail preview, sort-by-date, optional position counter.
+v2: three fully independent per-shape layout functions (Tall/Wide/Square) with auto-shrinking text.
+v1: original rebuild — engine, rail concept, motion styles, intro/countdown/outro, PNG+REC. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Timeline</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%;min-height:50px;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+.daterow{display:flex;gap:8px;margin-top:8px;align-items:center}
+.daterow input{flex:1}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn.small{width:auto;padding:6px 10px;font-size:13px}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.scenehead{display:flex;gap:6px;align-items:center}
+.scenehead b{flex:1}
+.quickrow{display:flex;gap:8px;margin-top:8px}
+.quickrow .btn{flex:1}
+#miniRail{display:flex;align-items:center;margin:4px 0 2px;min-height:20px}
+.mdot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:0 0 auto}
+.mdot.ms{background:var(--accent);width:14px;height:14px;box-shadow:0 0 6px var(--accent)}
+.mline{flex:1 1 auto;height:2px;background:var(--line);margin:0 3px;min-width:6px}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🕰️ Timeline <small>v4</small></h1>
+  <small>Each event plays as its own scene, with a rail showing where you are in the sequence.</small>
+
+  <div class="card">
+    <h2>Events</h2>
+    <small id="sceneHint">Pick an example to see what this tool produces, or add your own below.</small>
+    <div class="pills" id="presetPills" style="margin-top:8px">
+      <div class="p" data-preset="channel">📈 Channel growth</div>
+      <div class="p" data-preset="pillars">🕌 5 Pillars</div>
+      <div class="p" data-preset="wudu">💧 Steps of Wudu</div>
+    </div>
+    <small style="display:block;margin-top:6px">Loads a complete example so you can preview it straight away — edit or replace anything after.</small>
+    <div id="miniRail"></div>
+    <div id="scenesContainer"></div>
+    <div class="quickrow" style="margin-top:8px">
+      <button class="btn gold" id="addSceneBtn" type="button">+ Add an event</button>
+      <button class="btn" id="quickAddBtn" type="button">+ Add 5 blank</button>
+      <button class="btn" id="sortByDateBtn" type="button">↕ Sort by date</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro (optional)</h2>
+    <small>Leave either blank to skip it.</small>
+    <input id="introText" placeholder="Intro text (optional)" style="margin-top:8px">
+    <input id="outroText" placeholder="Outro text (optional)" style="margin-top:8px">
+    <div class="checkrow">
+      <input type="checkbox" id="showCountdown">
+      <label for="showCountdown">Show 3-2-1 countdown before the first event</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Colour theme</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing, shape &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="fade">Fade in</option><option value="slide">Slide in</option><option value="pop">Pop / bounce in</option></select>
+    </div>
+    <div class="checkrow">
+      <input type="checkbox" id="autoPace" checked>
+      <label for="autoPace">Auto-pace hold time by how much text each event has</label>
+    </div>
+    <div id="fixedHoldRow" class="hidden" style="margin-top:8px">
+      <small>Fixed hold per event: <span id="fixedHoldLabel">3.2s</span></small>
+      <input type="range" id="fixedHold" min="1.5" max="6" step="0.5" value="3.2">
+    </div>
+    <div class="checkrow">
+      <input type="checkbox" id="showCounter">
+      <label for="showCounter">Show "X / Y" position counter near the rail</label>
+    </div>
+    <small style="margin-top:10px;display:block">Sound when each event arrives:</small>
+    <select id="completeSfx" style="margin-top:6px">
+      <option value="tick">🔘 Soft tick</option>
+      <option value="chime">🔔 Chime</option>
+      <option value="none">🔇 No sound</option>
+    </select>
+    <small style="margin-top:8px;display:block">Background music (optional):</small>
+    <div class="row" style="margin-top:6px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+function escapeAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', accentLight:'#e9cf78', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', accentLight:'#c3dcff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', accentLight:'#f3c594', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', accentLight:'#f3c3d0', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+const FADE=300;
+
+/* ===== scene management ===== */
+function suggestNextDateFor(el){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const idx=blocks.indexOf(el);
+  const priorDates=blocks.slice(0,idx).map(b=>b.querySelector('[data-date]').value.trim()).filter(Boolean);
+  if(!priorDates.length) return 'Step 1';
+  const last=priorDates[priorDates.length-1];
+  const m=last.match(/^(.*?)(\d+)(\D*)$/);
+  if(m){
+    const prefix=m[1], num=parseInt(m[2],10), suffix=m[3];
+    let step=1;
+    if(priorDates.length>=2){
+      const prev=priorDates[priorDates.length-2];
+      const m2=prev.match(/^(.*?)(\d+)(\D*)$/);
+      if(m2 && m2[1]===prefix && m2[3]===suffix){
+        const s=num-parseInt(m2[2],10);
+        if(Number.isFinite(s) && s!==0) step=s;
+      }
+    }
+    return prefix+(num+step)+suffix;
+  }
+  return 'Step '+(priorDates.length+1);
+}
+
+function addScene(date, title, desc){
+  const el=document.createElement('div');
+  el.className='card'; el.style.background='var(--panel2)'; el.dataset.scene='1';
+  el.innerHTML =
+    '<div class="scenehead"><b>Event <span class="sceneNum"></span></b>'+
+    '<button class="btn small" type="button" data-up title="Move up">↑</button>'+
+    '<button class="btn small" type="button" data-down title="Move down">↓</button>'+
+    '<button class="btn small" type="button" data-remove>Remove</button></div>'+
+    '<div class="daterow"><input data-date placeholder="Date / step label (e.g. 2021, or Step 1)" value="'+escapeAttr(date||'')+'">'+
+    '<button class="btn small" type="button" data-suggest>✨ Suggest</button></div>'+
+    '<div class="row"><input data-title placeholder="Title" value="'+escapeAttr(title||'')+'"></div>'+
+    '<div class="row"><textarea data-desc placeholder="Description (optional)">'+escapeAttr(desc||'')+'</textarea></div>'+
+    '<div class="checkrow"><input type="checkbox" data-showdesc checked><label>Show description</label></div>'+
+    '<div class="checkrow"><input type="checkbox" data-milestone><label>⭐ Mark as milestone (bigger emphasis + longer hold)</label></div>';
+
+  el.querySelector('[data-remove]').onclick=()=>{ el.remove(); renumberScenes(); };
+  el.querySelector('[data-up]').onclick=()=>{ const prev=el.previousElementSibling; if(prev){ $('scenesContainer').insertBefore(el, prev); renumberScenes(); } };
+  el.querySelector('[data-down]').onclick=()=>{ const next=el.nextElementSibling; if(next){ $('scenesContainer').insertBefore(next, el); renumberScenes(); } };
+  el.querySelector('[data-milestone]').addEventListener('change', updateMiniRail);
+  el.querySelector('[data-suggest]').onclick=()=>{
+    const dateInput=el.querySelector('[data-date]');
+    if(dateInput.value.trim()){ toast('Clear the field first to get a new suggestion'); return; }
+    dateInput.value=suggestNextDateFor(el);
+    toast('✓ Suggested — edit freely if it\'s not right');
+  };
+
+  $('scenesContainer').appendChild(el);
+  renumberScenes();
+  return el;
+}
+function renumberScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  blocks.forEach((b,i)=>{
+    b.querySelector('.sceneNum').textContent=String(i+1);
+    b.querySelector('[data-remove]').style.display = blocks.length>1 ? '' : 'none';
+    b.querySelector('[data-up]').style.visibility = i===0 ? 'hidden':'visible';
+    b.querySelector('[data-down]').style.visibility = i===blocks.length-1 ? 'hidden':'visible';
+  });
+  updateMiniRail();
+}
+function updateMiniRail(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const wrap=$('miniRail'); wrap.innerHTML='';
+  blocks.forEach((b,i)=>{
+    const isMs=b.querySelector('[data-milestone]').checked;
+    const dot=document.createElement('div'); dot.className='mdot'+(isMs?' ms':''); dot.title='Event '+(i+1);
+    wrap.appendChild(dot);
+    if(i<blocks.length-1){ const ln=document.createElement('div'); ln.className='mline'; wrap.appendChild(ln); }
+  });
+}
+$('addSceneBtn').onclick=()=>{ addScene('','',''); toast('✓ Event added'); };
+$('quickAddBtn').onclick=()=>{ for(let i=0;i<5;i++) addScene('','',''); toast('✓ Added 5 blank events'); };
+$('sortByDateBtn').onclick=()=>{
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const parsed=blocks.map(b=>{
+    const v=b.querySelector('[data-date]').value.trim();
+    const m=v.match(/(\d+)/);
+    return { el:b, num: m?parseInt(m[1],10):null };
+  });
+  const numeric=parsed.filter(p=>p.num!==null);
+  if(numeric.length<2){ toast('Needs at least 2 events with a number in their date/step field to sort'); return; }
+  parsed.sort((a,b)=>{ if(a.num===null) return 1; if(b.num===null) return -1; return a.num-b.num; });
+  parsed.forEach(p=>$('scenesContainer').appendChild(p.el));
+  renumberScenes();
+  toast('✓ Sorted by date/number');
+};
+
+/* ===== example presets ===== */
+const PRESETS={
+  channel:{ intro:"Every big channel starts with one video", outro:"What's your next milestone?", events:[
+    {date:"2023", title:"Started Ummah Digital", desc:"Posted the first reminder video with just a phone and a prayer.", milestone:false},
+    {date:"2024", title:"Hit 10K followers", desc:"Consistency on short clips started paying off.", milestone:true},
+    {date:"2024", title:"Launched CreAItive EDGE", desc:"A second channel for behind-the-scenes and tutorials.", milestone:false},
+    {date:"2025", title:"100K total reach", desc:"Monthly reminders now reaching more people than ever.", milestone:true},
+    {date:"2026", title:"Built StoryForge", desc:"A full toolkit to make every video faster and sharper.", milestone:false}
+  ]},
+  pillars:{ intro:"The Five Pillars of Islam", outro:"The foundation every Muslim builds upon", events:[
+    {date:"1", title:"Shahada", desc:"The declaration of faith — there is no god but Allah, and Muhammad is His messenger.", milestone:false},
+    {date:"2", title:"Salah", desc:"Performing the five daily prayers.", milestone:false},
+    {date:"3", title:"Zakat", desc:"Giving a portion of wealth to those in need.", milestone:false},
+    {date:"4", title:"Sawm", desc:"Fasting during the month of Ramadan.", milestone:false},
+    {date:"5", title:"Hajj", desc:"The pilgrimage to Makkah, for those who are able.", milestone:false}
+  ]},
+  wudu:{ intro:"How to perform Wudu", outro:"Your prayer is ready", events:[
+    {date:"Step 1", title:"Make the intention", desc:"Niyyah — intend in your heart to purify yourself for prayer.", milestone:false},
+    {date:"Step 2", title:"Wash the hands", desc:"Three times, up to the wrists.", milestone:false},
+    {date:"Step 3", title:"Rinse the mouth and nose", desc:"Three times each.", milestone:false},
+    {date:"Step 4", title:"Wash the face", desc:"Three times, from hairline to chin, ear to ear.", milestone:false},
+    {date:"Step 5", title:"Wash the arms", desc:"To the elbows, right then left, three times.", milestone:false},
+    {date:"Step 6", title:"Wipe the head and ears", desc:"Once, with wet hands.", milestone:false},
+    {date:"Step 7", title:"Wash the feet", desc:"To the ankles, right then left, three times.", milestone:true}
+  ]}
+};
+function loadPreset(key){
+  const preset=PRESETS[key]; if(!preset) return;
+  const hasContent=[...$('scenesContainer').querySelectorAll('[data-scene]')].some(b=>b.querySelector('[data-title]').value.trim()||b.querySelector('[data-date]').value.trim());
+  if(hasContent && !confirm('Replace your current events with this example?')) return;
+  $('scenesContainer').innerHTML='';
+  preset.events.forEach(e=>{
+    const el=addScene(e.date, e.title, e.desc);
+    el.querySelector('[data-milestone]').checked=!!e.milestone;
+  });
+  $('introText').value=preset.intro;
+  $('outroText').value=preset.outro;
+  updateMiniRail();
+  toast('✓ Example loaded — hit Preview, then edit or clear anything you like');
+}
+$('presetPills').addEventListener('click', e=>{
+  const p=e.target.closest('.p'); if(!p) return;
+  loadPreset(p.dataset.preset);
+});
+
+function collectScenes(){
+  const blocks=[...$('scenesContainer').querySelectorAll('[data-scene]')];
+  const scenes=[];
+  blocks.forEach(b=>{
+    const title=b.querySelector('[data-title]').value.trim();
+    const date=b.querySelector('[data-date]').value.trim();
+    if(!title && !date) return;
+    scenes.push({
+      date, title, desc:b.querySelector('[data-desc]').value.trim(),
+      showDesc:b.querySelector('[data-showdesc]').checked,
+      milestone:b.querySelector('[data-milestone]').checked
+    });
+  });
+  return scenes;
+}
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+$('autoPace').addEventListener('change', ()=>{
+  $('fixedHoldRow').classList.toggle('hidden', $('autoPace').checked);
+});
+$('fixedHold').addEventListener('input', ()=>{ $('fixedHoldLabel').textContent=$('fixedHold').value+'s'; });
+
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function fitWrappedLines(ctx, text, maxW, maxLines, startFs, minFs, weight){
+  let fs=startFs;
+  if(!text) return {fs:startFs, lines:[]};
+  while(fs>minFs){
+    const font=weight+' '+Math.round(fs)+'px system-ui';
+    const lines=wrapText(ctx, text, maxW, font);
+    if(lines.length<=maxLines) return {fs:Math.round(fs), lines};
+    fs-=2;
+  }
+  const font=weight+' '+Math.round(minFs)+'px system-ui';
+  return {fs:Math.round(minFs), lines:wrapText(ctx, text, maxW, font).slice(0,maxLines)};
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+
+const TIMING={ fadeOut:450 };
+function computeHoldForScene(scene){
+  if(!$('autoPace').checked){
+    return Math.round(parseFloat($('fixedHold').value)*1000);
+  }
+  const titleWords=(scene.title||'').trim().split(/\s+/).filter(Boolean).length;
+  const descWords=scene.showDesc?(scene.desc||'').trim().split(/\s+/).filter(Boolean).length:0;
+  let hold=2200+(titleWords+descWords)*140;
+  hold=Math.max(2200, Math.min(6000, hold));
+  if(scene.milestone) hold=Math.round(hold*1.35);
+  return Math.round(hold);
+}
+
+/* ===== ambient background music + completion sound ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){ padOscillators.forEach(o=>{ try{o.stop();}catch(e){} }); padOscillators=[]; if(uploadedAudioEl) uploadedAudioEl.pause(); }
+function startAmbient(){
+  stopAmbient(); ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    [110,164.81,220].forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){ uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true; uploadedAudioEl.play().catch(()=>{}); }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl) uploadedAudioEl.pause();
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(e){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+function playChime(){
+  const now=audioCtx.currentTime;
+  [660,990].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+    const g=audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.16/(i+1), now+0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.6);
+    o.connect(g); g.connect(ambientGain);
+    o.start(now); o.stop(now+0.65);
+  });
+}
+function playTick(){
+  const now=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(); o.type='triangle'; o.frequency.value=1200;
+  const g=audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.18, now+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+0.1);
+  o.connect(g); g.connect(ambientGain);
+  o.start(now); o.stop(now+0.12);
+}
+function playCompleteSound(){
+  if(!audioCtx || !ambientGain) return;
+  const type=$('completeSfx').value;
+  if(type==='none') return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(type==='chime') playChime(); else if(type==='tick') playTick();
+}
+
+function drawFrame(th, W, H){
+  const m=Math.min(W,H)*0.055;
+  ctx.strokeStyle=hexAlpha(th.accent,0.7); ctx.lineWidth=2;
+  ctx.strokeRect(m, m, W-m*2, H-m*2);
+  const flourish=(x,y,sx,sy)=>{
+    ctx.save(); ctx.translate(x,y); ctx.scale(sx,sy);
+    ctx.strokeStyle=th.accent; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(0,36); ctx.lineTo(0,10); ctx.lineTo(26,10); ctx.stroke();
+    ctx.beginPath(); ctx.arc(10,10,7,0,Math.PI/2); ctx.stroke();
+    ctx.restore();
+  };
+  flourish(m,m,1,1); flourish(W-m,m,-1,1); flourish(m,H-m,1,-1); flourish(W-m,H-m,-1,-1);
+}
+
+function drawIntro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const hook=$('introText').value.trim();
+  const fs=Math.round(W*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, hook, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawOutro(localT, th){
+  const alpha=Math.min(1, localT/FADE);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const txt=$('outroText').value.trim();
+  const fs=Math.round(W*0.065);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, txt, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdown(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save(); ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.direction='ltr';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+function drawCounter(idx,total,th){
+  ctx.save(); ctx.textAlign='right'; ctx.direction='ltr';
+  ctx.fillStyle=hexAlpha(th.textDim,0.9);
+  ctx.font='700 '+Math.round(Math.min(W,H)*0.024)+'px system-ui';
+  const m=Math.min(W,H)*0.055;
+  ctx.fillText((idx+1)+' / '+total, W-m-14, m+34);
+  ctx.restore();
+}
+function drawStar(cx,cy,r,color){
+  ctx.save(); ctx.fillStyle=color;
+  ctx.beginPath();
+  for(let i=0;i<4;i++){
+    const a1=(Math.PI/2)*i, a2=a1+Math.PI/4;
+    ctx.lineTo(cx+Math.cos(a1)*r, cy+Math.sin(a1)*r);
+    ctx.lineTo(cx+Math.cos(a2)*r*0.42, cy+Math.sin(a2)*r*0.42);
+  }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
+function drawRail(points, curIdx, th, milestones, vertical){
+  ctx.save();
+  if(points.length>1){
+    ctx.strokeStyle=hexAlpha(th.line,0.9);
+    ctx.lineWidth=Math.max(2, Math.min(W,H)*0.006);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+    ctx.strokeStyle=th.accent;
+    ctx.beginPath();
+    for(let i=0;i<curIdx && i<points.length-1;i++){ ctx.moveTo(points[i].x,points[i].y); ctx.lineTo(points[i+1].x,points[i+1].y); }
+    ctx.stroke();
+  }
+  points.forEach((p,i)=>{
+    const isMs = milestones && milestones[i];
+    const r = i===curIdx ? Math.min(W,H)*(isMs?0.026:0.02) : Math.min(W,H)*(isMs?0.016:0.012);
+    if(i<curIdx){
+      ctx.fillStyle=th.accent;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+    } else if(i===curIdx){
+      ctx.save();
+      ctx.shadowColor=th.accent; ctx.shadowBlur=isMs?26:18;
+      ctx.fillStyle=th.accentLight;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle=th.accent; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r*1.6,0,Math.PI*2); ctx.stroke();
+    } else {
+      ctx.strokeStyle=hexAlpha(th.textDim,0.6); ctx.lineWidth=2;
+      ctx.fillStyle=hexAlpha(th.bg1,0.9);
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+    if(isMs){
+      const starR=Math.min(W,H)*0.014;
+      const off = vertical ? {x:-starR*2.6,y:0} : {x:0,y:-starR*2.6};
+      drawStar(p.x+off.x, p.y+off.y, starR, th.accentLight);
+    }
+  });
+  ctx.restore();
+}
+
+function tallRailPoints(count){
+  const m=Math.min(W,H)*0.055;
+  const top=m+H*0.1, bottom=H-m-H*0.1;
+  const railX=W*0.13;
+  const pts=[];
+  for(let i=0;i<count;i++){ const t=count<=1?0.5:i/(count-1); pts.push({x:railX,y:top+(bottom-top)*t}); }
+  return pts;
+}
+function drawTallContent(scene, idx, points, th, alpha, offsetX){
+  const p=points[idx];
+  const m=Math.min(W,H)*0.055;
+  const contentX=W*0.27;
+  const maxW=W-contentX-W*0.08;
+  const safeTop=m+H*0.1+10;
+  const safeBottom=H-m-H*0.1-10;
+
+  ctx.save(); ctx.globalAlpha=alpha; if(offsetX) ctx.translate(offsetX,0);
+  ctx.direction='ltr'; ctx.textAlign='left';
+
+  const dateFs=Math.round(W*0.034);
+  const { fs:titleFs, lines:titleLines } = fitWrappedLines(ctx, scene.title||'', maxW, 3, Math.round(W*0.082), Math.round(W*0.05), '800');
+  let descFs=0, descLines=[];
+  if(scene.showDesc && scene.desc){
+    const r=fitWrappedLines(ctx, scene.desc, maxW, 5, Math.round(titleFs*0.46), Math.round(titleFs*0.3), '500');
+    descFs=r.fs; descLines=r.lines;
+  }
+  const titleLh=titleFs*1.22, descLh=descFs*1.35;
+  const dateBlockH=scene.date?dateFs*1.6:0;
+  const descBlockH=descLines.length?(titleFs*0.3+descLines.length*descLh):0;
+  const blockH=dateBlockH+titleLines.length*titleLh+descBlockH;
+
+  let topY=p.y-blockH/2;
+  if(topY<safeTop) topY=safeTop;
+  if(topY+blockH>safeBottom) topY=Math.max(safeTop, safeBottom-blockH);
+
+  let cursorY=topY;
+  if(scene.date){
+    ctx.font='800 '+dateFs+'px system-ui'; ctx.fillStyle=th.accentLight;
+    cursorY+=dateFs*0.9; ctx.fillText(scene.date.toUpperCase(), contentX, cursorY);
+    cursorY+=dateFs*0.7;
+  }
+  ctx.font='800 '+titleFs+'px system-ui'; ctx.fillStyle=th.text;
+  titleLines.forEach(l=>{ cursorY+=titleLh; ctx.fillText(l, contentX, cursorY); });
+  if(descLines.length){
+    cursorY+=titleFs*0.3;
+    ctx.font='500 '+descFs+'px system-ui'; ctx.fillStyle=th.textDim;
+    descLines.forEach(l=>{ cursorY+=descLh; ctx.fillText(l, contentX, cursorY); });
+  }
+  ctx.restore();
+}
+
+function wideRailPoints(count){
+  const m=Math.min(W,H)*0.055;
+  const left=m+W*0.07, right=W-m-W*0.07;
+  const railY=m+H*0.18;
+  const pts=[];
+  for(let i=0;i<count;i++){ const t=count<=1?0.5:i/(count-1); pts.push({x:left+(right-left)*t,y:railY}); }
+  return pts;
+}
+function drawWideContent(scene, idx, points, th, alpha, offsetX){
+  const p=points[idx];
+  const m=Math.min(W,H)*0.055;
+  const maxW=W*0.6;
+  const safeTop=p.y+H*0.13;
+  const safeBottom=H-m-H*0.08;
+
+  ctx.save(); ctx.globalAlpha=alpha; if(offsetX) ctx.translate(offsetX,0);
+  ctx.direction='ltr'; ctx.textAlign='center';
+
+  const dateFs=Math.round(H*0.032);
+  const { fs:titleFs, lines:titleLines } = fitWrappedLines(ctx, scene.title||'', maxW, 2, Math.round(H*0.1), Math.round(H*0.06), '800');
+  let descFs=0, descLines=[];
+  if(scene.showDesc && scene.desc){
+    const r=fitWrappedLines(ctx, scene.desc, maxW, 3, Math.round(titleFs*0.4), Math.round(titleFs*0.28), '500');
+    descFs=r.fs; descLines=r.lines;
+  }
+  const titleLh=titleFs*1.2, descLh=descFs*1.4;
+  const dateBlockH=scene.date?dateFs*1.6:0;
+  const descBlockH=descLines.length?(titleFs*0.35+descLines.length*descLh):0;
+  const blockH=dateBlockH+titleLines.length*titleLh+descBlockH;
+
+  let topY=safeTop;
+  if(topY+blockH>safeBottom) topY=Math.max(p.y+H*0.05, safeBottom-blockH);
+
+  let cursorY=topY;
+  if(scene.date){
+    ctx.font='800 '+dateFs+'px system-ui'; ctx.fillStyle=th.accentLight;
+    cursorY+=dateFs*0.9; ctx.fillText(scene.date.toUpperCase(), W/2, cursorY);
+    cursorY+=dateFs*0.7;
+  }
+  ctx.font='800 '+titleFs+'px system-ui'; ctx.fillStyle=th.text;
+  titleLines.forEach(l=>{ cursorY+=titleLh; ctx.fillText(l, W/2, cursorY); });
+  if(descLines.length){
+    cursorY+=titleFs*0.35;
+    ctx.font='500 '+descFs+'px system-ui'; ctx.fillStyle=th.textDim;
+    descLines.forEach(l=>{ cursorY+=descLh; ctx.fillText(l, W/2, cursorY); });
+  }
+  ctx.restore();
+}
+
+function squareRailPoints(count){
+  const m=Math.min(W,H)*0.055;
+  const left=m+W*0.1, right=W-m-W*0.1;
+  const railY=m+H*0.15;
+  const pts=[];
+  for(let i=0;i<count;i++){ const t=count<=1?0.5:i/(count-1); pts.push({x:left+(right-left)*t,y:railY}); }
+  return pts;
+}
+function drawSquareContent(scene, idx, points, th, alpha, offsetX){
+  const p=points[idx];
+  const m=Math.min(W,H)*0.055;
+  const maxW=W*0.76;
+  const safeTop=p.y+H*0.11;
+  const safeBottom=H-m-H*0.07;
+
+  ctx.save(); ctx.globalAlpha=alpha; if(offsetX) ctx.translate(offsetX,0);
+  ctx.direction='ltr'; ctx.textAlign='center';
+
+  const dateFs=Math.round(W*0.03);
+  const { fs:titleFs, lines:titleLines } = fitWrappedLines(ctx, scene.title||'', maxW, 2, Math.round(W*0.078), Math.round(W*0.05), '800');
+  let descFs=0, descLines=[];
+  if(scene.showDesc && scene.desc){
+    const r=fitWrappedLines(ctx, scene.desc, maxW, 3, Math.round(titleFs*0.42), Math.round(titleFs*0.3), '500');
+    descFs=r.fs; descLines=r.lines;
+  }
+  const titleLh=titleFs*1.2, descLh=descFs*1.38;
+  const dateBlockH=scene.date?dateFs*1.6:0;
+  const descBlockH=descLines.length?(titleFs*0.32+descLines.length*descLh):0;
+  const blockH=dateBlockH+titleLines.length*titleLh+descBlockH;
+
+  let topY=safeTop;
+  if(topY+blockH>safeBottom) topY=Math.max(p.y+H*0.04, safeBottom-blockH);
+
+  let cursorY=topY;
+  if(scene.date){
+    ctx.font='800 '+dateFs+'px system-ui'; ctx.fillStyle=th.accentLight;
+    cursorY+=dateFs*0.9; ctx.fillText(scene.date.toUpperCase(), W/2, cursorY);
+    cursorY+=dateFs*0.7;
+  }
+  ctx.font='800 '+titleFs+'px system-ui'; ctx.fillStyle=th.text;
+  titleLines.forEach(l=>{ cursorY+=titleLh; ctx.fillText(l, W/2, cursorY); });
+  if(descLines.length){
+    cursorY+=titleFs*0.32;
+    ctx.font='500 '+descFs+'px system-ui'; ctx.fillStyle=th.textDim;
+    descLines.forEach(l=>{ cursorY+=descLh; ctx.fillText(l, W/2, cursorY); });
+  }
+  ctx.restore();
+}
+
+function contentAlphaAndOffset(t, revealDur, style){
+  const p=Math.min(1, t/revealDur);
+  if(style==='slide') return { alpha:p, offsetX:(1-p)*60 };
+  return { alpha:p, offsetX:0 };
+}
+
+function drawTimelineScene(t, th, scene, allScenes, idx, total, shape, style, holdMs){
+  const fadeOutStart=holdMs;
+  const inFadeOut = t>fadeOutStart;
+  const fadeOutAlpha = inFadeOut ? Math.max(0, 1-((t-fadeOutStart)/TIMING.fadeOut)) : 1;
+  const mv=contentAlphaAndOffset(t, 600, style);
+  const alpha=Math.min(fadeOutAlpha, mv.alpha);
+  const milestones=allScenes.map(s=>s.milestone);
+
+  if(shape==='tall'){
+    const points=tallRailPoints(total);
+    drawRail(points, idx, th, milestones, true);
+    drawTallContent(scene, idx, points, th, alpha, mv.offsetX);
+  } else if(shape==='square'){
+    const points=squareRailPoints(total);
+    drawRail(points, idx, th, milestones, false);
+    drawSquareContent(scene, idx, points, th, alpha, mv.offsetX);
+  } else {
+    const points=wideRailPoints(total);
+    drawRail(points, idx, th, milestones, false);
+    drawWideContent(scene, idx, points, th, alpha, mv.offsetX);
+  }
+  if($('showCounter').checked) drawCounter(idx, total, th);
+}
+
+function buildTimeline(scenes){
+  const hookText=$('introText').value.trim();
+  const outroText=$('outroText').value.trim();
+  const showCountdown=$('showCountdown').checked;
+  const introMs = hookText?2600:0;
+  const countdownMs = showCountdown?3000:0;
+  const outroMs = outroText?2600:0;
+  const sceneDurations = scenes.map(s=>computeHoldForScene(s)+TIMING.fadeOut);
+  const sceneOffsets=[]; let acc=0;
+  sceneDurations.forEach(d=>{ sceneOffsets.push(acc); acc+=d; });
+  const total = introMs+countdownMs+acc+outroMs;
+  return { introMs, countdownMs, scenes, sceneDurations, sceneOffsets, scenesTotalMs:acc, outroMs, total };
+}
+function phaseAt(t){
+  let rem=t;
+  if(rem<TL.introMs) return {phase:'intro', localT:rem};
+  rem-=TL.introMs;
+  if(rem<TL.countdownMs) return {phase:'countdown', localT:rem};
+  rem-=TL.countdownMs;
+  for(let i=0;i<TL.scenes.length;i++){
+    if(rem < TL.sceneOffsets[i]+TL.sceneDurations[i]){
+      return {phase:'event', sceneIndex:i, localT: rem-TL.sceneOffsets[i], holdForThisScene: TL.sceneDurations[i]-TIMING.fadeOut};
+    }
+  }
+  return {phase:'outro', localT: rem-TL.scenesTotalMs};
+}
+
+let cv,ctx,W,H,rafId,startTs=null,TL=null,lastSoundKey='';
+let mr,chunks=[],blob,pngBlob;
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  let elapsed=ts-startTs;
+  if(TL.total>0) elapsed = elapsed % TL.total;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  drawFrame(th, W, H);
+
+  const ph=phaseAt(elapsed);
+  if(ph.phase==='intro'){ drawIntro(ph.localT, th); }
+  else if(ph.phase==='countdown'){ drawCountdown(ph.localT, th); }
+  else if(ph.phase==='event'){
+    const scene=TL.scenes[ph.sceneIndex];
+    drawTimelineScene(ph.localT, th, scene, TL.scenes, ph.sceneIndex, TL.scenes.length, $('shape').value, $('motion').value, ph.holdForThisScene);
+    const soundKey='ev'+ph.sceneIndex;
+    if(soundKey!==lastSoundKey && ph.localT<150){ playCompleteSound(); lastSoundKey=soundKey; }
+  } else {
+    drawOutro(ph.localT, th);
+  }
+}
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const scenes=collectScenes();
+  if(!scenes.length){ toast('Add at least one event first — or pick an example above'); return; }
+  lastSoundKey=''; startTs=null;
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  TL=buildTimeline(scenes);
+  $('player').classList.add('show');
+  ensureAmbientGraph(); startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{ cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png'); };
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  startTs=null; lastSoundKey='';
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'timeline-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); } else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<!-- top-countdown.html — v1.3 — StoryForge Pack 2 · 🏆 Top Countdown.
+v1.3: (1) restored intro/outro/countdown — this was a standing feature in the timeline-engine family and
+got dropped when this file was built directly from timeline-v2.html's pattern, which didn't have it. Now:
+tick "Add an intro"/"Add an outro" to reveal a text field for each (unticked = skipped entirely); a
+countdown-mode dropdown offers no pause / a brief ~3s pause with no numbers / a classic 3-2-1 countdown —
+covers both forms the user asked for. (2) Fixed a real clipping bug: the region used to hide scrolled-past
+content started too close to the first item's position, so once v1.2's auto-grow sizing made the first
+badge bigger, the top of it (and its title) could get sliced off by that boundary. Moved the boundary
+further up, well clear of any legitimate content position.
+v1.2: auto-fit/auto-centre sizing for item count (fewer items = bigger & centred, more = shrink to fit).
+v1.1: audit pass. v1: adapted from the approved timeline.html engine. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StoryForge — Top Countdown</title>
+<style>
+:root{--bg:#0b0f17;--panel:#131a26;--panel2:#1a2333;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.hidden{display:none !important}
+#setup{max-width:680px;margin:0 auto;padding:14px 14px 140px}
+h1{font-size:18px;margin:0 0 4px}
+small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h2{margin:0 0 8px;font-size:14px}
+textarea{width:100%;min-height:180px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:14px/1.5 system-ui;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:100%}
+input[type=file]{padding:6px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills .p{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.pills .p.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);cursor:pointer;font-weight:600;width:100%}
+.btn.gold{background:var(--accent);color:#000;border:none}
+.btn:disabled{opacity:.5;cursor:default}
+.checkrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.checkrow input{width:auto}
+.checkrow label{font-size:14px;color:var(--text)}
+.step{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.step .num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .body{flex:1}
+.startbar{position:fixed;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,var(--bg) 40%);display:flex;justify-content:center}
+.startbar .btn{max-width:680px}
+#player{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#player.show{display:flex}
+#stage canvas{max-width:100vw;max-height:calc(100vh - 110px);display:block;border-radius:8px}
+#bar{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center}
+.cbtn{width:54px;height:54px;border-radius:50%;background:#1a2333;color:#fff;border:1px solid #333;font-weight:700;cursor:pointer}
+.cbtn.rec{background:#ff4444;width:62px;height:62px}
+.cbtn.rec.on{border-radius:16px}
+#after{position:fixed;inset:0;background:#000;display:none;flex-direction:column;gap:12px;padding:20px;z-index:10}
+#after.show{display:flex}
+#after video,#after img{width:100%;max-height:60vh;border-radius:10px;background:#000}
+#after .row .btn{flex:1}
+#toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#222c3d;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:85vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🏆 Top Countdown <small>v1.3</small></h1>
+  <small>Ranked list video — items reveal one at a time, each with its own numbered badge</small>
+
+  <div class="card">
+    <h2>Start from a preset</h2>
+    <small>Hand-checked, ready to go — pick one, then edit freely below.</small>
+    <div class="pills" id="presetPills" style="margin-top:8px">
+      <div class="p" data-v="qualities">Qualities of a Good Muslim</div>
+      <div class="p" data-v="sabr">Benefits of Patience</div>
+      <div class="p" data-v="creator">Habits of Successful Creators</div>
+      <div class="p" data-v="mistakes">Mistakes New Business Owners Make</div>
+      <div class="p" data-v="trust">Signs of a Trustworthy Person</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✨ Generate with any AI</h2>
+    <small>No key, no setup. Describe a topic, copy the prompt, paste it into ChatGPT, Gemini, Claude — whichever you already use — then bring the answer back here.</small>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="body">
+        <textarea id="genTopic" style="min-height:50px" placeholder="e.g. Top reasons to wake up for Fajr"></textarea>
+        <div class="row">
+          <select id="genCount">
+            <option value="3">Top 3</option>
+            <option value="5" selected>Top 5</option>
+            <option value="7">Top 7</option>
+            <option value="10">Top 10</option>
+          </select>
+          <button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="body"><small>Paste that into any AI chat app and send it. Copy its full reply.</small></div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <textarea id="aiPaste" style="min-height:90px" placeholder="Paste the AI's reply here…"></textarea>
+        <div class="row"><button class="btn gold" id="usePasteBtn" type="button">✓ Use this</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Style</h2>
+    <div class="pills" id="theme">
+      <div class="p on" data-v="emerald">Emerald &amp; Gold</div>
+      <div class="p" data-v="midnight">Midnight</div>
+      <div class="p" data-v="desert">Desert Sand</div>
+      <div class="p" data-v="rose">Rose Dusk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Title (optional)</h2>
+    <input id="timelineTitle" placeholder="e.g. Top 5 Qualities of a Good Muslim" value="Top 5 Qualities of a Good Muslim">
+  </div>
+
+  <div class="card">
+    <h2>Items — one per line</h2>
+    <small>Format: <code>Rank: Title | short description</code>. Order in the box is reveal order — put your #5 first and #1 last for a classic countdown, or any order you like.</small>
+    <textarea id="script" style="margin-top:8px">5: Patience | Staying steady and calm through hardship and delay
+4: Honesty | Speaking and acting truthfully, even when it's hard
+3: Humility | Not seeking praise or looking down on others
+2: Gratitude | Recognising and giving thanks for every blessing
+1: Trustworthiness | Being someone others can rely on completely</textarea>
+  </div>
+
+  <div class="card">
+    <h2>Intro &amp; outro (optional)</h2>
+    <small>Leave either off to skip it entirely.</small>
+    <div class="checkrow"><input type="checkbox" id="introEnabled"><label for="introEnabled">Add an intro</label></div>
+    <input id="introText" placeholder="Intro text" class="hidden" style="margin-top:8px">
+    <div class="checkrow" style="margin-top:12px"><input type="checkbox" id="outroEnabled"><label for="outroEnabled">Add an outro</label></div>
+    <input id="outroText" placeholder="Outro text" class="hidden" style="margin-top:8px">
+  </div>
+
+  <div class="card">
+    <h2>Timing &amp; sound</h2>
+    <div class="row">
+      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select>
+      <select id="motion"><option value="steady">Steady</option><option value="pulse">Pulsing badge</option><option value="glow">Glowing line</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="speed"><option value="2200">Normal</option><option value="1500">Fast</option><option value="3200">Slow</option></select>
+      <select id="countdownMode">
+        <option value="none">No pause before start</option>
+        <option value="pause">Brief ~3s pause (no numbers)</option>
+        <option value="numbers">3-2-1 countdown</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="soundType">
+        <option value="none">🔇 Silent</option>
+        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="upload">⬆ Upload your own</option>
+      </select>
+      <input type="file" id="ambientFile" accept="audio/*" class="hidden">
+    </div>
+  </div>
+</div>
+
+<div class="startbar"><button class="btn gold" id="openBtn">▶ Preview countdown</button></div>
+
+<div id="player">
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="bar">
+    <button class="cbtn" id="closeBtn">✕</button>
+    <button class="cbtn" id="pngBtn">PNG</button>
+    <button class="cbtn rec" id="recBtn">REC</button>
+  </div>
+</div>
+
+<div id="after">
+  <b style="font-size:18px">✓ Ready</b>
+  <video id="takeVid" class="hidden" controls playsinline></video>
+  <img id="takeImg" class="hidden" alt="">
+  <div class="row"><button class="btn gold" id="saveTake">⬇ Save</button></div>
+  <div class="row"><button class="btn" id="backTake">Back</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+let settings={ theme:'emerald' };
+function bindPills(id,key){
+  const box=$(id);
+  box.addEventListener('click',e=>{ const p=e.target.closest('.p'); if(!p) return;
+    [...box.children].forEach(c=>c.classList.remove('on')); p.classList.add('on');
+    settings[key]=p.dataset.v;
+  });
+}
+bindPills('theme','theme');
+
+const THEMES={
+  emerald:{ bg1:'#07261c', bg2:'#0e3d2c', accent:'#d4af37', text:'#f3ead9', textDim:'#9fcbb0', line:'#3a5f4c' },
+  midnight:{ bg1:'#0a0f1f', bg2:'#161d36', accent:'#8fb6ff', text:'#eef1fb', textDim:'#8e97b8', line:'#30395c' },
+  desert:{ bg1:'#2b1c12', bg2:'#4a2f1d', accent:'#e8a35c', text:'#fbeedd', textDim:'#caa27e', line:'#5c4330' },
+  rose:{ bg1:'#2a0f1a', bg2:'#471726', accent:'#e8a0b4', text:'#fbe8ee', textDim:'#c993a4', line:'#5c3245' }
+};
+
+/* ===== presets (hand-written, no API involved) ===== */
+const PRESETS = {
+  qualities: { title:"Top 5 Qualities of a Good Muslim", events:
+`5: Patience | Staying steady and calm through hardship and delay
+4: Honesty | Speaking and acting truthfully, even when it's hard
+3: Humility | Not seeking praise or looking down on others
+2: Gratitude | Recognising and giving thanks for every blessing
+1: Trustworthiness | Being someone others can rely on completely` },
+  sabr: { title:"Top 5 Benefits of Patience (Sabr)", events:
+`5: Inner Calm | Reacting to hardship with steadiness instead of panic
+4: Better Decisions | Thinking clearly instead of acting on impulse
+3: Stronger Relationships | Responding to conflict without overreacting
+2: Personal Growth | Building resilience through repeated small trials
+1: Peace of Heart | A deep sense of trust that things will work out` },
+  creator: { title:"Top 5 Habits of Successful Content Creators", events:
+`5: Consistency | Posting on a regular schedule, even when motivation dips
+4: Studying the Data | Checking what's working and adjusting, not guessing
+3: Hooking Fast | Earning attention in the first 2 seconds
+2: Reusing Content | Turning one idea into several formats
+1: Knowing Their Audience | Making content for a specific person, not everyone` },
+  mistakes: { title:"Top 5 Mistakes New Business Owners Make", events:
+`5: No Clear Target Customer | Trying to sell to everyone, reaching no one
+4: Underpricing | Charging too little and burning out fast
+3: Ignoring Cash Flow | Running out of money despite having sales
+2: No Marketing Plan | Expecting customers to just show up
+1: Giving Up Too Early | Quitting right before momentum builds` },
+  trust: { title:"Top 5 Signs of a Trustworthy Person", events:
+`5: They Keep Their Word | What they promise, they follow through on
+4: They're Consistent | Same person in private as in public
+3: They Admit Mistakes | No excuses, no blame-shifting
+2: They Respect Boundaries | They don't push when you say no
+1: They're Honest Even When It Costs Them | Truth over convenience` }
+};
+$('presetPills').addEventListener('click', e=>{
+  const p=e.target.closest('.p'); if(!p) return;
+  const data=PRESETS[p.dataset.v]; if(!data) return;
+  $('timelineTitle').value=data.title;
+  $('script').value=data.events;
+  toast('✓ Preset loaded — edit freely below');
+});
+
+$('introEnabled').addEventListener('change', ()=>{ $('introText').classList.toggle('hidden', !$('introEnabled').checked); });
+$('outroEnabled').addEventListener('change', ()=>{ $('outroText').classList.toggle('hidden', !$('outroEnabled').checked); });
+
+$('soundType').addEventListener('change', ()=>{
+  $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
+});
+
+/* ===== manual AI workflow: build prompt → clipboard, no API call of any kind ===== */
+function buildPrompt(){
+  const topic=$('genTopic').value.trim();
+  const count=+$('genCount').value;
+  if(!topic){ return null; }
+  return `You are drafting a ranked "Top ${count}" list about: "${topic}"
+
+Rules — follow exactly:
+1. Output ONLY list lines, each in this exact format: Rank: Title | short description
+2. Write exactly ${count} items, numbered ${count} down to 1 (countdown order, #1 last/best).
+3. Keep claims general and widely-agreed — don't invent specific statistics, studies, or dates you aren't sure of.
+4. If the topic is religious, never write the literal wording of a Qur'an ayah or a hadith — describe the idea in your own words only, and don't state specific rulings as fact if they're actually debated among scholars.
+5. Keep each title short (a few words) and each description to one short sentence.
+6. No intro, no explanation, no markdown code fences — output only the lines themselves.`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e2){ return false; }
+  }
+}
+$('copyPromptBtn').onclick=async ()=>{
+  const prompt=buildPrompt();
+  if(!prompt){ toast('Describe a topic first'); return; }
+  const ok=await copyText(prompt);
+  toast(ok ? '✓ Copied — paste it into any AI chat' : 'Could not copy automatically — select and copy manually');
+  if(!ok){
+    $('aiPaste').value='';
+    $('aiPaste').placeholder='Copy failed — here is the prompt, select all and copy it yourself:\n\n'+prompt;
+  }
+};
+$('usePasteBtn').onclick=()=>{
+  let text=$('aiPaste').value.trim();
+  if(!text){ toast('Paste the AI\u2019s reply first'); return; }
+  text=text.replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
+  const lineCount=text.split('\n').map(l=>l.trim()).filter(Boolean).length;
+  $('script').value=text;
+  toast('✓ Loaded '+lineCount+' line(s) into Items — review before recording');
+};
+
+function parseScript(){
+  return $('script').value.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const ci=line.indexOf(':');
+    if(ci===-1) return null;
+    const date=line.slice(0,ci).trim();
+    let rest=line.slice(ci+1).trim();
+    let title=rest, desc='';
+    const pi=rest.indexOf('|');
+    if(pi!==-1){ title=rest.slice(0,pi).trim(); desc=rest.slice(pi+1).trim(); }
+    return { date, title, desc };
+  }).filter(Boolean);
+}
+function shapeWH(){
+  const s=$('shape').value;
+  if(s==='tall') return [1080,1920];
+  if(s==='square') return [1080,1080];
+  return [1920,1080];
+}
+function wrapText(ctx,text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' ');
+  const lines=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+function hexAlpha(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+
+/* ===== ambient sound (same proven pattern as Timeline/Calendar) ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+function ensureAmbientGraph(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
+  if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
+}
+function stopAmbient(){
+  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
+  padOscillators=[];
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+}
+function startAmbient(){
+  stopAmbient();
+  ensureAmbientGraph();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const type=$('soundType').value;
+  if(type==='pad'){
+    const freqs=[110,164.81,220];
+    freqs.forEach((f,i)=>{
+      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=audioCtx.createGain(); g.gain.value=0;
+      o.connect(g); g.connect(ambientGain); o.start();
+      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
+      padOscillators.push(o);
+    });
+  } else if(type==='upload' && uploadedAudioEl){
+    uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
+    uploadedAudioEl.play().catch(()=>{});
+  }
+}
+$('ambientFile').addEventListener('change', e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  ensureAmbientGraph();
+  if(uploadedAudioEl){ uploadedAudioEl.pause(); }
+  uploadedAudioEl=new Audio(); uploadedAudioEl.src=URL.createObjectURL(f); uploadedAudioEl.loop=true;
+  if(uploadedSource){ try{uploadedSource.disconnect();}catch(err){} }
+  uploadedSource=audioCtx.createMediaElementSource(uploadedAudioEl);
+  uploadedSource.connect(ambientGain);
+  toast('✓ Ambient track loaded');
+});
+
+/* ===== intro/outro card + 3-2-1 countdown ===== */
+const FADE_CARD=300;
+function drawTitleCard(localT, th, text){
+  const alpha=Math.min(1, localT/FADE_CARD);
+  ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center'; ctx.direction='ltr';
+  const fs=Math.round(Math.min(W,H)*0.07);
+  ctx.fillStyle=th.text; ctx.font='900 '+fs+'px system-ui';
+  const lines=wrapText(ctx, text, W*0.82, ctx.font);
+  const lh=fs*1.25, totalH=lines.length*lh;
+  let y=H/2-totalH/2+lh*0.8;
+  lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+  ctx.strokeStyle=th.accent; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(W/2-60,y+10); ctx.lineTo(W/2+60,y+10); ctx.stroke();
+  ctx.restore();
+}
+function drawCountdownNumbers(localT, th){
+  const n=Math.max(1, 3-Math.floor(localT/1000));
+  const within=(localT%1000)/1000;
+  ctx.save(); ctx.translate(W/2,H/2);
+  const R=Math.min(W,H)*0.17;
+  ctx.lineWidth=Math.min(W,H)*0.012;
+  ctx.strokeStyle=hexAlpha(th.accent,0.25);
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=th.accent;
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+within*Math.PI*2); ctx.stroke();
+  const pulseScale=1+0.08*(1-within);
+  ctx.scale(pulseScale,pulseScale);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.direction='ltr';
+  ctx.fillStyle=th.text; ctx.font='900 '+Math.round(Math.min(W,H)*0.28)+'px system-ui';
+  ctx.fillText(String(n), 0, 0);
+  ctx.restore();
+}
+
+/* ===== vertical layout (tall + square): badge+line on the left, text to the right =====
+   Base sizes below are the "designed for ~6 items" reference point; computeVertScale() scales
+   everything up or down from here based on the ACTUAL item count, then the block is centred. */
+const VERT = {
+  tall:   { W:1080, H:1920, titleY:110, titleFs:48, startY:230, dotX:130, titleEventFs:50, descFs:32, gapAfter:60, dotR:34, lineW:5 },
+  square: { W:1080, H:1080, titleY:90,  titleFs:38, startY:190, dotX:120, titleEventFs:38, descFs:25, gapAfter:42, dotR:26, lineW:4 }
+};
+/* ===== horizontal layout (wide): badge+line across the middle, labels alternate above/below ===== */
+const HORZ = { W:1920, H:1080, titleY:90, titleFs:46, lineY:540, startX:260, titleEventFs:40, descFs:24, labelOffset:76, dotR:34, lineW:5, baseSlotW:460, minSlot:260, maxSlot:640 };
+
+function measureVertCardsScaled(ctx, L, items, scale){
+  const titleFs=L.titleEventFs*scale, descFs=L.descFs*scale, dotR=L.dotR*scale, gapAfter=L.gapAfter*scale;
+  const textX=L.dotX+dotR+56*scale;
+  const maxTextW=Math.max(120, W-textX-70);
+  const metas=items.map(ev=>{
+    const descLines = ev.desc ? wrapText(ctx, ev.desc, maxTextW, '500 '+descFs+'px system-ui') : [];
+    const h = titleFs*1.25 + descLines.length*(descFs*1.4) + gapAfter;
+    return { descLines, h };
+  });
+  let totalH=0; metas.forEach(m=>totalH+=m.h);
+  return { metas, totalH, titleFs, descFs, dotR, gapAfter, textX, maxTextW };
+}
+function computeVertScale(ctx, L, items, availableH){
+  if(!items.length) return 1;
+  const base=measureVertCardsScaled(ctx, L, items, 1);
+  if(base.totalH<=0) return 1;
+  const ideal=availableH/base.totalH;
+  return Math.max(0.55, Math.min(1.6, ideal));
+}
+
+function computeHorizLayout(items){
+  const n=Math.max(1, items.length);
+  const availableW=W-HORZ.startX-80;
+  let slotW = n>1 ? availableW/(n-1) : HORZ.baseSlotW;
+  slotW = Math.max(HORZ.minSlot, Math.min(HORZ.maxSlot, slotW));
+  const scale = Math.max(0.6, Math.min(1.5, Math.sqrt(6/n)));
+  const trackStartX = n===1 ? (HORZ.startX + availableW/2) : HORZ.startX;
+  return { slotW, scale, trackStartX };
+}
+
+function drawBadge(ctx, cx, cy, r, th, label){
+  ctx.save();
+  ctx.fillStyle=th.accent;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+  ctx.fillStyle=th.bg1;
+  const txt=String(label||'');
+  const fs = txt.length>1 ? r*0.82 : r*1.05;
+  ctx.font='900 '+Math.round(fs)+'px system-ui';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(txt, cx, cy+1);
+  ctx.restore();
+}
+
+let cv,ctx,W,H,events=[],visibleCount=0,rafId,lastStep=0,SPEED=2200;
+let mr,chunks=[],blob,pngBlob;
+let vScroll=0, hPan=0;
+let startTs=null, itemsStarted=false, lastItemRevealedAt=null, showingOutro=false, outroStartTs=null, PH=null;
+
+function drawVertical(ts, L, th){
+  const motion=$('motion').value;
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  const titleLines=wrapText(ctx, $('timelineTitle').value.trim(), W*0.86, '900 '+L.titleFs+'px system-ui');
+  titleLines.forEach((l,i)=> ctx.fillText(l, W/2, L.titleY+i*(L.titleFs*1.15)));
+  const contentTop = L.startY + Math.max(0,titleLines.length-1)*(L.titleFs*1.15);
+  const bottomMargin=60;
+  const availableH=Math.max(100, H-contentTop-bottomMargin);
+
+  const scale=computeVertScale(ctx, L, events, availableH);
+  const layout=measureVertCardsScaled(ctx, L, events, scale);
+  const metas=layout.metas;
+
+  let visTotalH=0; for(let i=0;i<visibleCount;i++) visTotalH+=metas[i].h;
+
+  const centerOffset=Math.max(0,(availableH-layout.totalH)/2);
+  const baseTop=contentTop+centerOffset;
+
+  const maxScroll=Math.max(0, visTotalH-availableH);
+  vScroll += (maxScroll-vScroll)*0.15;
+
+  /* Clip boundary sits well above the title, not near contentTop — guarantees it can never slice a
+     badge/title that auto-grew larger than the old fixed sizes. Only exists to hide content that has
+     scrolled above the frame during the (rare) overflow-scroll case. */
+  const clipTop=Math.max(0, L.titleY-10);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, clipTop, W, H-clipTop); ctx.clip();
+  ctx.translate(0, -vScroll);
+
+  ctx.strokeStyle=th.line; ctx.lineWidth=Math.max(2,L.lineW*scale); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(L.dotX, baseTop); ctx.lineTo(L.dotX, baseTop+visTotalH); ctx.stroke();
+
+  if(motion==='glow' && visibleCount>0){
+    const glowY = baseTop + ((ts/15)%Math.max(visTotalH,1));
+    const grad=ctx.createLinearGradient(0,glowY-80,0,glowY+80);
+    grad.addColorStop(0,'rgba(255,255,255,0)'); grad.addColorStop(0.5,th.accent); grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle=grad; ctx.lineWidth=Math.max(2,L.lineW*scale);
+    ctx.beginPath(); ctx.moveTo(L.dotX, baseTop); ctx.lineTo(L.dotX, baseTop+visTotalH); ctx.stroke(); ctx.restore();
+  }
+
+  let y=baseTop;
+  for(let i=0;i<visibleCount;i++){
+    const ev=events[i], m=metas[i];
+    const isNewest = i===visibleCount-1;
+    const pulse = (motion==='pulse' && isNewest) ? 1+0.22*Math.abs(Math.sin(ts/300)) : 1;
+    const by=y+layout.dotR+4;
+    ctx.save();
+    ctx.translate(L.dotX, by);
+    ctx.scale(pulse,pulse);
+    drawBadge(ctx, 0, 0, layout.dotR, th, ev.date);
+    ctx.restore();
+
+    ctx.textAlign='left';
+    ctx.fillStyle=th.text; ctx.font='800 '+layout.titleFs+'px system-ui';
+    ctx.fillText(ev.title, layout.textX, by+layout.titleFs*0.32);
+    let dy=by+layout.titleFs*0.32+layout.descFs*1.1;
+    ctx.fillStyle=th.textDim; ctx.font='500 '+layout.descFs+'px system-ui';
+    m.descLines.forEach(line=>{ ctx.fillText(line, layout.textX, dy); dy+=layout.descFs*1.4; });
+
+    y+=m.h;
+  }
+  ctx.restore();
+}
+
+function drawHorizontal(ts, th){
+  const L=HORZ, motion=$('motion').value;
+  ctx.textAlign='center';
+  ctx.fillStyle=th.text; ctx.font='900 '+L.titleFs+'px system-ui';
+  ctx.fillText($('timelineTitle').value.trim(), W/2, L.titleY);
+
+  const hl=computeHorizLayout(events);
+  const dotR=L.dotR*hl.scale, titleEventFs=L.titleEventFs*hl.scale, descFs=L.descFs*hl.scale, labelOffset=L.labelOffset*hl.scale;
+  const maxTextW=Math.min(400, hl.slotW*0.82);
+
+  const totalW = hl.trackStartX + Math.max(0,events.length-1)*hl.slotW;
+  const viewW = W - HORZ.startX - 80;
+  const latestWorldX = hl.trackStartX + Math.max(0,visibleCount-1)*hl.slotW;
+  const targetPan = Math.max(0, latestWorldX - W*0.68);
+  const maxPan = Math.max(0, totalW - viewW);
+  hPan += (Math.min(targetPan,maxPan) - hPan) * 0.15;
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(40, L.titleY+30, W-80, H-L.titleY-60); ctx.clip();
+  ctx.translate(-hPan, 0);
+
+  ctx.strokeStyle=th.line; ctx.lineWidth=Math.max(2,L.lineW*hl.scale); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(hl.trackStartX, L.lineY); ctx.lineTo(hl.trackStartX+Math.max(0,visibleCount-1)*hl.slotW, L.lineY); ctx.stroke();
+
+  if(motion==='glow' && visibleCount>1){
+    const span=Math.max(0,visibleCount-1)*hl.slotW;
+    const glowX = hl.trackStartX + ((ts/18)%Math.max(span,1));
+    const grad=ctx.createLinearGradient(glowX-90,0,glowX+90,0);
+    grad.addColorStop(0,'rgba(255,255,255,0)'); grad.addColorStop(0.5,th.accent); grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle=grad; ctx.lineWidth=Math.max(2,L.lineW*hl.scale);
+    ctx.beginPath(); ctx.moveTo(hl.trackStartX, L.lineY); ctx.lineTo(hl.trackStartX+span, L.lineY); ctx.stroke(); ctx.restore();
+  }
+
+  const minAboveTy = L.titleY + L.titleFs*1.3 + 20;
+
+  for(let i=0;i<visibleCount;i++){
+    const ev=events[i];
+    const x = hl.trackStartX + i*hl.slotW;
+    const above = i%2===0;
+    const isNewest = i===visibleCount-1;
+    const pulse = (motion==='pulse' && isNewest) ? 1+0.22*Math.abs(Math.sin(ts/300)) : 1;
+
+    ctx.save();
+    ctx.translate(x, L.lineY);
+    ctx.scale(pulse,pulse);
+    drawBadge(ctx, 0, 0, dotR, th, ev.date);
+    ctx.restore();
+
+    const descLines = ev.desc ? wrapText(ctx, ev.desc, maxTextW, '500 '+descFs+'px system-ui') : [];
+    ctx.textAlign='center';
+    if(above){
+      let ty = L.lineY - labelOffset - descLines.length*(descFs*1.35) - titleEventFs*1.1;
+      if(ty < minAboveTy) ty = minAboveTy;
+      ctx.fillStyle=th.text; ctx.font='800 '+titleEventFs+'px system-ui'; ctx.fillText(ev.title, x, ty); ty+=titleEventFs*1.1;
+      ctx.fillStyle=th.textDim; ctx.font='500 '+descFs+'px system-ui';
+      descLines.forEach(line=>{ ctx.fillText(line, x, ty); ty+=descFs*1.35; });
+    } else {
+      let ty = L.lineY + labelOffset + titleEventFs*0.8;
+      ctx.fillStyle=th.text; ctx.font='800 '+titleEventFs+'px system-ui'; ctx.fillText(ev.title, x, ty); ty+=descFs*1.2;
+      ctx.fillStyle=th.textDim; ctx.font='500 '+descFs+'px system-ui';
+      descLines.forEach(line=>{ ty+=descFs*1.35; ctx.fillText(line, x, ty); });
+    }
+  }
+  ctx.restore();
+}
+
+function computePhases(){
+  const introText = $('introEnabled').checked ? $('introText').value.trim() : '';
+  const outroText = $('outroEnabled').checked ? $('outroText').value.trim() : '';
+  const countdownMode = $('countdownMode').value;
+  return {
+    introText, outroText, countdownMode,
+    introMs: introText ? 2600 : 0,
+    countdownMs: countdownMode==='none' ? 0 : 3000
+  };
+}
+
+function draw(ts){
+  rafId=requestAnimationFrame(draw);
+  if(startTs===null) startTs=ts;
+  const elapsed=ts-startTs;
+
+  const th=THEMES[settings.theme];
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0, th.bg1); g.addColorStop(1, th.bg2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  if(elapsed<PH.introMs){ drawTitleCard(elapsed, th, PH.introText); return; }
+  const afterIntro=elapsed-PH.introMs;
+  if(afterIntro<PH.countdownMs){
+    if(PH.countdownMode==='numbers') drawCountdownNumbers(afterIntro, th);
+    return; /* 'pause' mode: just the plain themed background for ~3s, no numbers */
+  }
+
+  if(!itemsStarted){ itemsStarted=true; lastStep=ts; }
+  if(!showingOutro){
+    if(ts-lastStep>SPEED){ lastStep=ts; if(visibleCount<events.length) visibleCount++; }
+    if(visibleCount>=events.length){
+      if(lastItemRevealedAt===null) lastItemRevealedAt=ts;
+      if(PH.outroText && (ts-lastItemRevealedAt>2600)){ showingOutro=true; outroStartTs=ts; }
+    }
+  }
+
+  if(showingOutro){ drawTitleCard(ts-outroStartTs, th, PH.outroText); return; }
+
+  const shapeKey=$('shape').value;
+  if(shapeKey==='wide'){ drawHorizontal(ts, th); } else { drawVertical(ts, VERT[shapeKey], th); }
+}
+
+function stopLoop(){ cancelAnimationFrame(rafId); }
+
+$('openBtn').onclick=()=>{
+  const rawLineCount = $('script').value.split('\n').map(l=>l.trim()).filter(Boolean).length;
+  events=parseScript();
+  if(!events.length){ toast('Add at least one line: Rank: Title | description'); return; }
+  if(events.length < rawLineCount){ toast((rawLineCount-events.length)+' line(s) skipped — missing a ":" after the rank'); }
+  SPEED=+$('speed').value;
+  visibleCount = 1;
+  lastStep=0; vScroll=0; hPan=0;
+  startTs=null; itemsStarted=false; lastItemRevealedAt=null; showingOutro=false; outroStartTs=null;
+  PH=computePhases();
+  cv=$('cv'); ctx=cv.getContext('2d');
+  const [w,h]=shapeWH(); cv.width=w; cv.height=h; W=w; H=h;
+  const scale=Math.min(window.innerWidth/w,(window.innerHeight-110)/h);
+  cv.style.width=Math.round(w*scale)+'px'; cv.style.height=Math.round(h*scale)+'px';
+  $('player').classList.add('show');
+  startAmbient();
+  stopLoop(); rafId=requestAnimationFrame(draw);
+};
+$('closeBtn').onclick=()=>{
+  if(mr&&mr.state==='recording'){ if(!confirm('Stop recording and close?')) return; mr.stop(); }
+  stopLoop(); stopAmbient(); $('player').classList.remove('show');
+};
+
+$('pngBtn').onclick=()=>{
+  cv.toBlob(b=>{ if(!b) return; pngBlob=b; blob=null; showAfter('image'); },'image/png');
+};
+
+$('recBtn').onclick=()=>{
+  if(mr && mr.state==='recording'){ mr.stop(); $('recBtn').classList.remove('on'); $('recBtn').textContent='REC'; return; }
+  ensureAmbientGraph();
+  const vStream=cv.captureStream(30);
+  const tracks=[...vStream.getVideoTracks()];
+  if(mediaStreamDest) tracks.push(...mediaStreamDest.stream.getAudioTracks());
+  const combined=new MediaStream(tracks);
+  const recorderType=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  mr=new MediaRecorder(combined,recorderType?{mimeType:recorderType}:{});
+  chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ blob=new Blob(chunks,{type:mr.mimeType}); pngBlob=null; showAfter('video'); };
+  mr.start(300);
+  $('recBtn').classList.add('on'); $('recBtn').textContent='■';
+};
+
+function fileBase(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return 'topcountdown-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
+function showAfter(kind){
+  $('takeVid').classList.toggle('hidden',kind!=='video');
+  $('takeImg').classList.toggle('hidden',kind!=='image');
+  if(kind==='video'){ $('takeVid').src=URL.createObjectURL(blob); }
+  else { $('takeImg').src=URL.createObjectURL(pngBlob); }
+  $('after').classList.add('show');
+}
+$('saveTake').onclick=()=>{
+  const file = pngBlob ? pngBlob : blob;
+  const ext = pngBlob ? '.png' : (/mp4/i.test(blob.type) ? '.mp4' : '.webm');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fileBase()+ext; a.click();
+  toast('✓ Saved');
+};
+$('backTake').onclick=()=>{ $('after').classList.remove('show'); $('takeVid').pause && $('takeVid').pause(); };
+</script>
+</body>
+</html>

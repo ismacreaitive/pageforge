@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poem Follow — Forge Tools</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#2a313c;--text:#e6edf3;--muted:#8b949e;--gold:#f5c542}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Arial,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--line)}
+header a{color:var(--text);text-decoration:none;font-weight:700}
+.wrap{max-width:980px;margin:0 auto;padding:20px}
+h1{font-size:1.5rem;margin:6px 0 4px}
+.sub{color:var(--muted);margin:0 0 14px;font-size:14px;line-height:1.5}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.step{font-weight:700;margin:0 0 10px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+@media(max-width:700px){.cols{grid-template-columns:1fr}}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+textarea,select,input[type=text]{width:100%;background:#0d1117;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px}
+textarea{min-height:140px;resize:vertical}
+#ar{direction:rtl;font-family:'Amiri',serif;font-size:20px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+button,.filebtn{background:#238636;color:#fff;border:0;border-radius:10px;padding:11px 18px;font-size:15px;font-weight:600;cursor:pointer;display:inline-block}
+button.alt,.filebtn.alt{background:#30363d}
+button.rec{background:#1f6feb}
+button.rec.on{background:#da3633}
+button.big{font-size:17px;padding:14px 22px}
+button:disabled{opacity:.5;cursor:default}
+#fileInfo,#status,#vstatus{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+.prog{height:8px;background:#0d1117;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:10px;display:none}
+.prog div{height:100%;width:0;background:var(--gold)}
+#view{display:block;max-width:100%;max-height:62vh;margin:0 auto;border-radius:10px;background:#000}
+#player{margin-top:12px}
+#player audio{width:100%}
+#player video{width:100%;max-height:200px;border-radius:10px;background:#000}
+#result{display:none;margin-top:14px;text-align:center}
+#result video{max-width:100%;max-height:60vh;border-radius:10px;background:#000}
+</style>
+</head>
+<body>
+<header><a href="index.html">← Forge Tools</a></header>
+<div class="wrap">
+  <h1>Poem Follow</h1>
+  <p class="sub">Record or upload your poem, paste the Arabic, let the AI time every word, then download it as a video with the golden highlight. Works in Chrome or Edge.</p>
+
+  <div class="panel">
+    <p class="step">1 · Your recording</p>
+    <div class="bar" style="margin-top:0">
+      <button id="rec" class="rec">🎙️ Record now</button>
+      <label class="filebtn alt" for="fileIn" style="margin:0">📁 Upload audio or video</label>
+      <input type="file" id="fileIn" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.webm" hidden>
+    </div>
+    <div id="fileInfo">No recording yet</div>
+  </div>
+
+  <div class="panel">
+    <p class="step">2 · The poem</p>
+    <div class="cols">
+      <div>
+        <label>Arabic (one verse per line, exactly as you sang it)</label>
+        <textarea id="ar">طَلَعَ الْبَدْرُ عَلَيْنَا
+مِنْ ثَنِيَّاتِ الْوَدَاعْ
+وَجَبَ الشُّكْرُ عَلَيْنَا
+مَا دَعَا لِلَّهِ دَاعْ</textarea>
+      </div>
+      <div>
+        <label>English (optional, same order, one line per verse)</label>
+        <textarea id="en">The full moon rose over us
+from the valley of Wada'
+Gratitude is due upon us
+for as long as one calls to Allah</textarea>
+      </div>
+    </div>
+    <div class="bar">
+      <button id="align">🎧 Listen and time every word</button>
+      <button id="cancel" class="alt" style="display:none">Cancel</button>
+      <button id="reset" class="alt">↺ Forget saved timing</button>
+    </div>
+    <div class="prog" id="prog"><div id="bar"></div></div>
+    <div id="status"></div>
+  </div>
+
+  <div class="panel">
+    <p class="step">3 · Look and preview</p>
+    <div class="opts">
+      <div><label>Shape</label><select id="shape"><option value="9:16">Vertical 9:16 (Shorts, Reels, TikTok, Status)</option><option value="16:9">Wide 16:9 (YouTube)</option><option value="1:1">Square 1:1</option></select></div>
+      <div><label>Quality</label><select id="quality"><option value="720">720p (faster)</option><option value="1080" selected>1080p (best)</option></select></div>
+      <div><label>Background</label><select id="bg"><option value="stars">Night sky with stars</option><option value="light">Soft golden light</option><option value="waves">Calm teal waves</option><option value="pic">My own picture</option></select></div>
+      <div><label>Gold highlight</label><select id="hl"><option value="box">Gold box behind the word</option><option value="txt">Gold glowing letters</option></select></div>
+      <div><label>On screen</label><select id="layout"><option value="one">One verse at a time</option><option value="all">All verses together</option></select></div>
+      <div><label>Highlight: later ◀ ▶ earlier <b id="leadVal">0.10 s</b></label><input type="range" id="lead" min="-30" max="50" step="5" value="10" style="width:100%"></div>
+    </div>
+    <div class="bar" style="margin-top:10px">
+      <label class="filebtn alt" for="picIn" id="picBtn" style="display:none;margin:0">🖼️ Choose picture</label>
+      <input type="file" id="picIn" accept="image/*" hidden>
+      <label style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="safe" checked> 📱 Keep clear of the TikTok, Reels and Shorts buttons</label>
+      <label style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="trim" checked> Cut the silence at the start and end</label>
+    </div>
+    <div style="margin-top:14px"><canvas id="view" width="540" height="960"></canvas></div>
+    <div id="player"><div class="sub" style="margin:0">Record or upload your recording first, then press play here to preview.</div></div>
+  </div>
+
+  <div class="panel">
+    <p class="step">4 · Make the video</p>
+    <button id="make" class="big">✨ Make my poem video</button>
+    <button id="cancelV" class="alt" style="display:none">Cancel</button>
+    <div class="prog" id="vprog"><div id="vbar"></div></div>
+    <div id="vstatus"></div>
+    <div id="result">
+      <video id="resVid" controls playsinline></video>
+      <div style="margin-top:12px"><button id="dl" class="big">⬇ Download video</button></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const tick=()=>new Promise(r=>setTimeout(r,0));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const AR='Amiri, "Traditional Arabic", serif', LAT='system-ui, "Segoe UI", Arial, sans-serif', GOLD='#F5C542';
+const FORMATS={'9:16':[1080,1920],'16:9':[1920,1080],'1:1':[1080,1080]};
+let file=null, buf=null, a16=null, media=null, objUrl='', cancel=false, busy=false, CTC=null, ORTP=null;
+let words=[], verses=[], picBmp=null, resultUrl='', MBP=null;
+const LAYOUT=new Map();
+
+/* ===== exact aligner (same method as your Quran Studio) ===== */
+const CTC_URL='https://huggingface.co/Synthesium/quran-recitation-v2-onnx/resolve/main/wav2vec2-ar-ctc-aligner/model.int8.onnx';
+const VOCAB=['<pad>','<s>','</s>','<unk>','|','-','ء','آ','أ','ؤ','إ','ئ','ا','ب','ة','ت','ث','ج','ح','خ','د','ذ','ر','ز','س','ش','ص','ض','ط','ظ','ع','غ','ـ','ف','ق','ك','ل','م','ن','ه','و','ى','ي','ً','ٌ','ٍ','َ','ُ','ِ','ّ','ْ'];
+const IDX=Object.fromEntries(VOCAB.map((c,i)=>[c,i])), SEP=4, FR=0.02;
+function say(m){ $('status').textContent=m; }
+function setBar(p){ $('prog').style.display='block'; $('bar').style.width=Math.round(p*100)+'%'; }
+function charsOf(w){
+  const t=String(w).replace(/ٱ/g,'ا').replace(/ی/g,'ي').replace(/ک/g,'ك').replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g,'');
+  const o=[]; for(const c of t){ const k=IDX[c]; if(k!=null&&k>5) o.push(k); } return o;
+}
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); }); }
+async function loadOrt(){
+  if(window.ort) return window.ort;
+  if(!ORTP) ORTP=(async()=>{
+    const base='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+    await loadScript(base+'ort.min.js');
+    const o=window.ort; if(!o) throw new Error('the aligner engine could not load');
+    o.env.wasm.wasmPaths=base;
+    o.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1)):1;
+    return o;
+  })().catch(e=>{ ORTP=null; throw e; });
+  return ORTP;
+}
+async function fetchModel(url){
+  let cache=null;
+  try{ cache=await caches.open('forge-models-v1'); const hit=await cache.match(url); if(hit){ say('Loading the aligner…'); return await hit.arrayBuffer(); } }catch{}
+  const r=await fetch(url); if(!r.ok) throw new Error('the aligner could not be downloaded ('+r.status+')');
+  const total=+r.headers.get('content-length')||0, reader=r.body.getReader(), parts=[]; let got=0, last=0;
+  for(;;){
+    const {done,value}=await reader.read(); if(done) break;
+    parts.push(value); got+=value.length;
+    if(got-last>2*1048576){ last=got; say('Downloading the aligner (first time only, then it is saved)… '+Math.round(got/1048576)+(total?' of '+Math.round(total/1048576):'')+' MB'); if(total) setBar(got/total*0.3); }
+  }
+  const blob=new Blob(parts);
+  if(cache){ try{ await cache.put(url,new Response(blob)); }catch{} }
+  return await blob.arrayBuffer();
+}
+async function audio16(){
+  if(a16) return a16;
+  const R=16000, off=new OfflineAudioContext(1,Math.max(1,Math.ceil(buf.duration*R)),R), src=off.createBufferSource();
+  src.buffer=buf; src.connect(off.destination); src.start();
+  a16=(await off.startRendering()).getChannelData(0); return a16;
+}
+async function ctcLogits(ort){
+  const a=await audio16(), n=a.length, R=16000, CH=R*20, CTX=R, STRIDE=320, T=Math.floor(n/STRIDE)+1;
+  let V=VOCAB.length, logp=null;
+  for(let c0=0;c0<n;c0+=CH){
+    if(cancel) throw new Error('cancelled');
+    const c1=Math.min(n,c0+CH), i0=Math.max(0,c0-CTX), i1=Math.min(n,c1+CTX), seg=a.slice(i0,i1);
+    let mean=0; for(let i=0;i<seg.length;i++) mean+=seg[i]; mean/=seg.length;
+    let v=0; for(let i=0;i<seg.length;i++){ const d=seg[i]-mean; v+=d*d; } const sd=Math.sqrt(v/seg.length+1e-7);
+    for(let i=0;i<seg.length;i++) seg[i]=(seg[i]-mean)/sd;
+    say('The aligner is listening… '+Math.round(c0/n*100)+'% (takes about as long as your recording)'); setBar(0.3+0.6*c0/n);
+    await tick();
+    const feeds={};
+    for(const nm of CTC.inputNames){
+      if(/mask/i.test(nm)){ const m=new BigInt64Array(seg.length); m.fill(1n); feeds[nm]=new ort.Tensor('int64',m,[1,seg.length]); }
+      else feeds[nm]=new ort.Tensor('float32',seg,[1,seg.length]);
+    }
+    const res=await CTC.run(feeds), o=res[CTC.outputNames[0]], dims=o.dims, F=dims[dims.length-2], VV=dims[dims.length-1], d=o.data;
+    if(!logp){ V=VV; logp=new Float32Array(T*V).fill(-30); }
+    const g0=Math.round(i0/STRIDE), core0=Math.round(c0/STRIDE), core1=Math.round(c1/STRIDE);
+    for(let f=0;f<F;f++){
+      const g=g0+f; if(g<core0||g>=core1||g>=T) continue;
+      let mx=-Infinity; for(let k=0;k<V;k++) if(d[f*V+k]>mx) mx=d[f*V+k];
+      let s=0; for(let k=0;k<V;k++) s+=Math.exp(d[f*V+k]-mx);
+      const lse=mx+Math.log(s);
+      for(let k=0;k<V;k++) logp[g*V+k]=d[f*V+k]-lse;
+    }
+    if(o.dispose) try{ o.dispose(); }catch{}
+  }
+  return {logp,T,V};
+}
+function viterbi(logp,V,F0,F1,toks){
+  const L=toks.length, S2=2*L+1, T=F1-F0, OUT=-3, NEG=-1e30;
+  if(T<L+2) return null;
+  const bp=new Uint8Array(T*S2), pbp=new Uint8Array(T);
+  let prev=new Float64Array(S2).fill(NEG), cur=new Float64Array(S2), pre=0, post=NEG;
+  for(let t=0;t<T;t++){
+    const o=(F0+t)*V;
+    const e1=prev[S2-1], e2=S2>1?prev[S2-2]:NEG, endPrev=e1>e2?e1:e2;
+    if(post>=endPrev){ post+=OUT; pbp[t]=0; } else { post=endPrev+OUT; pbp[t]=e1>=e2?1:2; }
+    for(let s=0;s<S2;s++){
+      let best=prev[s], b=0;
+      if(s>0&&prev[s-1]>best){ best=prev[s-1]; b=1; }
+      if((s&1)&&s>2&&toks[(s-1)>>1]!==toks[(s-3)>>1]&&prev[s-2]>best){ best=prev[s-2]; b=2; }
+      if(s<2&&pre>best){ best=pre; b=3; }
+      cur[s]=best+((s&1)?logp[o+toks[(s-1)>>1]]:logp[o]);
+      bp[t*S2+s]=b;
+    }
+    pre+=OUT;
+    const tmp=prev; prev=cur; cur=tmp;
+  }
+  const endS=prev[S2-1]>=prev[S2-2]?S2-1:S2-2;
+  let t=T-1, s;
+  if(post>prev[endS]){ while(t>=0&&pbp[t]===0) t--; if(t<=0) return null; s=pbp[t]===1?S2-1:S2-2; t--; }
+  else s=endS;
+  const first=new Int32Array(L).fill(-1), last=new Int32Array(L).fill(-1), conf=new Float32Array(L).fill(-30);
+  while(t>=0){
+    if(s&1){ const k=(s-1)>>1; first[k]=t; if(last[k]<0) last[k]=t; const lp=logp[(F0+t)*V+toks[k]]; if(lp>conf[k]) conf[k]=lp; }
+    const b=bp[t*S2+s];
+    if(b===3) break;
+    if(b===1) s-=1; else if(b===2) s-=2;
+    t--;
+  }
+  return {first,last,conf};
+}
+function alignWords(logp,T,V){
+  const toks=[], fi=[], li=[], js=[];
+  words.forEach((w,j)=>{ if(!w.ch.length) return; if(toks.length) toks.push(SEP); fi.push(toks.length); for(const c of w.ch) toks.push(c); li.push(toks.length-1); js.push(j); });
+  if(!toks.length) throw new Error('no Arabic letters were found in the poem text');
+  if(T*(2*toks.length+1)>150e6) throw new Error('this recording is too long for one go. Please use a recording under about 6 minutes, or split the poem');
+  const r=viterbi(logp,V,0,T,toks);
+  if(!r) throw new Error('the recording is too short for this much text. Check that the poem text matches what you sang');
+  let ok=0;
+  words.forEach(w=>{ w.st=NaN; w.en=NaN; });
+  js.forEach((j,q)=>{
+    const f=r.first[fi[q]], l=r.last[li[q]]; if(f<0) return;
+    words[j].st=f*FR; words[j].en=((l>=0?l:f)+1)*FR;
+    let c=0; for(let k=fi[q];k<=li[q];k++) c+=r.conf[k];
+    if(c/(li[q]-fi[q]+1)>-1.6) ok++;
+  });
+  let lastT=-1; for(const w of words){ if(!isNaN(w.st)){ if(w.st<=lastT+0.04){ w.st=NaN; w.en=NaN; } else lastT=w.st; } }
+  const known=words.map((w,j)=>isNaN(w.st)?-1:j).filter(j=>j>=0);
+  if(known.length<2) throw new Error('the aligner could not follow the recording. Check that the text matches what you sang');
+  const k0=known[0], kL=known[known.length-1], dur=buf.duration;
+  for(let j=0;j<k0;j++) words[j].st=Math.max(0,words[k0].st-(k0-j)*0.35);
+  for(let q=0;q<known.length-1;q++){
+    const a=known[q], b=known[q+1]; if(b-a<2) continue;
+    let tot=0; for(let j=a;j<b;j++) tot+=words[j].ch.length+1;
+    let acc=words[a].ch.length+1;
+    for(let j=a+1;j<b;j++){ words[j].st=words[a].st+(words[b].st-words[a].st)*acc/tot; acc+=words[j].ch.length+1; }
+  }
+  for(let j=kL+1;j<words.length;j++) words[j].st=Math.min(dur-0.2,words[j-1].st+0.4);
+  for(let j=1;j<words.length;j++) if(words[j].st<words[j-1].st+0.06) words[j].st=words[j-1].st+0.06;
+  words.forEach((w,j)=>{ const nx=j+1<words.length?words[j+1].st:dur; if(isNaN(w.en)||w.en<w.st) w.en=Math.min(nx,w.st+0.5); });
+  return ok/words.length;
+}
+
+/* ===== the poem text and saved timing ===== */
+function hash(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return String(h); }
+function saveKey(){ return file ? 'forge:pf:'+file.name+'|'+file.size+'|'+hash($('ar').value) : ''; }
+function build(){
+  const ar=$('ar').value.split('\n'), en=$('en').value.split('\n');
+  words=[]; verses=[]; LAYOUT.clear();
+  ar.forEach((line,i)=>{
+    if(!line.trim()) return;
+    const v={words:[],en:(en[i]||'').trim()}, vi=verses.length;
+    line.trim().split(/\s+/).forEach(t=>{ words.push({text:t,ch:charsOf(t),st:NaN,en:NaN,v:vi}); v.words.push(words.length-1); });
+    verses.push(v);
+  });
+  const k=saveKey();
+  if(k){ try{ const s=JSON.parse(localStorage.getItem(k)||'null'); if(s&&s.st&&s.st.length===words.length){ words.forEach((w,j)=>{ w.st=s.st[j]; w.en=s.en[j]; }); say('✓ Saved timing loaded for this recording.'); } }catch{} }
+}
+function saveTiming(){ const k=saveKey(); if(!k) return; try{ localStorage.setItem(k,JSON.stringify({st:words.map(w=>w.st),en:words.map(w=>w.en)})); }catch{} }
+const timed=()=>words.length>0 && !isNaN(words[0].st);
+$('ar').addEventListener('change',build); $('en').addEventListener('change',build);
+
+/* ===== the recording: upload or record ===== */
+function toWav(b){
+  const nc=Math.min(2,b.numberOfChannels), n=b.length, R=b.sampleRate, ab=new ArrayBuffer(44+n*nc*2), v=new DataView(ab);
+  const ws=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  ws(0,'RIFF'); v.setUint32(4,36+n*nc*2,true); ws(8,'WAVE'); ws(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,nc,true);
+  v.setUint32(24,R,true); v.setUint32(28,R*nc*2,true); v.setUint16(32,nc*2,true); v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,n*nc*2,true);
+  const ch=[]; for(let c=0;c<nc;c++) ch.push(b.getChannelData(c));
+  let o=44; for(let i=0;i<n;i++) for(let c=0;c<nc;c++){ const s=Math.max(-1,Math.min(1,ch[c][i])); v.setInt16(o,s<0?s*0x8000:s*0x7fff,true); o+=2; }
+  return new Blob([ab],{type:'audio/wav'});
+}
+async function loadFile(f){
+  $('fileInfo').textContent='Reading the sound…';
+  try{
+    const ac=new AudioContext(); let b;
+    try{ b=await ac.decodeAudioData(await f.arrayBuffer()); } finally{ ac.close(); }
+    if(!b||b.duration<1) throw new Error('no sound');
+    file=f; buf=b; a16=null;
+    if(objUrl) URL.revokeObjectURL(objUrl);
+    objUrl=URL.createObjectURL(f);
+    const isV=f.type.startsWith('video/')||/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);
+    media=document.createElement(isV?'video':'audio'); media.controls=true; media.src=objUrl; media.playsInline=true;
+    $('player').innerHTML=''; $('player').appendChild(media);
+    $('fileInfo').textContent=(isV?'🎬 ':'🎵 ')+f.name+' · '+Math.round(b.duration)+' s';
+    build();
+  }catch(err){ $('fileInfo').textContent='No recording yet'; say('Could not read the sound in that file. Try MP3, M4A, WAV or MP4.'); }
+}
+$('fileIn').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) loadFile(f); };
+let recorder=null, rStream=null, rChunks=[];
+$('rec').onclick=async()=>{
+  if(recorder){ recorder.stop(); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ say('Recording needs Google Chrome or Microsoft Edge.'); return; }
+  try{ rStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch{ say('Microphone blocked. Click the 🔒 next to the address, allow the microphone, and try again.'); return; }
+  rChunks=[]; recorder=new MediaRecorder(rStream);
+  recorder.ondataavailable=e=>{ if(e.data.size) rChunks.push(e.data); };
+  recorder.onstop=async()=>{
+    rStream.getTracks().forEach(t=>t.stop());
+    const blob=new Blob(rChunks,{type:recorder.mimeType||'audio/webm'}); recorder=null;
+    $('rec').classList.remove('on'); $('rec').textContent='🎙️ Record now';
+    try{
+      const ac=new AudioContext(); let b; try{ b=await ac.decodeAudioData(await blob.arrayBuffer()); } finally{ ac.close(); }
+      const d=new Date(); const f=new File([toWav(b)],'my-recording-'+d.getHours()+'-'+d.getMinutes()+'-'+d.getSeconds()+'.wav',{type:'audio/wav'});
+      await loadFile(f);
+    }catch{ say('The recording could not be read. Try again.'); }
+  };
+  recorder.start(); $('rec').classList.add('on'); $('rec').textContent='⏹ Stop recording';
+  $('fileInfo').textContent='🔴 Recording… sing your poem, then press Stop.';
+};
+
+/* ===== AI timing ===== */
+async function runAlign(){
+  if(busy) return;
+  if(!buf) return say('Record or upload your recording first (step 1).');
+  build(); busy=true; cancel=false; $('align').disabled=true; $('make').disabled=true; $('cancel').style.display='inline-block';
+  try{
+    setBar(0.02);
+    const ort=await loadOrt();
+    if(!CTC){
+      const m=await fetchModel(CTC_URL);
+      say('Starting the aligner…'); await tick();
+      CTC=await ort.InferenceSession.create(m,{executionProviders:['wasm'],graphOptimizationLevel:'all'});
+    }
+    const {logp,T,V}=await ctcLogits(ort);
+    say('Matching every letter of your poem…'); setBar(0.95); await tick();
+    const rate=alignWords(logp,T,V);
+    saveTiming(); setBar(1);
+    say('✓ Done. '+Math.round(rate*100)+'% of the words were very clear. Press play below to preview.'+(rate<0.4?' (Low: check that the text matches what you sang.)':''));
+  }catch(e){
+    if(e.message==='cancelled') say('Cancelled.'); else { console.error(e); say('Could not finish: '+e.message+'.'); }
+  }finally{ busy=false; $('align').disabled=false; $('make').disabled=false; $('cancel').style.display='none'; }
+}
+$('align').onclick=runAlign;
+$('cancel').onclick=()=>{ cancel=true; };
+$('reset').onclick=()=>{ const k=saveKey(); if(k) localStorage.removeItem(k); build(); say('Saved timing removed.'); };
+
+/* ===== drawing (the preview and the video use exactly the same code) ===== */
+const lead=()=>+$('lead').value/100;
+const cfgNow=()=>({ hl:$('hl').value, layout:$('layout').value, bg:$('bg').value, safe:$('safe').checked });
+const STARS=(()=>{ let s=7; const r=()=>{ s=(s*16807)%2147483647; return s/2147483647; }; return Array.from({length:170},()=>({x:r(),y:r(),z:r(),p:r()*6.283})); })();
+function rr(ctx,x,y,w,h,r){ r=Math.max(0,Math.min(r,w/2,h/2)); ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x,y,w,h,r); else ctx.rect(x,y,w,h); }
+function drawDesigned(ctx,W,H,t,kind){
+  const m=Math.min(W,H);
+  if(kind==='light'){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#21170c'); g.addColorStop(1,'#0b0805'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(let k=0;k<4;k++){ const cx=W*(0.5+0.32*Math.sin(t*0.07+k*1.7)), cy=H*(0.45+0.3*Math.cos(t*0.05+k*2.3)), rad=m*(0.45+0.12*k); const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,rad); rg.addColorStop(0,'rgba(233,196,106,0.16)'); rg.addColorStop(1,'rgba(233,196,106,0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H); }
+    return;
+  }
+  if(kind==='waves'){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#073039'); g.addColorStop(1,'#02121a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(let k=0;k<3;k++){ const cx=W*(0.5+0.38*Math.sin(t*0.12+k*2.1)), cy=H*(0.5+0.32*Math.cos(t*0.09+k*1.7)), rad=m*(0.6+0.1*k), col=k===1?'233,196,106':'42,157,143'; const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,rad); rg.addColorStop(0,'rgba('+col+',0.2)'); rg.addColorStop(1,'rgba('+col+',0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H); }
+    return;
+  }
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0b1430'); g.addColorStop(1,'#03060f'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const rg=ctx.createRadialGradient(W*0.5,H*0.16,0,W*0.5,H*0.16,m*0.65); rg.addColorStop(0,'rgba(233,196,106,0.16)'); rg.addColorStop(1,'rgba(233,196,106,0)'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.fillStyle='#FFFFFF';
+  for(const st of STARS){ const a=0.35+0.65*(0.5+0.5*Math.sin(t*(0.6+st.z)+st.p)); ctx.globalAlpha=a*(0.35+0.65*st.z); ctx.beginPath(); ctx.arc(st.x*W,st.y*H,m*(0.0012+st.z*0.0026),0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+function drawBg(ctx,W,H,t,c){
+  ctx.fillStyle='#05080d'; ctx.fillRect(0,0,W,H);
+  if(c.bg==='pic' && picBmp){
+    const s=Math.max(W/picBmp.width,H/picBmp.height), w=picBmp.width*s, h=picBmp.height*s;
+    ctx.drawImage(picBmp,(W-w)/2,(H-h)/2,w,h); ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H); return;
+  }
+  drawDesigned(ctx,W,H,t,c.bg==='pic'?'stars':c.bg);
+}
+function safeBox(W,H,safe){
+  const m=Math.min(W,H), vert=W<H, sq=Math.abs(W-H)<4;
+  if(safe&&vert) return {t:H*0.15,b:H*0.72,l:W*0.06,r:W*0.815};
+  if(safe&&sq) return {t:H*0.09,b:H*0.82,l:W*0.06,r:W*0.86};
+  return {t:m*0.06,b:H-m*0.06,l:m*0.05,r:W-m*0.05};
+}
+function wrapText(ctx,text,maxW){
+  const ws=String(text).split(/\s+/).filter(Boolean), lines=[]; let line='';
+  for(const w of ws){ const t=line?line+' '+w:w; if(ctx.measureText(t).width>maxW&&line){ lines.push(line); line=w; } else line=t; }
+  if(line) lines.push(line); return lines;
+}
+function layoutVerse(ctx,vi,fs,maxW){
+  const key=vi+'|'+Math.round(fs)+'|'+Math.round(maxW);
+  if(LAYOUT.has(key)) return LAYOUT.get(key);
+  ctx.save(); ctx.font=Math.round(fs)+'px '+AR; ctx.direction='rtl';
+  const gap=fs*0.32, items=verses[vi].words.map(j=>({j,w:ctx.measureText(words[j].text).width}));
+  ctx.restore();
+  const lines=[]; let line=[], lw=0;
+  for(const it of items){ if(line.length&&lw+gap+it.w>maxW){ lines.push({items:line,w:lw}); line=[]; lw=0; } lw+=(line.length?gap:0)+it.w; line.push(it); }
+  if(line.length) lines.push({items:line,w:lw});
+  const L={lines,gap,widest:Math.max(0,...items.map(x=>x.w))};
+  LAYOUT.set(key,L); return L;
+}
+function blockFor(ctx,vi,fs,maxW){
+  const L=layoutVerse(ctx,vi,fs,maxW), lh=fs*1.9, efs=fs*0.4; let en=[];
+  if(verses[vi].en){ ctx.save(); ctx.font=Math.round(efs)+'px '+LAT; ctx.direction='ltr'; en=wrapText(ctx,verses[vi].en,maxW).slice(0,3); ctx.restore(); }
+  return {L,lh,efs,en,h:L.lines.length*lh+(en.length?fs*0.2+en.length*efs*1.45:0)};
+}
+function wordState(t){
+  const tt=t+lead(); let cur=-1;
+  if(timed()) for(let j=0;j<words.length;j++){ if(words[j].st<=tt) cur=j; else break; }
+  return {cur,active:cur>=0&&tt<=words[cur].en+0.8,tt};
+}
+function drawFrame(ctx,W,H,t,c){
+  const m=Math.min(W,H), G=safeBox(W,H,c.safe);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=1; ctx.shadowColor='transparent'; ctx.direction='ltr';
+  drawBg(ctx,W,H,t,c);
+  if(!verses.length){ ctx.restore(); return; }
+  const cx=(G.l+G.r)/2, maxW=(G.r-G.l)*0.96, availH=G.b-G.t;
+  const {cur,active,tt}=wordState(t), curV=cur>=0?words[cur].v:0;
+  const show=c.layout==='all'?verses.map((_,i)=>i):[curV];
+  let fs=m*(W<H?0.085:0.08), blocks, total;
+  for(;;){
+    blocks=show.map(i=>blockFor(ctx,i,fs,maxW));
+    total=blocks.reduce((a,b)=>a+b.h,0)+(show.length-1)*fs*0.55;
+    if((total<=availH&&blocks.every(b=>b.L.widest<=maxW))||fs<m*0.03) break;
+    fs*=0.93;
+  }
+  let y0=G.t+Math.max(0,(availH-total)/2);
+  show.forEach((vi,bi)=>{
+    const B=blocks[bi];
+    let a=1;
+    if(c.layout==='one'&&timed()){ const st=words[verses[vi].words[0]].st; a=clamp((tt-st+0.15)/0.35,0,1); }
+    else if(c.layout==='all'&&vi!==curV) a=0.75;
+    ctx.save(); ctx.globalAlpha=a; ctx.textAlign='right'; ctx.textBaseline='alphabetic'; ctx.direction='rtl'; ctx.font=Math.round(fs)+'px '+AR;
+    B.L.lines.forEach((ln,k)=>{
+      let x=cx+ln.w/2; const y=y0+k*B.lh+fs*1.3;
+      for(const it of ln.items){
+        const j=it.j, w=words[j], done=j<cur||(j===cur&&!active), now=j===cur&&active;
+        ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=m*0.012;
+        if(now&&c.hl==='box'){
+          ctx.save(); ctx.shadowColor='rgba(245,197,66,0.7)'; ctx.shadowBlur=m*0.03; rr(ctx,x-it.w-fs*0.18,y-fs*1.05,it.w+fs*0.36,fs*1.75,fs*0.22); ctx.fillStyle=GOLD; ctx.fill(); ctx.restore();
+          ctx.fillStyle='#1a1a1a'; ctx.shadowBlur=0;
+        }else if(now){ ctx.fillStyle=GOLD; ctx.shadowColor='rgba(245,197,66,0.95)'; ctx.shadowBlur=m*0.035; }
+        else if(done){ ctx.fillStyle=c.hl==='box'?'#f3d98a':'#EAC75E'; }
+        else ctx.fillStyle='#FFFFFF';
+        ctx.fillText(w.text,x,y);
+        x-=it.w+B.L.gap;
+      }
+    });
+    if(B.en.length){
+      ctx.shadowColor='rgba(0,0,0,0.85)'; ctx.shadowBlur=m*0.01; ctx.fillStyle='#d5dbe3'; ctx.direction='ltr'; ctx.textAlign='center';
+      ctx.font=Math.round(B.efs)+'px '+LAT;
+      const ey=y0+B.L.lines.length*B.lh+fs*0.2;
+      B.en.forEach((l,k)=>ctx.fillText(l,cx,ey+B.efs*(1+k*1.45)));
+    }
+    ctx.restore();
+    y0+=B.h+fs*0.55;
+  });
+  ctx.restore();
+}
+
+/* ===== live preview ===== */
+const view=$('view');
+function sizeView(){ const [W,H]=FORMATS[$('shape').value]; view.width=Math.round(W/2); view.height=Math.round(H/2); LAYOUT.clear(); }
+function loop(){
+  if(!busy||true){ const t=media?media.currentTime:0; try{ drawFrame(view.getContext('2d'),view.width,view.height,t,cfgNow()); }catch(e){} }
+  requestAnimationFrame(loop);
+}
+['shape'].forEach(id=>$(id).addEventListener('change',sizeView));
+$('layout').addEventListener('change',()=>LAYOUT.clear());
+$('lead').oninput=()=>{ const v=lead(); $('leadVal').textContent=(v>0?'+':'')+v.toFixed(2)+' s'; };
+$('bg').addEventListener('change',()=>{ $('picBtn').style.display=$('bg').value==='pic'?'inline-block':'none'; });
+$('picIn').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; try{ picBmp=await createImageBitmap(f); $('bg').value='pic'; $('picBtn').style.display='inline-block'; }catch{ say('Could not read that picture.'); } };
+
+/* ===== making the video ===== */
+const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
+function sliceBuf(b,r0,r1){
+  const R=b.sampleRate, s=Math.floor(r0*R), e=Math.min(b.length,Math.ceil(r1*R)), len=Math.max(1,e-s), nc=b.numberOfChannels;
+  const out=new AudioBuffer({length:len,numberOfChannels:nc,sampleRate:R}), fi=Math.round(R*0.04), fo=Math.min(len,Math.round(R*0.6));
+  for(let c=0;c<nc;c++){
+    const d=out.getChannelData(c); d.set(b.getChannelData(c).subarray(s,e),0);
+    for(let i=0;i<Math.min(fi,len);i++) d[i]*=i/fi;
+    for(let i=0;i<fo;i++) d[len-1-i]*=i/fo;
+  }
+  return out;
+}
+const vsay=m=>{ $('vstatus').textContent=m; };
+const vbar=p=>{ $('vprog').style.display='block'; $('vbar').style.width=Math.round(p*100)+'%'; };
+async function makeVideo(){
+  if(busy) return;
+  if(!buf) return vsay('Record or upload your recording first (step 1).');
+  if(!timed()) return vsay('Press "🎧 Listen and time every word" first (step 2), so the highlight knows where each word is.');
+  busy=true; cancel=false; if(media) media.pause();
+  $('make').style.display='none'; $('cancelV').style.display='inline-block'; $('align').disabled=true; $('result').style.display='none';
+  let output=null;
+  try{
+    await document.fonts.load('48px Amiri','طَلَعَ'); LAYOUT.clear();
+    vsay('Preparing…'); vbar(0.01);
+    const MB=await loadMB();
+    let [W,H]=FORMATS[$('shape').value];
+    if($('quality').value==='720'){ W=Math.round(W*2/3/2)*2; H=Math.round(H*2/3/2)*2; }
+    const vcodec=await MB.getFirstEncodableVideoCodec(['avc','vp9','av1'],{width:W,height:H});
+    if(!vcodec) throw new Error('this browser cannot make MP4 videos. Please use Google Chrome or Microsoft Edge');
+    const acodec=await MB.getFirstEncodableAudioCodec(['aac','opus']);
+    const canvas=new OffscreenCanvas(W,H), ctx=canvas.getContext('2d');
+    output=new MB.Output({format:new MB.Mp4OutputFormat({fastStart:'in-memory'}),target:new MB.BufferTarget()});
+    const vs=new MB.CanvasSource(canvas,{codec:vcodec,bitrate:MB.QUALITY_HIGH});
+    output.addVideoTrack(vs,{frameRate:30});
+    let as=null; if(acodec){ as=new MB.AudioBufferSource({codec:acodec,bitrate:MB.QUALITY_HIGH}); output.addAudioTrack(as); }
+    await output.start();
+    let r0=0, r1=buf.duration;
+    if($('trim').checked){ r0=Math.max(0,words[0].st-0.8); r1=Math.min(buf.duration,words[words.length-1].en+1.8); }
+    if(as) await as.add(sliceBuf(buf,r0,r1));
+    const fps=30, total=Math.max(1,Math.ceil((r1-r0)*fps)), c=cfgNow(), t0=performance.now();
+    for(let k=0;k<total;k++){
+      if(cancel) throw new Error('cancelled');
+      const tv=k/fps;
+      drawFrame(ctx,W,H,r0+tv,c);
+      await vs.add(tv,1/fps);
+      if(k%15===0){ const d=(k+1)/total, secs=(performance.now()-t0)/1000; vbar(0.03+0.95*d); vsay('Making your video… '+Math.round(d*100)+'%'+(d>0.03?' · about '+Math.max(1,Math.round(secs/d*(1-d)))+' s left':'')); await tick(); }
+    }
+    vsay('Finishing the file…');
+    await output.finalize();
+    const blob=new Blob([output.target.buffer],{type:'video/mp4'});
+    if(resultUrl) URL.revokeObjectURL(resultUrl);
+    resultUrl=URL.createObjectURL(blob);
+    $('resVid').src=resultUrl; $('result').style.display='block'; vbar(1);
+    vsay('✓ Done: '+(blob.size/1048576).toFixed(1)+' MB. Watch it below, then download.');
+  }catch(e){
+    if(output){ try{ await output.cancel(); }catch{} }
+    if(e.message==='cancelled'){ vsay('Cancelled.'); } else { console.error(e); vsay('The video could not be made: '+e.message+'.'); }
+  }finally{
+    busy=false; $('make').style.display='inline-block'; $('cancelV').style.display='none'; $('align').disabled=false;
+  }
+}
+$('make').onclick=makeVideo;
+$('cancelV').onclick=()=>{ cancel=true; };
+$('dl').onclick=()=>{ if(!resultUrl) return; const a=document.createElement('a'); a.href=resultUrl; a.download='poem-'+$('shape').value.replace(':','x')+'.mp4'; document.body.appendChild(a); a.click(); a.remove(); };
+
+/* ===== start ===== */
+build(); sizeView();
+document.fonts.load('48px Amiri','طَلَعَ الْبَدْرُ').then(()=>LAYOUT.clear());
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
