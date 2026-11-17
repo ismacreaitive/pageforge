@@ -159,6 +159,10 @@
       <option value="phrase">Always phrase by phrase (at the waqf signs and my pauses)</option>
       <option value="whole">Whole ayah (turns pages by lines)</option>
     </select></div>
+    <div><div class="label">English translation timing</div><select id="trSplit">
+      <option value="phrase">Follow the Arabic phrases and pauses (recommended)</option>
+      <option value="whole">Show the whole translation for each ayah</option>
+    </select><div class="ptext">The wording stays unchanged and in order. Phrase boundaries are estimated because translations are supplied by ayah, not phrase.</div></div>
     <div><div class="label">Text position</div><select id="txtPos"><option value="auto">Auto</option><option value="up">Higher</option><option value="mid">Middle</option><option value="low">Lower</option></select></div>
     <label class="slider">Text size <input type="range" id="txtSize" min="80" max="130" step="5" value="100"><b id="sizeVal">100%</b></label>
     <label class="check"><input type="checkbox" id="melOn" checked> 🎼 Melody line (the rise and fall of my voice)</label>
@@ -371,6 +375,7 @@ const FINDS=[
   [['ai','ai timing','listen','listener','aligner','automatic timing','detect','recognise','recognize','whisper','word timing'],'aiSync'],
   [['cover','thumbnail','thumb','first frame','blink'],'cvBox'],
   [['phrase','split','long ayah','long ayat','waqf','pause'],'txtSplit'],
+  [['translation timing','english timing','translation phrase','english pause'],'trSplit'],
   [['change background','background change','rotate','switch background'],'bgChange'],
   [['shape','ratio','aspect','size of video','vertical','wide','square','9:16','16:9','1:1','portrait','landscape'],'format'],
   [['show me','me','face','cut','remove room','green screen','bubble','avatar','photo','picture of me','frame'],'meMode'],
@@ -437,7 +442,7 @@ async function idbPut(store,rec){
 }
 
 /* ---------- saved settings (only in this browser) ---------- */
-const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','denoise','smooth','tune','coughOn','echo','echoType','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
+const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','trSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','denoise','smooth','tune','coughOn','echo','echoType','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
 { const ver=localStorage.getItem('forge:qs:ver');
   if(!['8','9','10','11','12','13'].includes(ver)){ localStorage.setItem('forge:qs:set:hlMode','quick'); localStorage.setItem('forge:qs:set:mvLen','alt'); }
   if(!['10','11','12','13'].includes(ver)) localStorage.setItem('forge:qs:set:aiQ','align');
@@ -1024,6 +1029,7 @@ function loadMan(){
 }
 function saveMan(){ try{ localStorage.setItem('forge:qs:sync:'+S.sig,JSON.stringify(S.man)); }catch{} }
 const LAYOUT=new Map();
+const TR_LAYOUT=new WeakMap();
 function rebuild(){
   const N=S.units.length, mb=S.man.b, ai=S.man.ai;
   const aiB=ai && Array.isArray(ai.b) && ai.b.length===N+1 ? ai.b : null;
@@ -1794,14 +1800,14 @@ for(const id of ['bgUp','bgFolder']){
 if(!('webkitdirectory' in $('bgFolder'))) $('bgFolderLabel').classList.add('hidden');
 
 /* background changes: every ayah, or every time a meaning scene ends */
-function rotMode(cfg){ if(cfg.bg==='random') return cfg.bgChange==='never' ? 'ayah' : cfg.bgChange; if(cfg.bgChange!=='never' && cfg.bg!=='roomblur') return cfg.bgChange; return null; }
+function rotMode(cfg){ if(cfg.bg==='random') return cfg.bgChange==='never' ? null : cfg.bgChange; if(cfg.bgChange!=='never' && cfg.bg!=='roomblur') return cfg.bgChange; return null; }
 function bgChangeTimes(cfg){
   const rm=rotMode(cfg); if(!rm || !S.Bn || !S.units.length) return [];
   const cache=bgTimesCache;
   if(cache && cache.units===S.units && cache.B===S.Bn && cache.vis===S.vis && cache.rev===bgRevision && cache.rm===rm && cache.mvOn===cfg.mvOn && cache.mvLen===cfg.mvLen) return cache.times;
   let times;
   if(rm==='scene' && cfg.mvOn){
-    const out=[]; for(let i=0;i<S.units.length;i++) for(const g of visSegs(i,cfg)) out.push(Math.max(g.st+0.3,g.en-0.6));
+    const out=S.Bn.slice(1,S.units.length); for(let i=0;i<S.units.length;i++) for(const g of visSegs(i,cfg)) out.push(Math.max(g.st+0.3,g.en-0.6));
     if(out.length) times=out.sort((a,b)=>a-b).filter((t,i,a)=>!i || t-a[i-1]>0.05);
   }
   if(!times) times=S.Bn.slice(1,S.units.length);
@@ -2286,7 +2292,7 @@ async function itemFrame(it,tt){ if(!it) return null; if(it.img) return it.img; 
 async function openSources(MB,cfg,W,H){
   const rd={ face:null, list:[] };
   if(S.isVideo && (VIDEO_ME.includes(cfg.me) || cfg.bg==='roomblur')){ try{ rd.face=await openReader(MB,S.file,Math.max(W,H),false); rd.list.push(rd.face); }catch(e){ console.warn('Your video picture could not be read',e); } }
-  const bgItems=rotMode(cfg) ? S.items : cfg.bg.startsWith('lib:') && S.bgItem ? [S.bgItem] : [];
+  const bgItems=rotMode(cfg) || cfg.bg==='random' ? S.items : cfg.bg.startsWith('lib:') && S.bgItem ? [S.bgItem] : [];
   for(const it of bgItems){ if(it.blob && !it.reader){ try{ it.reader=await openReader(MB,it.blob,1280,true); rd.list.push(it.reader); }catch(e){ console.warn(e); } } }
   if(cfg.mvOn){
     const vids=[]; eachItem(it=>{ if(it.type==='vid' && it.blob && !it.reader) vids.push(it); });
@@ -2305,7 +2311,8 @@ async function buildFrame(t,cfg,rd){
       const it=S.items[b.idx%S.items.length]; F.cur=await itemFrame(it,b.since);
       if(b.idx>0 && b.since<0.8){ const ip=S.items[(b.idx-1)%S.items.length]; if(ip!==it) F.prev=await itemFrame(ip,b.since+b.prevSpan); }
     }
-  }else if(cfg.bg.startsWith('lib:')) F.cur=await itemFrame(S.bgItem,t);
+  }else if(cfg.bg==='random') F.cur=await itemFrame(S.items[0],t);
+  else if(cfg.bg.startsWith('lib:')) F.cur=await itemFrame(S.bgItem,t);
   const layers=visLayers(t,cfg);
   if(layers){ F.V=layers; F.vis=[]; for(const L of layers) F.vis.push(await itemFrame(L.item,t-L.st)); }
   if(cfg.me==='cut' && F.face && SEG) F.maskOk=computeMask(F.face,true);
@@ -2320,7 +2327,7 @@ function readCfg(){
   const tr=$('qTr').value; let me=$('meMode').value;
   if(!S.isVideo && VIDEO_ME.includes(me)) me=S.photo ? 'bubble' : 'none';
   if(me==='bubble' && !S.photo) me='none';
-  return { me, bg:$('bgSel').value||'stars', bgChange:$('bgChange').value, text:$('textMode').value, style:$('txtStyle').value, split:$('txtSplit').value, hl:$('hlMode').value, lead:+$('hlLead').value/100, pos:$('txtPos').value, size:+$('txtSize').value/100,
+  return { me, bg:$('bgSel').value||'stars', bgChange:$('bgChange').value, text:$('textMode').value, style:$('txtStyle').value, split:$('txtSplit').value, trSplit:$('trSplit').value, hl:$('hlMode').value, lead:+$('hlLead').value/100, pos:$('txtPos').value, size:+$('txtSize').value/100,
     safe:$('safeOn').checked, mel:$('melOn').checked, hdr:$('hdrOn').checked, bar:$('barOn').checked, trRtl:/^(ur|fa|ar)\./.test(tr), pname:$('pName').value.trim(),
     mvOn:$('mvOn').checked, icOn:$('icOn').checked, mvLen:$('mvLen').value, mvMe:$('mvMe').value };
 }
@@ -2371,6 +2378,11 @@ function drawBackdrop(ctx,W,H,t,F,cfg,range){
   if(bg.startsWith('lib:') && F.cur){
     const span=range && range.r1>range.r0 ? range.r1-range.r0 : 60, p=clamp((t-(range ? range.r0 : 0))/span,0,1);
     cover(ctx,F.cur,W,H,F.cur instanceof ImageBitmap ? 1.03+0.07*p : 1,0);
+    ctx.fillStyle='rgba(0,0,0,'+(cfg.me==='cut' ? 0.22 : 0.45)+')'; ctx.fillRect(0,0,W,H);
+    return;
+  }
+  if(bg==='random' && F.cur){
+    cover(ctx,F.cur,W,H,F.cur instanceof ImageBitmap ? 1.03+0.07*clamp(t/60,0,1) : 1,0);
     ctx.fillStyle='rgba(0,0,0,'+(cfg.me==='cut' ? 0.22 : 0.45)+')'; ctx.fillRect(0,0,W,H);
     return;
   }
@@ -2503,9 +2515,47 @@ function wrap(ctx,text,maxW){ const ws=String(text).split(/\s+/).filter(Boolean)
 const trFont=(cfg,fs,weight)=>cfg.trRtl ? Math.round(fs)+'px '+AR_FONT : cfg.style==='classic' ? 'italic 600 '+Math.round(fs)+'px '+SERIF : (weight||'400')+' '+Math.round(fs)+'px '+LAT;
 function fitLines(ctx,text,fs0,maxW,maxLines,cfg,weight){
   let fs=fs0, lines;
-  for(;;){ ctx.font=trFont(cfg,fs,weight); lines=wrap(ctx,text,maxW); if(lines.length<=maxLines || fs<fs0*0.6) break; fs*=0.93; }
-  if(lines.length>maxLines){ lines=lines.slice(0,maxLines); lines[maxLines-1]=lines[maxLines-1].replace(/\s*\S*$/,'')+'…'; }
+  for(;;){ ctx.font=trFont(cfg,fs,weight); lines=wrap(ctx,text,maxW); if(lines.length<=maxLines || fs<=fs0*0.7) break; fs=Math.max(fs0*0.7,fs*0.93); }
   return { fs, lines };
+}
+function splitTranslation(text,pages){
+  const words=String(text||'').trim().split(/\s+/).filter(Boolean);
+  if(!pages.length || !words.length) return pages.map(()=> '');
+  if(words.length<pages.length){
+    const chunks=pages.map(()=> '');
+    if(words.length===1) chunks[pages.length-1]=words[0];
+    else words.forEach((word,i)=>{ chunks[Math.round(i*(pages.length-1)/(words.length-1))]=word; });
+    return chunks;
+  }
+  const weights=pages.map(p=>Math.max(1,p.flatMap(l=>l.items).filter(it=>!it.tk.num).length));
+  const total=weights.reduce((a,b)=>a+b,0), chunks=[]; let start=0, used=0;
+  for(let i=0;i<pages.length;i++){
+    used+=weights[i];
+    if(i===pages.length-1){ chunks.push(words.slice(start).join(' ')); break; }
+    const remaining=pages.length-i-1, target=Math.round(words.length*used/total);
+    const min=Math.min(words.length-remaining,Math.max(start+1,target-1));
+    const max=words.length-remaining;
+    let cut=clamp(target,min,max);
+    const punctuation=[];
+    for(let k=min;k<=max;k++) if(/[,;:.!?…。]$/.test(words[k-1])) punctuation.push(k);
+    if(punctuation.length) cut=punctuation.reduce((best,k)=>Math.abs(k-target)<Math.abs(best-target) ? k : best,punctuation[0]);
+    chunks.push(words.slice(start,cut).join(' ')); start=cut;
+  }
+  return chunks;
+}
+function translationPage(text,pages,cw,wt,tt,num){
+  let chunks=TR_LAYOUT.get(pages);
+  if(!chunks){ chunks=new Map(); TR_LAYOUT.set(pages,chunks); }
+  if(!chunks.has(text)) chunks.set(text,splitTranslation(text,pages));
+  const parts=chunks.get(text); let page=0, alpha=1;
+  if(cw>=0) pages.forEach((p,k)=>{ if(p.some(l=>l.items.some(it=>it.tk.wi===cw))) page=k; });
+  if(page>0 && wt){
+    const first=pages[page].flatMap(l=>l.items).find(it=>!it.tk.num);
+    if(first && wt[first.tk.wi]!=null) alpha=clamp((tt-wt[first.tk.wi]+0.08)/0.25,0,1);
+  }
+  let value=parts[page]||'';
+  if(page===pages.length-1 && num) value+='  ('+num+')';
+  return { text:value, alpha };
 }
 function placeBlock(H,m,G,cfg,blockH){
   const topLim=G.top2+m*0.03, botLim=G.b-(cfg.mel ? m*0.14 : m*0.03);
@@ -2520,11 +2570,18 @@ function drawCard(ctx,W,H,m,t,i,cfg,G){
   const shadow=classic ? ['rgba(0,0,0,0.85)',m*0.02] : ['rgba(0,0,0,0.45)',m*0.008];
   const trColor=classic ? CREAM : '#FFFFFF';
   if(cfg.text==='tr'){
-    const txt=(u.tr||'')+(u.num ? '  ('+u.num+')' : ''), T=fitLines(ctx,txt,m*0.05*cfg.size,maxW,7,cfg,'500'), lh=T.fs*1.4, blockH=T.lines.length*lh;
+    let txt=(u.tr||'')+(u.num ? '  ('+u.num+')' : ''), alpha=1;
+    if(cfg.trSplit==='phrase' && u.tr){
+      const fs=m*(vert ? 0.07 : 0.066)*cfg.size*(G.small ? 0.85 : 1), L=layoutFor(ctx,i,fs,maxW);
+      const pages=phrasePages(i,fs,maxW,vert ? (cfg.safe ? 3 : 4) : 3,L), wt=S.WT[i], tt=t+cfg.lead;
+      let cw=-1; if(wt) for(let j=0;j<wt.length;j++){ if(tt>=wt[j]) cw=j; else break; }
+      const current=translationPage(u.tr,pages,cw,wt,tt,u.num); txt=current.text; alpha=current.alpha;
+    }
+    const T=fitLines(ctx,txt,m*0.06*cfg.size,maxW,cfg.trSplit==='whole' ? 12 : 6,cfg,'500'), lh=T.fs*1.4, blockH=T.lines.length*lh;
     const top=placeBlock(H,m,G,cfg,blockH);
     LASTCARD={ top:top-m*0.035, bot:top+blockH+m*0.03 };
     if(!classic){ ctx.save(); ctx.globalAlpha=boxA; rr(ctx,cx-maxW/2-m*0.045,top-m*0.035,maxW+m*0.09,blockH+m*0.06,m*0.03); ctx.fillStyle='#000'; ctx.fill(); ctx.restore(); }
-    ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
+    ctx.save(); ctx.globalAlpha=a*(cfg.trSplit==='phrase' ? 0.2+0.8*alpha : 1); ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
     ctx.font=trFont(cfg,T.fs,'500'); ctx.shadowColor=shadow[0]; ctx.shadowBlur=shadow[1];
     T.lines.forEach((l,k)=>ctx.fillText(l,cx,top+T.fs*(1+k*1.4)));
     ctx.restore();
@@ -2548,7 +2605,12 @@ function drawCard(ctx,W,H,m,t,i,cfg,G){
   let pa=1;
   if(pg>0 && wt){ const firstIt=lines.flatMap(l=>l.items).find(it=>!it.tk.num); if(firstIt && wt[firstIt.tk.wi]!=null) pa=clamp((tt-wt[firstIt.tk.wi]+0.08)/0.25,0,1); }
   const aa=a*(0.2+0.8*pa);
-  const T=cfg.text==='both' && u.tr ? fitLines(ctx,u.tr,m*(classic ? 0.034 : 0.032)*cfg.size*(G.small ? 0.9 : 1),maxW,4,cfg) : null;
+  let trText=u.tr||'', trAlpha=pa;
+  if(cfg.trSplit==='phrase' && trText){
+    const trPages=phrasePages(i,fs,maxW,maxLines,L), current=translationPage(trText,trPages,cw,wt,tt,u.num);
+    trText=current.text; trAlpha=current.alpha;
+  }
+  const T=cfg.text==='both' && trText ? fitLines(ctx,trText,m*(classic ? 0.046 : 0.043)*cfg.size*(G.small ? 0.9 : 1),maxW,cfg.trSplit==='whole' ? 12 : 4,cfg) : null;
   const gapTr=classic ? m*0.06 : m*0.035;
   const lh=fs*1.9, trH=T ? gapTr+T.lines.length*T.fs*1.45 : 0, blockH=lines.length*lh+trH;
   const top=placeBlock(H,m,G,cfg,blockH);
@@ -2577,7 +2639,7 @@ function drawCard(ctx,W,H,m,t,i,cfg,G){
   if(T){
     const yl=top+lines.length*lh;
     if(classic){ ctx.save(); ctx.globalAlpha=a*0.85; ctx.strokeStyle=GOLD; ctx.lineWidth=Math.max(1.5,m*0.0025); ctx.beginPath(); ctx.moveTo(cx-maxW*0.17,yl+gapTr*0.35); ctx.lineTo(cx+maxW*0.17,yl+gapTr*0.35); ctx.stroke(); ctx.restore(); }
-    ctx.save(); ctx.globalAlpha=a*0.95; ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
+    ctx.save(); ctx.globalAlpha=a*(cfg.trSplit==='phrase' ? 0.2+0.8*trAlpha : 0.95); ctx.fillStyle=trColor; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.direction=cfg.trRtl ? 'rtl' : 'ltr';
     ctx.font=trFont(cfg,T.fs); ctx.shadowColor=shadow[0]; ctx.shadowBlur=classic ? m*0.015 : m*0.006;
     const y0=yl+gapTr;
     T.lines.forEach((l,k)=>ctx.fillText(l,cx,y0+T.fs*(0.85+k*1.45)));
@@ -2691,7 +2753,8 @@ function previewF(t,cfg){
       const it=S.items[b.idx%S.items.length]; F.cur=ok(it);
       if(b.idx>0 && b.since<0.8){ const ip=S.items[(b.idx-1)%S.items.length]; if(ip!==it) F.prev=ok(ip); }
     }
-  }else if(cfg.bg.startsWith('lib:')) F.cur=ok(S.bgItem);
+  }else if(cfg.bg==='random') F.cur=ok(S.items[0]);
+  else if(cfg.bg.startsWith('lib:')) F.cur=ok(S.bgItem);
   const layers=visLayers(t,cfg), want=new Set();
   if(layers){
     F.V=layers;
@@ -3076,7 +3139,7 @@ $('echoType').addEventListener('change',()=>{
 });
 $('format').addEventListener('change',()=>{ sizeView(); redraw(); });
 $('chan').addEventListener('change',()=>loadMark().then(()=>{ updatePost(); staleCovers(); redraw(); }));
-['textMode','txtStyle','txtSplit','hlMode','melOn','hdrOn','barOn','safeOn','zonesOn','txtPos'].forEach(id=>$(id).addEventListener('change',()=>{ LAYOUT.clear(); staleCovers(); redraw(); }));
+['textMode','txtStyle','txtSplit','trSplit','hlMode','melOn','hdrOn','barOn','safeOn','zonesOn','txtPos'].forEach(id=>$(id).addEventListener('change',()=>{ LAYOUT.clear(); staleCovers(); redraw(); }));
 $('qTr').addEventListener('change',()=>{ if(S.units.length) toast('Press "Get the ayat" again to use the new translation'); });
 fontsReady.then(()=>{ LAYOUT.clear(); redraw(); });
 if(location.protocol==='file:') showNote('This page was opened by double-clicking the file. Open it with Live Server in VS Code, or on your Netlify site.');
