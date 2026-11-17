@@ -146,7 +146,10 @@
       <option value="ayah">Every ayah (uses my library)</option>
       <option value="never">Never (keep one background)</option>
     </select></div>
-    <label class="pick">🖼️ Add my own pictures or videos as backgrounds<input type="file" id="bgUp" accept="image/*,video/*" multiple hidden></label>
+    <div class="ptext">Select several files at once, or choose a folder. Folder selection is available in supported browsers.</div>
+    <label class="pick">🖼️ Choose multiple background files<input type="file" id="bgUp" accept="image/*,video/*" multiple hidden></label>
+    <label class="pick" id="bgFolderLabel">📁 Choose a background folder<input type="file" id="bgFolder" accept="image/*,video/*" webkitdirectory multiple hidden></label>
+    <div id="bgUploadStatus" class="ptext" role="status" aria-live="polite"></div>
     <div class="row">
       <div><div class="label">Text</div><select id="textMode"><option value="both">Arabic + translation</option><option value="ar">Arabic only</option><option value="tr">Translation only</option></select></div>
       <div><div class="label">Text style</div><select id="txtStyle"><option value="classic">Classic: gold line, elegant translation</option><option value="card">Modern: on a soft dark box</option></select></div>
@@ -1514,21 +1517,33 @@ $('bgSel').addEventListener('change',async()=>{ localStorage.setItem('forge:qs:s
 $('bgChange').addEventListener('change',async()=>{ await prepareBackground(); staleCovers(); redraw(); });
 $('meMode').addEventListener('change',async()=>{ meUI(); await prepareBackground(); LAYOUT.clear(); staleCovers(); redraw(); });
 $('pName').addEventListener('input',redraw);
-$('bgUp').onchange=async e=>{
-  const files=[...e.target.files]; e.target.value=''; let first=null;
-  for(const f of files){
-    const type=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name) ? 'vid' : f.type.startsWith('image/') ? 'img' : '';
-    if(!type){ toast('Skipped '+f.name+' (not a picture or video)'); continue; }
-    const id=newId();
-    try{ await idbPut('bgs',{ id, name:f.name, type, blob:f }); if(!first) first=id; }catch{ toast('Could not save '+f.name+'. The browser storage may be full.'); }
+async function importBgFiles(files){
+  if(!files.length) return;
+  let first=null, added=0, skipped=0, failed=0;
+  $('bgUploadStatus').textContent='Importing '+files.length+' files…';
+  for(let i=0;i<files.length;i++){
+    const f=files[i], type=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name) ? 'vid' : f.type.startsWith('image/') ? 'img' : '';
+    if(!type){ skipped++; continue; }
+    try{ await idbPut('bgs',{ id:newId(), name:f.name, type, blob:f }); if(!first) first=true; added++; }
+    catch(e){ failed++; console.warn('Could not save background '+f.name,e); }
+    if(i%10===9 || i===files.length-1){ $('bgUploadStatus').textContent='Importing backgrounds… '+(i+1)+' of '+files.length; await tick(); }
   }
-  if(!first) return;
+  if(!first){
+    const msg=failed ? 'Could not save any backgrounds. Check browser storage space.' : 'No supported pictures or videos were found.';
+    $('bgUploadStatus').textContent=msg; toast(msg); return;
+  }
   await fillBgSel();
   $('bgSel').value='random'; localStorage.setItem('forge:qs:set:bgSel','random');
-  if(S.isVideo && $('meMode').value==='asis'){ $('meMode').value='cut'; $('meMode').dispatchEvent(new Event('change')); localStorage.setItem('forge:qs:set:meMode','cut'); }
-  await resetItems(); seekStatic(S.lastT);
-  toast('✓ Added to your background library.');
-};
+  if(S.isVideo && $('meMode').value==='asis'){ $('meMode').value='cut'; meUI(); LAYOUT.clear(); localStorage.setItem('forge:qs:set:meMode','cut'); }
+  await resetItems(); staleCovers(); seekStatic(S.lastT);
+  const msg='Added '+added+' background'+(added===1 ? '' : 's')+(skipped ? '; skipped '+skipped+' unsupported file'+(skipped===1 ? '' : 's') : '')+(failed ? '; could not save '+failed+' file'+(failed===1 ? '' : 's') : '')+'.';
+  $('bgUploadStatus').textContent=msg+' Your library can rotate at ayah or meaning-scene changes.';
+  toast(msg);
+}
+for(const id of ['bgUp','bgFolder']){
+  $(id).onchange=e=>{ const files=[...e.target.files]; e.target.value=''; importBgFiles(files).catch(err=>{ console.error(err); $('bgUploadStatus').textContent='Could not finish importing backgrounds.'; toast('Could not finish importing backgrounds: '+(err.message||'unknown error')); }); };
+}
+if(!('webkitdirectory' in $('bgFolder'))) $('bgFolderLabel').classList.add('hidden');
 
 /* background changes: every ayah, or every time a meaning scene ends */
 function rotMode(cfg){ if(cfg.bg==='random') return cfg.bgChange==='never' ? 'ayah' : cfg.bgChange; if(cfg.bgChange!=='never' && cfg.bg!=='roomblur') return cfg.bgChange; return null; }
