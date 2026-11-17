@@ -74,7 +74,7 @@
   <input type="text" id="findSet" placeholder="🔎 Jump to a setting: AI timing, cover, phrase, visuals, maqam, keys…" autocomplete="off" spellcheck="false">
 
   <div class="sec">1 · Your recitation</div>
-  <label class="drop" id="drop"><input type="file" id="fileIn" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">📖</div><strong>Drop your recitation video or audio here</strong><span>Your voice stays exactly as it is.</span></label>
+  <label class="drop" id="drop"><input type="file" id="fileIn" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">📖</div><strong>Drop your recitation video or audio here</strong><span>Your original recording stays untouched; preview processing before export.</span></label>
   <div class="file-info" id="fileInfo">No file chosen yet</div>
 
   <div class="sec">2 · Which ayat did you recite?</div>
@@ -166,6 +166,12 @@
     <label class="check"><input type="checkbox" id="safeOn" checked> 📱 Safe layout for TikTok, Reels and Shorts (nothing at the top edge, the bottom or the right side)</label>
     <label class="check"><input type="checkbox" id="zonesOn"> 👁 Show where the app buttons cover the video (only in this preview, never in the final video)</label>
     <label class="check"><input type="checkbox" id="barOn"> Thin progress bar</label>
+    <div><div class="label">Clean and smooth my voice</div><label class="slider">Background noise reduction <input type="range" id="denoise" min="0" max="80" step="5" value="45"><b id="denoiseVal">45%</b></label>
+      <div class="ptext">Best with a brief quiet pause in the recording. It reduces steady room noise, not other voices or music over your recitation.</div></div>
+    <label class="slider">Voice volume smoothing <input type="range" id="smooth" min="0" max="100" step="5" value="35"><b id="smoothVal">35%</b></label>
+    <label class="slider">Gentle tune correction toward my opening notes <input type="range" id="tune" min="0" max="100" step="5" value="0"><b id="tuneVal">0%</b></label>
+    <div class="ptext">Tune correction is off at 0%. Preview it first; it only adjusts small pitch drift. It cannot turn a cough into a recited note.</div>
+    <label class="check"><input type="checkbox" id="coughOn" checked> Reduce isolated coughs in pauses (never alter timed recited words)</label>
     <div><div class="label">Choose an echo space</div><select id="echoType">
       <option value="custom">Custom (keep my current echo amount)</option>
       <option value="none">No echo</option>
@@ -175,7 +181,7 @@
     </select></div>
     <label class="slider">Echo amount <input type="range" id="echo" min="0" max="60" value="0"><b id="echoVal">0%</b></label>
     <div class="box">
-      <div class="ptext" style="margin:0">Hear the recitation repeat with the selected echo and see your video design before making it. Load the ayat first to preview its Arabic and translation on screen.</div>
+      <div class="ptext" style="margin:0">Preview noise reduction, voice smoothing, optional tune correction and echo with your video design before making it. Load the ayat first to preview its Arabic and translation on screen.</div>
       <button class="mini" id="playBtn">▶ Preview video + echo</button>
     </div>
     <div class="row">
@@ -431,7 +437,7 @@ async function idbPut(store,rec){
 }
 
 /* ---------- saved settings (only in this browser) ---------- */
-const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','echo','echoType','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
+const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','denoise','smooth','tune','coughOn','echo','echoType','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
 { const ver=localStorage.getItem('forge:qs:ver');
   if(!['8','9','10','11','12','13'].includes(ver)){ localStorage.setItem('forge:qs:set:hlMode','quick'); localStorage.setItem('forge:qs:set:mvLen','alt'); }
   if(!['10','11','12','13'].includes(ver)) localStorage.setItem('forge:qs:set:aiQ','align');
@@ -1406,24 +1412,265 @@ async function computePitch(){
   return { f0:sm, hop:hop/R, lo, span:Math.max(6,12*Math.log2(hi/lo)) };
 }
 
+function complexFFT(re,im,inverse=false){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit;
+    if(i<j){ let t=re[i]; re[i]=re[j]; re[j]=t; t=im[i]; im[i]=im[j]; im[j]=t; }
+  }
+  for(let len=2;len<=n;len<<=1){
+    const a=(inverse ? 2 : -2)*Math.PI/len, wr0=Math.cos(a), wi0=Math.sin(a);
+    for(let i=0;i<n;i+=len){
+      let wr=1, wi=0;
+      for(let j=0;j<len/2;j++){
+        const u=i+j, v=u+len/2, vr=re[v]*wr-im[v]*wi, vi=re[v]*wi+im[v]*wr;
+        re[v]=re[u]-vr; im[v]=im[u]-vi; re[u]+=vr; im[u]+=vi;
+        const next=wr*wr0-wi*wi0; wi=wr*wi0+wi*wr0; wr=next;
+      }
+    }
+  }
+  if(inverse) for(let i=0;i<n;i++){ re[i]/=n; im[i]/=n; }
+}
+function cloneAudioBuffer(src){
+  const out=new AudioBuffer({ length:src.length, numberOfChannels:src.numberOfChannels, sampleRate:src.sampleRate });
+  for(let c=0;c<src.numberOfChannels;c++) out.getChannelData(c).set(src.getChannelData(c));
+  return out;
+}
+async function denoiseBuffer(src,strength,version){
+  if(!S.A) throw new Error('Analyze the recording before reducing noise');
+  const N=1024, H=512, B=N/2+1, R=src.sampleRate, nc=src.numberOfChannels, frames=Math.ceil(src.length/H)+1;
+  const win=new Float32Array(N), input=Array.from({ length:nc },(_,c)=>src.getChannelData(c)), re=Array.from({ length:nc },()=>new Float64Array(N)), im=Array.from({ length:nc },()=>new Float64Array(N));
+  for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
+  const level=new Float32Array(frames);
+  for(let f=0;f<frames;f++){ const k=clamp(Math.floor(f*H/R/S.A.fr),0,S.A.n-1); level[f]=S.A.env[k]||0; }
+  const sorted=Array.from(level).sort((a,b)=>a-b), quietLimit=Math.max((S.A.noise||0)*1.1,sorted[Math.floor((frames-1)*0.15)]||0);
+  const profile=new Float64Array(B); let quiet=0;
+  setHint('Learning the background noise…');
+  for(let f=0;f<frames;f++){
+    if(level[f]<=quietLimit){
+      const start=f*H-N/2;
+      for(let c=0;c<nc;c++){
+        const d=input[c], rr=re[c], ii=im[c];
+        for(let j=0;j<N;j++){ const p=start+j; rr[j]=p>=0 && p<d.length ? d[p]*win[j] : 0; ii[j]=0; }
+        complexFFT(rr,ii);
+      }
+      for(let k=0;k<B;k++){ let power=0; for(let c=0;c<nc;c++) power+=re[c][k]*re[c][k]+im[c][k]*im[c][k]; profile[k]+=Math.sqrt(power/nc); }
+      quiet++;
+    }
+    if(f%32===31){ if(version!==procVersion) return null; await tick(); }
+  }
+  if(!quiet) throw new Error('No quiet background sample was found. Record a short quiet pause, or set noise reduction to 0%.');
+  for(let k=0;k<B;k++) profile[k]/=quiet;
+  const smoothNoise=new Float64Array(B);
+  for(let k=0;k<B;k++) smoothNoise[k]=(profile[Math.max(0,k-1)]+2*profile[k]+profile[Math.min(B-1,k+1)])/4;
+  const out=new AudioBuffer({ length:src.length, numberOfChannels:nc, sampleRate:R }), output=Array.from({ length:nc },(_,c)=>out.getChannelData(c)), weight=new Float32Array(src.length), prev=new Float32Array(B); prev.fill(1);
+  const floor=1-0.95*strength;
+  setHint('Reducing background noise…');
+  for(let f=0;f<frames;f++){
+    const start=f*H-N/2;
+    for(let c=0;c<nc;c++){
+      const d=input[c], rr=re[c], ii=im[c];
+      for(let j=0;j<N;j++){ const p=start+j; rr[j]=p>=0 && p<d.length ? d[p]*win[j] : 0; ii[j]=0; }
+      complexFFT(rr,ii);
+    }
+    for(let k=0;k<B;k++){
+      let power=0; for(let c=0;c<nc;c++) power+=re[c][k]*re[c][k]+im[c][k]*im[c][k];
+      const mag=Math.sqrt(power/nc), target=clamp(1-strength*smoothNoise[k]/(mag+1e-8),floor,1), gain=0.65*target+0.35*prev[k];
+      prev[k]=gain;
+      for(let c=0;c<nc;c++){
+        re[c][k]*=gain; im[c][k]*=gain;
+        if(k>0 && k<N/2){ re[c][N-k]*=gain; im[c][N-k]*=gain; }
+      }
+    }
+    for(let c=0;c<nc;c++) complexFFT(re[c],im[c],true);
+    for(let j=0;j<N;j++){
+      const p=start+j; if(p<0 || p>=src.length) continue;
+      const w=win[j]; weight[p]+=w*w;
+      for(let c=0;c<nc;c++) output[c][p]+=re[c][j]*w;
+    }
+    if(f%32===31){ if(version!==procVersion) return null; setHint('Reducing background noise… '+Math.round(f/frames*100)+'%'); await tick(); }
+  }
+  for(let c=0;c<nc;c++) for(let i=0;i<src.length;i++) output[c][i]=weight[i]>1e-7 ? output[c][i]/weight[i] : input[c][i];
+  return out;
+}
+function coughOverlapsWords(t0,t1){
+  if(!S.WT || !S.Bn) return false;
+  for(let i=0;i<S.WT.length;i++){
+    const times=S.WT[i]||[];
+    for(let j=0;j<times.length;j++){
+      const start=times[j], end=j+1<times.length ? times[j+1] : S.Bn[i+1];
+      if(Number.isFinite(end) && t0<end+0.04 && t1>start-0.04) return true;
+    }
+  }
+  return false;
+}
+async function reducePauseCoughs(buf,version){
+  if(!S.A) return 0;
+  const { env, fr, thr, noise }=S.A, n=env.length, limit=Math.max(thr*1.4,noise*2.2), runs=[];
+  for(let i=0;i<n;){
+    if(env[i]<=limit){ i++; continue; }
+    const start=i; while(i<n && env[i]>limit) i++; const end=i;
+    if(end-start<3 || end-start>35) continue;
+    let quietBefore=start>=10, quietAfter=end+10<=n;
+    for(let j=Math.max(0,start-10);j<start;j++) if(env[j]>thr*1.15) quietBefore=false;
+    for(let j=end;j<Math.min(n,end+10);j++) if(env[j]>thr*1.15) quietAfter=false;
+    if(!quietBefore || !quietAfter || coughOverlapsWords(start*fr,end*fr)) continue;
+    runs.push([start,end]);
+  }
+  if(!runs.length) return 0;
+  const mask=new Float32Array(n); mask.fill(1);
+  for(const [start,end] of runs){
+    const a=Math.max(0,start-3), b=Math.min(n,end+4);
+    for(let f=a;f<b;f++){
+      if(f<start) mask[f]=1-0.88*(f-a+1)/Math.max(1,start-a+1);
+      else if(f<end) mask[f]=0.12;
+      else mask[f]=0.12+0.88*(f-end+1)/Math.max(1,b-end);
+    }
+  }
+  const step=buf.sampleRate*fr;
+  for(let c=0;c<buf.numberOfChannels;c++){
+    const d=buf.getChannelData(c);
+    for(let i=0;i<d.length;i++){
+      const f=clamp(Math.floor(i/step),0,n-1), q=i/step-f, g=mask[f]*(1-q)+(mask[Math.min(n-1,f+1)]||mask[f])*q;
+      d[i]*=g;
+      if(i%262144===262143){ if(version!==procVersion) return 0; await tick(); }
+    }
+  }
+  return runs.length;
+}
+async function tuneBuffer(src,pitch,amount,version){
+  if(!pitch || !pitch.f0 || !pitch.f0.length) throw new Error('Could not detect your opening tune. Set tune correction to 0% and try again.');
+  const opening=[];
+  for(let i=0;i<pitch.f0.length && i*pitch.hop<4;i++){ const f=pitch.f0[i]; if(f>=65 && f<=700) opening.push(f); }
+  if(opening.length<8) throw new Error('Could not detect enough clear opening notes. Set tune correction to 0% or use a clearer recording.');
+  opening.sort((a,b)=>a-b);
+  const ref=opening[opening.length>>1], ratio=new Float32Array(pitch.f0.length), strength=amount/100;
+  for(let i=0;i<ratio.length;i++){
+    const f=pitch.f0[i];
+    if(f<65 || f>700){ ratio[i]=1; continue; }
+    const semis=12*Math.log2(f/ref), nearest=Math.round(semis), deviation=semis-nearest;
+    ratio[i]=Math.abs(deviation)<=0.4 ? Math.pow(2,-deviation*strength/12) : 1;
+  }
+  const filtered=Float32Array.from(ratio);
+  for(let i=0;i<ratio.length;i++){
+    if(pitch.f0[i]<65) continue;
+    let s=0,c=0; for(let j=Math.max(0,i-2);j<=Math.min(ratio.length-1,i+2);j++) if(pitch.f0[j]>=65){ s+=ratio[j]; c++; }
+    if(c) filtered[i]=s/c;
+  }
+  const N=2048,H=512,B=N/2+1,R=src.sampleRate,nc=src.numberOfChannels,frames=Math.ceil(src.length/H)+1,win=new Float32Array(N);
+  for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
+  const input=Array.from({ length:nc },(_,c)=>src.getChannelData(c)), re=Array.from({ length:nc },()=>new Float64Array(N)), im=Array.from({ length:nc },()=>new Float64Array(N));
+  const prevPhase=Array.from({ length:nc },()=>new Float64Array(B)), synthPhase=Array.from({ length:nc },()=>new Float64Array(B)), outRe=Array.from({ length:nc },()=>new Float64Array(N)), outIm=Array.from({ length:nc },()=>new Float64Array(N));
+  const out=new AudioBuffer({ length:src.length, numberOfChannels:nc, sampleRate:R }), output=Array.from({ length:nc },(_,c)=>out.getChannelData(c)), weight=new Float32Array(src.length);
+  setHint('Smoothing pitch toward your opening notes…');
+  for(let f=0;f<frames;f++){
+    const center=f*H, start=center-N/2, pi=clamp(Math.floor(center/R/pitch.hop),0,filtered.length-1), shift=filtered[pi]||1;
+    for(let c=0;c<nc;c++){
+      const d=input[c], rr=re[c], ii=im[c], pr=prevPhase[c], sp=synthPhase[c], or=outRe[c], oi=outIm[c];
+      for(let j=0;j<N;j++){ const p=start+j; rr[j]=p>=0 && p<d.length ? d[p]*win[j] : 0; ii[j]=0; }
+      complexFFT(rr,ii);
+      or.fill(0); oi.fill(0);
+      for(let k=0;k<B;k++){
+        const mag=Math.hypot(rr[k],ii[k]), phase=Math.atan2(ii[k],rr[k]);
+        let omega=2*Math.PI*k*H/N;
+        if(f===0) sp[k]=phase;
+        else{
+          let delta=phase-pr[k]-omega; delta-=2*Math.PI*Math.round(delta/(2*Math.PI));
+          omega+=delta;
+          sp[k]+=omega*shift;
+        }
+        pr[k]=phase;
+        const dest=k*shift, lo=Math.floor(dest), frac=dest-lo;
+        if(lo>B-1) continue;
+        const a=mag*(1-frac), b=mag*frac, co=Math.cos(sp[k]), si=Math.sin(sp[k]);
+        or[lo]+=a*co; oi[lo]+=a*si;
+        if(frac && lo+1<B){ or[lo+1]+=b*co; oi[lo+1]+=b*si; }
+      }
+      for(let k=1;k<N/2;k++){ or[N-k]=or[k]; oi[N-k]=-oi[k]; }
+      complexFFT(or,oi,true);
+    }
+    for(let j=0;j<N;j++){
+      const p=start+j; if(p<0 || p>=src.length) continue;
+      const w=win[j]; weight[p]+=w*w;
+      for(let c=0;c<nc;c++) output[c][p]+=outRe[c][j]*w;
+    }
+    if(f%24===23){ if(version!==procVersion) return null; setHint('Smoothing pitch toward your opening notes… '+Math.round(f/frames*100)+'%'); await tick(); }
+  }
+  for(let c=0;c<nc;c++) for(let i=0;i<src.length;i++) output[c][i]=weight[i]>1e-7 ? output[c][i]/weight[i] : input[c][i];
+  return out;
+}
+async function smoothVoice(buf,amount,version){
+  if(!(amount>0)) return;
+  const R=buf.sampleRate,nc=buf.numberOfChannels,frameSize=Math.max(1,Math.round(R*0.02)),frames=Math.ceil(buf.length/frameSize),ch=Array.from({ length:nc },(_,c)=>buf.getChannelData(c)), rms=new Float32Array(frames);
+  for(let f=0;f<frames;f++){
+    const a=f*frameSize,b=Math.min(buf.length,a+frameSize); let sum=0,count=0;
+    for(let i=a;i<b;i++){ let x=0; for(let c=0;c<nc;c++) x+=ch[c][i]/nc; sum+=x*x; count++; }
+    rms[f]=Math.sqrt(sum/Math.max(1,count));
+    if(f%256===255){ if(version!==procVersion) return; await tick(); }
+  }
+  const active=Array.from(rms).filter(x=>x>Math.max(1e-5,(S.A ? S.A.noise*1.2 : 0))).sort((a,b)=>a-b);
+  if(active.length<4) return;
+  const threshold=active[Math.floor((active.length-1)*0.78)], ratio=1+2*amount/100, attack=Math.exp(-frameSize/R/0.025), release=Math.exp(-frameSize/R/0.16), gains=new Float32Array(frames);
+  let prev=1;
+  for(let f=0;f<frames;f++){
+    const x=rms[f], target=x>threshold ? (threshold+(x-threshold)/ratio)/x : 1, a=target<prev ? attack : release;
+    prev=target+(prev-target)*a; gains[f]=prev;
+  }
+  for(let c=0;c<nc;c++){
+    const d=ch[c];
+    for(let i=0;i<d.length;i++){
+      const f=Math.min(frames-1,Math.floor(i/frameSize)), q=(i-f*frameSize)/frameSize, g=gains[f]*(1-q)+(gains[Math.min(frames-1,f+1)]||gains[f])*q;
+      d[i]*=g;
+      if(i%262144===262143){ if(version!==procVersion) return; await tick(); }
+    }
+  }
+}
+async function processVoice(raw,settings,version){
+  let out=raw;
+  if(settings.denoise>0){ out=await denoiseBuffer(raw,settings.denoise/100,version); if(!out) return null; }
+  if(settings.cough){
+    if(out===raw) out=cloneAudioBuffer(raw);
+    const count=await reducePauseCoughs(out,version); if(version!==procVersion) return null;
+    if(count) setHint('Reduced '+count+' isolated burst'+(count===1 ? '' : 's')+' in pauses…');
+  }
+  if(settings.tune>0){
+    if(!S.pitch){ setHint('Analyzing your opening tune…'); S.pitch=await computePitch(); }
+    if(version!==procVersion) return null;
+    out=await tuneBuffer(out,S.pitch,settings.tune,version); if(!out) return null;
+  }
+  if(settings.smooth>0){
+    if(out===raw) out=cloneAudioBuffer(raw);
+    await smoothVoice(out,settings.smooth,version); if(version!==procVersion) return null;
+  }
+  return out;
+}
+
 /* ---------- mosque echo (made in the browser, optional) ---------- */
 async function ensureProc(){
   if(!S.raw) throw new Error('Choose your recitation first');
   for(;;){
-    const raw=S.raw, type=$('echoType').value, e=type==='none' ? 0 : +$('echo').value/100, key=type+':'+e;
+    const raw=S.raw, type=$('echoType').value, e=type==='none' ? 0 : +$('echo').value/100;
+    const settings={ denoise:+$('denoise').value, smooth:+$('smooth').value, tune:+$('tune').value, cough:$('coughOn').checked };
+    const key=[type,e,settings.denoise,settings.smooth,settings.tune,settings.cough ? 1 : 0].join(':');
     if(S.proc && S.procKey===key) return;
-    if(!(e>0)){ procVersion++; S.proc=raw; S.procKey=key; return; }
     if(procTask && procTask.key===key && procTask.version===procVersion){ await procTask.promise; continue; }
-    const version=++procVersion, R=raw.sampleRate, profile=ECHO_PROFILES[type]||ECHO_PROFILES.custom, level=clamp(e/0.6,0,1);
-    const feedback=profile.feedback*(0.55+0.45*level), tail=Math.min(6,profile.delay*Math.ceil(Math.log(0.005)/Math.log(feedback)));
-    const tailFrames=Math.ceil(R*(tail+0.1)), len=raw.length+tailFrames, chunkFrames=R*20;
-    setHint('Preparing your selected echo…');
+    const version=++procVersion;
     const task={ key, version, promise:null };
     task.promise=(async()=>{
+      const voice=await processVoice(raw,settings,version);
+      if(!voice || version!==procVersion || raw!==S.raw) return;
+      if(!(e>0)){
+        if(key!==[$('echoType').value,$('echoType').value==='none' ? 0 : +$('echo').value/100,+$('denoise').value,+$('smooth').value,+$('tune').value,$('coughOn').checked ? 1 : 0].join(':')) return;
+        S.proc=voice; S.procKey=key; setHint('✓ Voice cleanup ready. Preview to listen.'); return;
+      }
+      const R=voice.sampleRate, profile=ECHO_PROFILES[type]||ECHO_PROFILES.custom, level=clamp(e/0.6,0,1);
+      const feedback=profile.feedback*(0.55+0.45*level), tail=Math.min(6,profile.delay*Math.ceil(Math.log(0.005)/Math.log(feedback)));
+      const tailFrames=Math.ceil(R*(tail+0.1)), len=voice.length+tailFrames, chunkFrames=R*20;
+      setHint('Preparing your selected echo…');
       const out=new AudioBuffer({ length:len, numberOfChannels:2, sampleRate:R });
-      for(let start=0;start<raw.length;start+=chunkFrames){
-        const frames=Math.min(chunkFrames,raw.length-start), off=new OfflineAudioContext(2,frames+tailFrames,R), src=off.createBufferSource();
-        src.buffer=raw;
+      for(let start=0;start<voice.length;start+=chunkFrames){
+        const frames=Math.min(chunkFrames,voice.length-start), off=new OfflineAudioContext(2,frames+tailFrames,R), src=off.createBufferSource();
+        src.buffer=voice;
         const delay=off.createDelay(1); delay.delayTime.value=profile.delay;
         const tone=off.createBiquadFilter(); tone.type='lowpass'; tone.frequency.value=4800;
         const repeat=off.createGain(); repeat.gain.value=feedback;
@@ -1443,7 +1690,7 @@ async function ensureProc(){
             await tick();
           }
         }
-        setHint('Preparing your selected echo… '+Math.round(Math.min(1,(start+frames)/raw.length)*100)+'%');
+        setHint('Preparing your selected echo… '+Math.round(Math.min(1,(start+frames)/voice.length)*100)+'%');
       }
       let pk=0;
       for(let c=0;c<out.numberOfChannels;c++){
@@ -1466,9 +1713,10 @@ async function ensureProc(){
           }
         }
       }
-      if(version!==procVersion || raw!==S.raw || key!==$('echoType').value+':'+($('echoType').value==='none' ? 0 : +$('echo').value/100)) return;
+      const currentKey=[$('echoType').value,$('echoType').value==='none' ? 0 : +$('echo').value/100,+$('denoise').value,+$('smooth').value,+$('tune').value,$('coughOn').checked ? 1 : 0].join(':');
+      if(version!==procVersion || raw!==S.raw || key!==currentKey) return;
       S.proc=out; S.procKey=key;
-      setHint('✓ Echo added.');
+      setHint('✓ Voice cleanup and echo ready.');
     })();
     procTask=task;
     try{ await task.promise; }finally{ if(procTask===task) procTask=null; }
@@ -2707,7 +2955,7 @@ function sliceBuf(buf,r0,r1,lead){
 async function makeVideo(){
   if(S.busy) return;
   if(!S.units.length || !S.Bn) return toast('Press "Get the ayat" first (step 2)');
-  stopPreview(); S.busy=true; S.cancel=false; $('echo').disabled=true; $('echoType').disabled=true;
+  stopPreview(); S.busy=true; S.cancel=false; $('echo').disabled=true; $('echoType').disabled=true; $('denoise').disabled=true; $('smooth').disabled=true; $('tune').disabled=true; $('coughOn').disabled=true;
   $('makeBtn').classList.add('hidden'); $('cancelBtn').classList.remove('hidden'); $('prog').classList.remove('hidden'); $('note').classList.add('hidden'); $('doneBox').classList.add('hidden');
   let rd=null, output=null;
   try{
@@ -2783,7 +3031,7 @@ async function makeVideo(){
     else{ console.error(e); showNote('The video could not be made: '+e.message+'.'); }
   }finally{
     if(rd) await rd.close();
-    S.busy=false; $('makeBtn').classList.remove('hidden'); $('cancelBtn').classList.add('hidden'); $('echo').disabled=false; $('echoType').disabled=false;
+    S.busy=false; $('makeBtn').classList.remove('hidden'); $('cancelBtn').classList.add('hidden'); $('echo').disabled=false; $('echoType').disabled=false; $('denoise').disabled=false; $('smooth').disabled=false; $('tune').disabled=false; $('coughOn').disabled=false;
   }
 }
 $('makeBtn').onclick=makeVideo;
@@ -2802,6 +3050,12 @@ const showSize=()=>{ $('sizeVal').textContent=$('txtSize').value+'%'; };
 showLead(); showSize();
 $('hlLead').addEventListener('input',()=>{ showLead(); redraw(); });
 $('txtSize').addEventListener('input',()=>{ showSize(); LAYOUT.clear(); staleCovers(); redraw(); });
+for(const [id,label] of [['denoise','denoiseVal'],['smooth','smoothVal'],['tune','tuneVal']]){
+  $(label).textContent=$(id).value+'%';
+  $(id).addEventListener('input',()=>{ procVersion++; $(label).textContent=$(id).value+'%'; });
+  $(id).addEventListener('change',stopPreview);
+}
+$('coughOn').addEventListener('change',()=>{ procVersion++; stopPreview(); });
 $('echo').addEventListener('input',()=>{
   procVersion++;
   $('echoVal').textContent=$('echo').value+'%';
