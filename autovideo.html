@@ -16,6 +16,7 @@
 .pick:hover{border-color:var(--accent)}
 .ptext a,.credit a{color:var(--accent)}
 .credit{font-size:12px;color:var(--muted)}
+.embedded header{display:none}
 #out{display:block;max-width:100%;max-height:calc(100vh - 480px);min-height:200px;border-radius:8px;background:#000}
 .scenes{height:330px;flex:none;overflow:auto;border-top:1px solid var(--line);background:var(--panel);padding:10px 16px;display:flex;flex-direction:column;gap:10px}
 .sc{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:10px;display:flex;flex-direction:column;gap:8px}
@@ -59,6 +60,7 @@ aside>*,.box>*{flex-shrink:0}
 </style>
 </head>
 <body class="app">
+<script>if(new URLSearchParams(location.search).has('embed')) document.body.classList.add('embedded');</script>
 <header>
   <a class="brand" href="index.html"><div class="logo">✨</div>StoryForge <small>an idea, a script or your own voice → a finished video · footage, captions, music, post text</small></a>
   <a class="home-link" href="index.html">← All tools</a>
@@ -69,6 +71,7 @@ aside>*,.box>*{flex-shrink:0}
   <div class="seg3" id="srcMode"><button data-s="ai" class="on">💡 An idea</button><button data-s="own">✍️ My script</button><button data-s="media">🎙️ Video / audio</button></div>
   <div class="stack hidden" id="mediaBox" style="gap:10px">
     <label class="drop" id="mediaDrop"><input type="file" id="mediaInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">🎙️</div><strong>Drop your video or audio here</strong><span>Only the sound is kept, unless you tick "Keep my video picture" below.</span></label>
+    <div class="ptext">Try the <a href="sample-assets/forge-demo-video.webm" download>generated spoken sample clip</a> to test listening and scene creation.</div>
     <div class="file-info" id="mediaInfo">No file chosen yet</div>
     <div class="row">
       <div><div class="label">Language spoken</div><select id="mlang"><option value="auto">Detect</option><option value="quran">Quran recitation (exact text)</option><option value="english" selected>English</option><option value="arabic">Arabic</option><option value="french">French</option><option value="spanish">Spanish</option><option value="portuguese">Portuguese</option><option value="german">German</option><option value="yoruba">Yoruba</option><option value="hausa">Hausa</option><option value="swahili">Swahili</option><option value="hindi">Hindi</option><option value="urdu">Urdu</option><option value="chinese">Chinese</option></select></div>
@@ -89,6 +92,8 @@ aside>*,.box>*{flex-shrink:0}
     </div>
   </div>
   <textarea id="topic" rows="3" placeholder="What is the video about? e.g. 5 habits of successful students · the fear of Allah in secret · why you should drink more water"></textarea>
+  <div class="row"><button class="mini" id="ideaSampleBtn" type="button">🎲 Load next sample idea</button></div>
+  <div class="ptext">Click again to rotate through ideas. Your topic is replaced only after you confirm.</div>
   <div class="row" id="typeRow">
     <div><div class="label">Type</div><select id="vtype"><option value="explainer">Faceless explainer</option><option value="list">Top list (e.g. 5 tips)</option><option value="story">Story narration</option><option value="motivation">Motivational</option><option value="promo">Product / business promo</option></select></div>
     <div><div class="label">Length</div><select id="vlen"><option value="30">About 30 s</option><option value="60" selected>About 60 s</option><option value="90">About 90 s</option><option value="180">About 3 min</option></select></div>
@@ -118,7 +123,10 @@ aside>*,.box>*{flex-shrink:0}
     <label class="check"><input type="checkbox" id="fallback" checked> When every key of one AI is used up, switch to the other AI automatically</label>
     <div class="ptext" style="margin:0">Keys are saved only in this browser, never in your website files. Use a normal (not incognito) window so they stay saved.</div>
   </div>
-  <div class="hidden" id="ownBox"><textarea id="ownScript" rows="7" placeholder="Paste or type your script. Every sentence or two becomes a scene."></textarea></div>
+  <div class="hidden" id="ownBox">
+    <textarea id="ownScript" rows="7" placeholder="Paste or type your script. Every sentence or two becomes a scene."></textarea>
+    <div class="row"><button class="mini" id="ownSampleBtn" type="button">🎲 Load next sample script</button></div>
+  </div>
   <button id="scriptBtn">📝 Write the script only (optional)</button>
 
   <div class="sec">3 · Voice</div>
@@ -202,6 +210,13 @@ aside>*,.box>*{flex-shrink:0}
   <label class="check"><input type="checkbox" id="introOn" checked> Show the video title at the start</label>
   <input type="text" id="channel" placeholder="Channel name for the ending, e.g. @dailyreminder">
   <input type="text" id="outroLine" placeholder="Closing line" value="Follow for more reminders">
+  <div class="box" style="margin-top:8px">
+    <button class="mini" id="suggestCopyBtn" type="button">💡 Suggest intro &amp; outro from my idea or script</button>
+    <div class="hidden" id="copySuggestions" style="margin-top:8px">
+      <div class="ptext">Choose an intro title:</div><div class="forge-suggestions" id="introChoices"></div>
+      <div class="ptext" style="margin-top:8px">Choose a closing line:</div><div class="forge-suggestions" id="outroChoices"></div>
+    </div>
+  </div>
   <label class="check"><input type="checkbox" id="xfOn" checked> Smooth fades between clips</label>
   <label class="check"><input type="checkbox" id="cineOn" checked> Warm cinematic look</label>
 
@@ -227,12 +242,14 @@ aside>*,.box>*{flex-shrink:0}
 </main>
 <div class="toast" id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script type="module">
 let Bridge={ dock(){}, setResult(){}, take:async()=>null };
 try{ Bridge=await import('./forge-bridge.js'); }catch(e){ console.warn('Tool bar unavailable',e); }
 Bridge.dock('autovideo');
 import('./presenter-explainer.js').then(m=>{ if(m.mountUI) m.mountUI(); }).catch(e=>console.warn('Presenter tools unavailable',e));
 const $=id=>document.getElementById(id);
+if(new URLSearchParams(location.search).get('type')==='list') $('vtype').value='list';
 let MBP=null, KP=null, TFP=null, STP=null;
 const loadMB=()=>MBP||(MBP=import('https://cdn.jsdelivr.net/npm/mediabunny/+esm').catch(()=>import('https://esm.sh/mediabunny')));
 const loadKokoro=()=>KP||(KP=import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm').catch(()=>import('https://esm.sh/kokoro-js@1.2.1')));
@@ -243,6 +260,12 @@ const GBASE='https://generativelanguage.googleapis.com/v1beta/', QBASE='https://
 const FORMATS={ '9:16':[1080,1920], '16:9':[1920,1080], '1:1':[1080,1080] };
 const VOICES=[['am_michael','Michael: calm US male'],['am_fenrir','Fenrir: deep US male'],['am_puck','Puck: upbeat US male'],['bm_george','George: British male'],['bm_fable','Fable: British storyteller (male)'],['af_heart','Heart: warm US female'],['af_bella','Bella: lively US female'],['af_nicole','Nicole: soft US female'],['af_sarah','Sarah: clear US female'],['bf_emma','Emma: British female'],['bf_isabella','Isabella: British female']];
 const TYPES={ explainer:'faceless educational explainer', list:'top-list countdown', story:'story narration', motivation:'motivational speech', promo:'product or business promo' };
+const IDEA_SAMPLES=[
+  {topic:'Three small habits that make studying feel less overwhelming',script:'Start with one clear goal, not a perfect schedule. Put your phone out of reach for ten minutes. Take a short break, then repeat. Which habit would help you most? Tell us below.'},
+  {topic:'Why a simple checklist can make a busy day easier',script:'Write down the three things that matter most today. Start with the smallest one. Cross it off before adding more. Your list should help you, not become your manager. What is your number-one task today?'},
+  {topic:'A friendly guide to making your first short video',script:'Pick one idea. Say the main point in one sentence. Add a concrete example, then end with a question viewers can answer. You do not need a studio to begin. What topic should your first video cover?'}
+];
+let nextIdeaSample=0;
 const LEAD=0.25, GAP=0.35, FPS=30, GOLD='#e9c46a';
 const RTL=/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
@@ -250,6 +273,25 @@ const TOPIC_PH='What is the video about? e.g. 5 habits of successful students ·
 let scenes=[], srcMode='ai', busy=false, cancelled=false, tts=null, out=null, soundList=[], photoImg=null, myBgs=[];
 let media=null, asr=null, asrModel='', transcript=null, lastCaps=[], qInfo=null;
 let resultBlob=null, resultUrl=null, resultName='', credits='', wakeLock=null, nextId=1;
+
+function loadTextSample(targetId,key){
+  const sample=IDEA_SAMPLES[nextIdeaSample];
+  if($(targetId).value.trim()&&!confirm('Replace the current text with a sample?')) return;
+  nextIdeaSample=(nextIdeaSample+1)%IDEA_SAMPLES.length;
+  $(targetId).value=sample[key];
+  toast('Loaded sample '+(nextIdeaSample||IDEA_SAMPLES.length)+' of '+IDEA_SAMPLES.length+' · click again to rotate');
+}
+$('ideaSampleBtn').addEventListener('click',()=>loadTextSample('topic','topic'));
+$('ownSampleBtn').addEventListener('click',()=>loadTextSample('ownScript','script'));
+$('suggestCopyBtn').addEventListener('click',()=>{
+  const source=[$('topic').value,$('ownScript').value,scenes.map(scene=>scene.text).join(' ')].filter(Boolean).join('\n');
+  if(!source.trim()) return toast('Add an idea or script first, then ask for suggestions.');
+  const title=$('postTitle').value.trim()||$('topic').value.trim();
+  const suggestions=window.ForgeScriptSuggestions.build(source,title,'general');
+  window.ForgeScriptSuggestions.render('introChoices',suggestions.intro,'postTitle');
+  window.ForgeScriptSuggestions.render('outroChoices',suggestions.outro,'outroLine');
+  show('copySuggestions');
+});
 
 /* ---------- helpers ---------- */
 const show=id=>$(id).classList.remove('hidden');

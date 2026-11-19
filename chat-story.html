@@ -121,6 +121,8 @@ You: which one?
 Ahmad: > "The first thing a person will be asked about on the Day of Judgment is their prayer" 🕌</textarea>
       <button type="button" class="mic-btn" id="scriptMicBtn" title="Dictate the script">🎤</button>
     </div>
+    <div class="row"><button class="btn" id="sampleChatBtn" type="button">🎲 Load next sample chat</button></div>
+    <small>Loads a complete, editable chat. Your current messages are left alone unless you confirm.</small>
   </div>
 
   <div class="card">
@@ -174,6 +176,22 @@ function bindPills(id,key){
   });
 }
 bindPills('theme','theme');
+const CHAT_SAMPLES=[
+  {name:'The group project',text:'{{L}}: I finished the group project 😎\n{{R}}: You did all the slides?\n{{L}}: No. I created a group chat called “Finished the group project.”\n{{R}}: That is not the same thing 😂\n{{L}}: It has a title page!\n{{R}}: What is your group-project survival trick? Tell us below.'},
+  {name:'The ten-minute plan',text:'{{L}}: I made a plan to be more productive today.\n{{R}}: Nice. What is step one?\n{{L}}: Write a list of everything I need to do.\n{{R}}: And step two?\n{{L}}: Stare at the list until it becomes tomorrow 😅\n{{R}}: Try one ten-minute task first. Which one would you pick?'},
+  {name:'The phone battery',text:'{{L}}: My phone battery is at 2%.\n{{R}}: Do you have a charger?\n{{L}}: Yes. I am using it to charge my power bank.\n{{R}}: While your phone is at 2%?\n{{L}}: I never said my plan was good 😂\n{{R}}: What is your funniest low-battery move? Drop it in the comments.'},
+  {name:'The alarm negotiation',text:'{{L}}: I set three alarms to wake up early.\n{{R}}: Did they work?\n{{L}}: The first one woke me up.\n{{R}}: Great!\n{{L}}: The other two woke me up again after I went back to sleep 😅\n{{R}}: What actually gets you out of bed? Share your best tip.'}
+];
+let nextChatSample=0;
+$('sampleChatBtn').addEventListener('click',()=>{
+  if($('script').value.trim()&&!confirm('Replace the current chat with a sample?')) return;
+  const sample=CHAT_SAMPLES[nextChatSample];
+  nextChatSample=(nextChatSample+1)%CHAT_SAMPLES.length;
+  const left=$('leftName').value.trim()||'Ahmad', right=$('rightName').value.trim()||'You';
+  $('script').value=sample.text.replace(/\{\{L\}\}/g,left).replace(/\{\{R\}\}/g,right);
+  $('script').dispatchEvent(new Event('input',{bubbles:true}));
+  toast('Loaded "'+sample.name+'" · click again to rotate');
+});
 
 const THEMES={
   whatsapp:{ bg:'#0b141a', header:'#1f2c34', headerText:'#fff', right:'#005c4b', left:'#1f2c34', textR:'#e9edef', textL:'#e9edef', tick:'#53bdeb', accent:'#25D366' },

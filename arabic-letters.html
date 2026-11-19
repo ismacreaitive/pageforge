@@ -170,6 +170,7 @@ input[type=file]{padding:6px}
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -514,8 +515,6 @@ function collectScenes(){
 }
 
 /* ===== hook / outro suggestion helper ===== */
-const HOOKS=['Learn to Read Arabic','Letter by Letter','Watch the Letters Join'];
-const OUTROS=['Practice This Word','Save to Learn Later','Follow for More Arabic Lessons'];
 function renderPills(containerId, options, targetInputId){
   const box=$(containerId);
   box.innerHTML='';
@@ -531,8 +530,13 @@ function renderPills(containerId, options, targetInputId){
   });
 }
 $('suggestBtn').onclick=()=>{
-  renderPills('hookPillsList', HOOKS, 'introText');
-  renderPills('outroPillsList', OUTROS, 'outroText');
+  const scenes=collectScenes();
+  const source=scenes.map(scene=>[scene.en,scene.tl].filter(Boolean).join(' ')).filter(Boolean).join('. ');
+  const firstScene=scenes.find(scene=>scene.tl||scene.en);
+  const title=firstScene?(firstScene.tl&&firstScene.en?`${firstScene.tl} (${firstScene.en})`:firstScene.tl||firstScene.en):'';
+  const choices=window.ForgeScriptSuggestions.build(source,title,'general');
+  renderPills('hookPillsList', choices.intro, 'introText');
+  renderPills('outroPillsList', choices.outro, 'outroText');
   $('hookPills').classList.remove('hidden');
   $('outroPills').classList.remove('hidden');
   toast('✓ Suggestions ready — tap one to use it, or keep typing your own');

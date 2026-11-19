@@ -74,6 +74,8 @@ input,select{background:var(--panel2);border:1px solid var(--line);color:var(--t
       <div class="p" data-v="ramadan">Ramadan &amp; Fasting</div>
       <div class="p" data-v="prayer">Prayer (Salah) Basics</div>
       <div class="p" data-v="general">General Islamic Trivia</div>
+      <div class="p" data-v="science">Everyday Science &amp; Logic</div>
+      <div class="p" data-v="digital">Digital Life Smarts</div>
     </div>
   </div>
 
@@ -148,11 +150,16 @@ Correct: C</textarea>
 
   <div class="card">
     <h2>Intro &amp; outro (optional)</h2>
-    <small>Loading a preset auto-fills the intro as the quiz title. Leave either off to skip it entirely.</small>
+    <small>Loading a preset fills the intro and adds a score/comment prompt. You can edit or turn either off.</small>
     <div class="checkrow"><input type="checkbox" id="introEnabled"><label for="introEnabled">Add an intro</label></div>
     <input id="introText" placeholder="Intro text" class="hidden" style="margin-top:8px">
-    <div class="checkrow" style="margin-top:12px"><input type="checkbox" id="outroEnabled"><label for="outroEnabled">Add an outro</label></div>
-    <input id="outroText" placeholder="Outro text" class="hidden" style="margin-top:8px">
+    <div class="checkrow" style="margin-top:12px"><input type="checkbox" id="outroEnabled" checked><label for="outroEnabled">Add an outro</label></div>
+    <input id="outroText" value="How many did you get right? Drop your score below." placeholder="Outro text" style="margin-top:8px">
+    <div class="row"><button class="btn gold" id="suggestQuizCopy" type="button">💡 Suggest from my quiz</button></div>
+    <div id="quizCopyChoices" class="hidden">
+      <small>Choose an intro:</small><div class="forge-suggestions" id="quizIntroChoices"></div>
+      <small style="display:block;margin-top:8px">Choose a comment prompt:</small><div class="forge-suggestions" id="quizOutroChoices"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -204,6 +211,7 @@ Correct: C</textarea>
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -242,7 +250,7 @@ C: Zakat
 D: Hajj
 Correct: B
 
-Q: What is the charity given to the poor called?
+Q: Which of the Five Pillars involves obligatory giving from qualifying wealth?
 A: Sawm
 B: Hajj
 C: Zakat
@@ -354,11 +362,11 @@ C: Khutbah
 D: Dua
 Correct: B
 
-Q: What must a Muslim perform before prayer for purification?
-A: Ghusl
+Q: Which term names the ritual washing commonly performed before salah?
+A: Adhan
 B: Wudu
-C: Tayammum only
-D: Zakat
+C: Zakat
+D: Khutbah
 Correct: B
 
 Q: What is the Friday congregational prayer called?
@@ -401,6 +409,76 @@ A: Prayer
 B: Submission to God
 C: Charity
 D: Pilgrimage
+Correct: B` },
+  science: { title:"Everyday Science & Logic", script:
+`Q: Which part of a plant mainly absorbs water from the soil?
+A: Leaves
+B: Roots
+C: Petals
+D: Seeds
+Correct: B
+
+Q: At standard atmospheric pressure, pure water boils at about what temperature?
+A: 0°C
+B: 50°C
+C: 100°C
+D: 150°C
+Correct: C
+
+Q: Which unit is used to measure electrical resistance?
+A: Watt
+B: Volt
+C: Ampere
+D: Ohm
+Correct: D
+
+Q: Which organ pumps blood through the human body?
+A: Liver
+B: Heart
+C: Lung
+D: Kidney
+Correct: B
+
+Q: Which number is prime?
+A: 21
+B: 29
+C: 39
+D: 51
+Correct: B` },
+  digital: { title:"Digital Life Smarts", script:
+`Q: What does HTTPS primarily help protect?
+A: Data travelling between your browser and a website
+B: A website from every possible scam
+C: Your device from all viruses
+D: Your password after you share it
+Correct: A
+
+Q: What is phishing?
+A: A way to speed up a slow internet connection
+B: A message designed to trick you into revealing information
+C: A safe way to store passwords
+D: A type of computer screen
+Correct: B
+
+Q: What does multi-factor authentication add?
+A: A second way to verify it is really you
+B: A second username for every website
+C: A faster internet connection
+D: A public copy of your password
+Correct: A
+
+Q: Which common image format can support transparency and lossless compression?
+A: JPG
+B: PNG
+C: BMP only
+D: TXT
+Correct: B
+
+Q: Which is the safest password habit?
+A: Reuse one memorable password everywhere
+B: Use a unique long password for each account
+C: Add your birth year to your name
+D: Share passwords only in group chats
 Correct: B` }
 };
 $('presetPills').addEventListener('click', e=>{
@@ -410,11 +488,24 @@ $('presetPills').addEventListener('click', e=>{
   $('introEnabled').checked=true;
   $('introText').classList.remove('hidden');
   $('introText').value=data.title+'!';
+  $('outroEnabled').checked=true;
+  $('outroText').classList.remove('hidden');
+  $('outroText').value='How many did you get right? Drop your score below.';
   toast('✓ Preset loaded — edit freely below');
 });
 
 $('introEnabled').addEventListener('change', ()=>{ $('introText').classList.toggle('hidden', !$('introEnabled').checked); });
 $('outroEnabled').addEventListener('change', ()=>{ $('outroText').classList.toggle('hidden', !$('outroEnabled').checked); });
+$('suggestQuizCopy').addEventListener('click',()=>{
+  const source=$('genTopic').value.trim()||$('script').value;
+  const title=$('genTopic').value.trim()||$('introText').value.trim();
+  const choices=window.ForgeScriptSuggestions.build(source,title,'quiz');
+  window.ForgeScriptSuggestions.render('quizIntroChoices',choices.intro,'introText');
+  window.ForgeScriptSuggestions.render('quizOutroChoices',choices.outro,'outroText');
+  $('introEnabled').checked=true; $('introText').classList.remove('hidden');
+  $('outroEnabled').checked=true; $('outroText').classList.remove('hidden');
+  $('quizCopyChoices').classList.remove('hidden');
+});
 
 $('soundType').addEventListener('change', ()=>{
   $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');
@@ -437,9 +528,10 @@ C: [option]
 D: [option]
 Correct: [the single correct letter, A, B, C or D]
 3. Use only widely-agreed, well-established facts. Do not invent statistics, dates, or figures you are not confident about.
-4. If the topic is religious, never write the literal wording of a Qur'an ayah or a hadith — describe ideas in your own words only, and do not state a specific ruling as settled fact if it is genuinely debated among scholars.
-5. Keep each question and each option short — one line each.
-6. No intro, no explanation, no markdown code fences, no numbering beyond the Q/A/B/C/D/Correct labels — output only the blocks themselves.`;
+4. Make the questions mature, clear and engaging for teens or adults: one unambiguous answer, plausible distractors, no trick wording, and short options with matching grammar.
+5. Light, friendly humor is welcome when it fits; never mock a faith, a person or a group. If the topic is religious, keep it respectful, do not quote Qur'an or hadith wording, and do not present a genuinely debated ruling as settled fact.
+6. Do not invent statistics, dates, quotations or facts. Keep each question and option to one line.
+7. No intro, explanation, comment prompt, markdown or extra numbering — output only the Q/A/B/C/D/Correct blocks. The editor adds an optional comment prompt in the outro.`;
 }
 async function copyText(text){
   try{ await navigator.clipboard.writeText(text); return true; }

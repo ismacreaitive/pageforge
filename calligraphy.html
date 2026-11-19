@@ -162,6 +162,7 @@ input[type=file]{padding:6px}
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -346,8 +347,6 @@ function collectScenes(){
 }
 
 /* ===== hook / outro suggestion helper ===== */
-const HOOKS=['A Reminder for Today','Read This Slowly','Say This With Me'];
-const OUTROS=['Share This With Someone','Save This for Later','Follow for Daily Reminders'];
 function renderPills(containerId, options, targetInputId){
   const box=$(containerId);
   box.innerHTML='';
@@ -363,8 +362,12 @@ function renderPills(containerId, options, targetInputId){
   });
 }
 $('suggestBtn').onclick=()=>{
-  renderPills('hookPillsList', HOOKS, 'introText');
-  renderPills('outroPillsList', OUTROS, 'outroText');
+  const scenes=collectScenes();
+  const source=scenes.map(scene=>[scene.en,scene.tl].filter(Boolean).join(' ')).filter(Boolean).join('. ');
+  const title=scenes.map(scene=>scene.tl||scene.en).find(Boolean)||'';
+  const choices=window.ForgeScriptSuggestions.build(source,title,'general');
+  renderPills('hookPillsList', choices.intro, 'introText');
+  renderPills('outroPillsList', choices.outro, 'outroText');
   $('hookPills').classList.remove('hidden');
   $('outroPills').classList.remove('hidden');
   toast('✓ Suggestions ready — tap one to use it, or keep typing your own');

@@ -41,6 +41,7 @@ input[type=color]{width:34px;height:28px;border:none;background:none;padding:0;c
 <main class="split">
 <aside>
   <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🧍</div><strong>Drop your video here</strong><span>or click to choose · works best with people</span></label>
+  <small style="display:block;margin:8px 0;color:var(--muted)">Try the <a href="sample-assets/forge-demo-video.webm" download style="color:var(--accent)">generated sample clip</a>. It includes a stylized figure; results may differ from real-person footage.</small>
   <div class="file-info" id="fileInfo">No video selected</div>
   <div><div class="label">Who is in the video?</div>
     <select id="model"><option value="people">People (fast, recommended)</option><option value="any">Anything (slower, keeps clothing better)</option></select>

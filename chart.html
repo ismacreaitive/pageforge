@@ -61,7 +61,7 @@ input[type=file]{padding:6px}
     <h2>Add a chart from a preset</h2>
     <small>Well-known, verifiable figures. Click one — or several — to add them as scenes below.</small>
     <div class="pills" id="presetPills" style="margin-top:8px">
-      <div class="p" data-v="rakahs">Rakahs per Daily Prayer</div>
+      <div class="p" data-v="rakahs">Rak'ahs per Daily Prayer</div>
       <div class="p" data-v="surahs">Longest Surahs by Ayah Count</div>
       <div class="p" data-v="caliphs">Rightly-Guided Caliphs — Years</div>
       <div class="p" data-v="sample">Compare Anything (sample)</div>
@@ -122,6 +122,11 @@ input[type=file]{padding:6px}
     <h2>Intro &amp; outro</h2>
     <input id="introText" placeholder="Intro text (leave blank to skip)" value="Did You Know?">
     <input id="outroText" placeholder="Outro text (leave blank to skip)" style="margin-top:8px" value="Follow for More ✨">
+    <button class="btn" id="suggestChartCopy" type="button" style="margin-top:8px">💡 Suggest from my charts</button>
+    <div id="chartCopyChoices" class="hidden">
+      <small>Choose an intro:</small><div class="forge-suggestions" id="chartIntroChoices"></div>
+      <small style="display:block;margin-top:8px">Choose a comment prompt:</small><div class="forge-suggestions" id="chartOutroChoices"></div>
+    </div>
     <div class="checkrow">
       <input type="checkbox" id="showCountdown" checked>
       <label for="showCountdown">Show 3-2-1 countdown before the first chart</label>
@@ -183,6 +188,7 @@ input[type=file]{padding:6px}
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -209,7 +215,7 @@ const FADE = 300; // ms fade-in at the start of each phase
 
 /* ===== presets (hand-checked, verifiable figures, no API involved) ===== */
 const PRESETS = {
-  rakahs: { title:"Rakahs per Daily Prayer", unit:"rakahs", data:
+  rakahs: { title:"Rak'ahs per Daily Prayer", unit:"rak'ahs", data:
 `Fajr: 2
 Dhuhr: 4
 Asr: 4
@@ -259,6 +265,22 @@ $('presetPills').addEventListener('click', e=>{
   const data=PRESETS[p.dataset.v]; if(!data) return;
   addScene(data.title, data.unit, data.data);
   toast('✓ Added as a new chart scene');
+});
+$('suggestChartCopy').addEventListener('click',()=>{
+  const charts=[...$('scenesContainer').querySelectorAll('[data-scene]')].map(scene=>[
+    scene.querySelector('[data-title]').value,
+    scene.querySelector('[data-data]').value
+  ].filter(Boolean).join(' ')).filter(Boolean);
+  const topic=$('genTopic').value.trim();
+  const source=[topic,...charts].filter(Boolean).join('\n');
+  if(!source.trim()) return toast('Add a chart or topic first, then ask for suggestions.');
+  const firstScene=$('scenesContainer').querySelector('[data-title]');
+  const firstTitle=firstScene?firstScene.value.trim():'';
+  const title=topic||firstTitle;
+  const choices=window.ForgeScriptSuggestions.build(source,title,'general');
+  window.ForgeScriptSuggestions.render('chartIntroChoices',choices.intro,'introText');
+  window.ForgeScriptSuggestions.render('chartOutroChoices',choices.outro,'outroText');
+  $('chartCopyChoices').classList.remove('hidden');
 });
 $('addSceneBtn').onclick=()=>{ addScene('', '', ''); toast('✓ Blank chart added'); };
 

@@ -62,6 +62,7 @@ input[type=file]{padding:6px}
   <div class="card">
     <h2>Screens in this video</h2>
     <small id="sceneHint">Upload an image, then tap it to drop highlight points (optional). Each gets its own caption.</small>
+    <small style="display:block;margin-top:8px">Try it with the <a href="sample-assets/forge-demo-screen.png" download style="color:var(--accent)">sample website screenshot</a>.</small>
     <div class="tipbox">
       <b>Showing a whole website in one smooth shot:</b> in Chrome, open your site, press F12, then Ctrl+Shift+P (Cmd+Shift+P on Mac), type "screenshot", and choose "Capture full size screenshot." That saves one single tall image of the entire page. Upload that one image below and mark as many points as you like, top to bottom.
     </div>
@@ -172,6 +173,7 @@ input[type=file]{padding:6px}
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -233,6 +235,17 @@ function renderPills(containerId, options, targetInputId){
 $('suggestBtn').onclick=()=>{
   const type=$('contentType').value;
   const kw=keywordHeadline($('contentKeyword').value);
+  const sceneText=[...$('demoScenesContainer').querySelectorAll('[data-caption]')].map(input=>input.value.trim()).filter(Boolean).join('. ');
+  if(kw||sceneText){
+    const source=[kw,sceneText,type==='islamic'?'Islamic content':''].filter(Boolean).join('. ');
+    const choices=window.ForgeScriptSuggestions.build(source,kw,'general');
+    renderPills('hookPillsList',choices.intro,'introText');
+    renderPills('outroPillsList',choices.outro,'outroText');
+    $('hookPills').classList.remove('hidden');
+    $('outroPills').classList.remove('hidden');
+    toast('✓ Suggestions follow your heading and screen captions — tap to use one');
+    return;
+  }
   let hooks=HOOK_TEMPLATES[type].slice();
   const outros=OUTRO_TEMPLATES[type].slice();
   if(kw){ hooks=[kw+' — See How', hooks[0], hooks[1]]; }

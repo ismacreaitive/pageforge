@@ -247,6 +247,7 @@ input[type=range]{padding:0;height:38px;accent-color:var(--accent)}
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+if(window.parent!==window){ const home=document.querySelector('#setup header a'); if(home) home.hidden=true; }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const KEY='forge:qz:';
@@ -269,10 +270,10 @@ const FALLBACK_CURATED=[
   { question:"What is the Islamic holy book called?", answers:["Torah","Bible","Qur'an","Zabur"], answerIndex:2, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
   { question:"What is the call to prayer called?", answers:["Iqamah","Adhan","Khutbah","Dua"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
   { question:"Which month is the Islamic fasting month?", answers:["Shawwal","Rajab","Ramadan","Muharram"], answerIndex:2, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
-  { question:"What must a Muslim perform before prayer for purification?", answers:["Ghusl","Wudu","Tayammum only","Zakat"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"Which term names the ritual washing commonly performed before salah?", answers:["Adhan","Wudu","Zakat","Khutbah"], answerIndex:1, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
   { question:"Who is considered the final prophet in Islam?", answers:["Isa (Jesus)","Musa (Moses)","Muhammad ﷺ","Ibrahim (Abraham)"], answerIndex:2, source:"General Islamic knowledge", cat:'PROPHETS', kind:'curated' },
   { question:"Which prophet is associated with the story of the ark and the flood?", answers:["Nuh (Noah)","Yusuf (Joseph)","Dawud (David)","Sulaiman (Solomon)"], answerIndex:0, source:"General Islamic knowledge", cat:'PROPHETS', kind:'curated' },
-  { question:"What is the charity given to the poor called?", answers:["Sawm","Hajj","Zakat","Shahada"], answerIndex:2, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
+  { question:"Which of the Five Pillars involves obligatory giving from qualifying wealth?", answers:["Sawm","Hajj","Zakat","Shahada"], answerIndex:2, source:"General Islamic knowledge", cat:'BELIEF', kind:'curated' },
   { question:"What is the Friday congregational prayer called?", answers:["Eid","Jumu'ah","Tarawih","Witr"], answerIndex:1, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' },
   { question:"What is the Islamic place of worship called?", answers:["Church","Mosque","Temple","Synagogue"], answerIndex:1, source:"General Islamic knowledge", cat:'ISLAM', kind:'curated' }
 ];

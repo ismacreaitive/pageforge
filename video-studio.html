@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto Video Studio — Forge Tools</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f17;--panel:#131a26;--line:#2a3548;--text:#eef2f8;--muted:#93a1b8;--accent:#d4af37}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+header strong{font-size:16px}
+.home-link{margin-left:auto;color:var(--muted);text-decoration:none;font-size:13px}
+.home-link:hover{color:var(--text)}
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.intro{padding:10px 18px 0;color:var(--muted)}
+.tabs{display:flex;gap:8px;padding:10px 18px}
+.tabs button{flex:1;max-width:380px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);font:inherit;font-weight:650;cursor:pointer}
+.tabs button[aria-selected=true]{border-color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.workspace{flex:1;min-height:0}
+.workspace[hidden]{display:none}
+iframe{display:block;width:100%;height:100%;border:0;background:var(--bg)}
+@media(max-width:600px){header{padding:10px 12px}.intro{padding:8px 12px 0}.tabs{padding:8px 12px}.tabs button{padding:9px 8px;font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <strong>🤖 Auto Video Studio</strong>
+  <a class="home-link" href="index.html">← All tools</a>
+</header>
+<main>
+  <div class="intro">Create narrated videos from an idea, script, or recording—or switch to a focused animated top-countdown workflow.</div>
+  <div class="tabs" role="tablist" aria-label="Video workflows">
+    <button id="autoTab" type="button" role="tab" aria-selected="true" aria-controls="autoPanel">Auto Video</button>
+    <button id="countdownTab" type="button" role="tab" aria-selected="false" aria-controls="countdownPanel">Top Countdown</button>
+  </div>
+  <section id="autoPanel" class="workspace" role="tabpanel" aria-labelledby="autoTab">
+    <iframe id="autoFrame" title="Auto Video workflow" src="autovideo.html?embed=1"></iframe>
+  </section>
+  <section id="countdownPanel" class="workspace" role="tabpanel" aria-labelledby="countdownTab" hidden>
+    <iframe id="countdownFrame" title="Top Countdown workflow" data-src="top-countdown.html?embed=1"></iframe>
+  </section>
+</main>
+<script>
+(() => {
+  const tabs = {
+    auto: {button: document.getElementById('autoTab'), panel: document.getElementById('autoPanel')},
+    countdown: {button: document.getElementById('countdownTab'), panel: document.getElementById('countdownPanel')}
+  };
+
+  function selectMode(mode, updateAddress) {
+    const selected = tabs[mode] ? mode : 'auto';
+    for (const [name, tab] of Object.entries(tabs)) {
+      const active = name === selected;
+      tab.button.setAttribute('aria-selected', String(active));
+      tab.panel.hidden = !active;
+    }
+
+    const frame = selected === 'countdown' ? document.getElementById('countdownFrame') : null;
+    if (frame && !frame.getAttribute('src')) frame.src = frame.dataset.src;
+
+    if (updateAddress) {
+      const url = new URL(location.href);
+      if (selected === 'auto') url.searchParams.delete('mode');
+      else url.searchParams.set('mode', selected);
+      history.replaceState(null, '', url);
+    }
+  }
+
+  document.getElementById('autoTab').addEventListener('click', () => selectMode('auto', true));
+  document.getElementById('countdownTab').addEventListener('click', () => selectMode('countdown', true));
+  document.querySelector('.tabs').addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const mode = event.key === 'ArrowLeft' ? 'auto' : 'countdown';
+    tabs[mode].button.focus();
+    selectMode(mode, true);
+  });
+
+  selectMode(new URLSearchParams(location.search).get('mode') || 'auto', false);
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // forge-bridge.js: a tool bar on every video tool, and passing your edited video between tools.
 const DB='forge-bridge', STORE='files', KEY='current';
 export const TOOLS=[
-  { id:'video',    page:'video.html',    icon:'✨', label:'Watermark',        takesVideo:true },
+  { id:'video',    page:'watermark-remover.html', icon:'✨', label:'Watermark', takesVideo:true },
   { id:'toolkit',  page:'toolkit.html',  icon:'✂️', label:'Trim & resize',    takesVideo:true },
   { id:'upscale',  page:'upscale.html',  icon:'🔭', label:'Upscale',          takesVideo:true },
   { id:'bgvideo',  page:'bgvideo.html',  icon:'🧍', label:'Video background', takesVideo:true },

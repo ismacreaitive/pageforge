@@ -142,6 +142,11 @@ input[type=file]{padding:6px}
     <input id="introText" placeholder="Intro text" class="hidden" style="margin-top:8px">
     <div class="checkrow" style="margin-top:12px"><input type="checkbox" id="outroEnabled"><label for="outroEnabled">Add an outro</label></div>
     <input id="outroText" placeholder="Outro text" class="hidden" style="margin-top:8px">
+    <div class="row"><button class="btn gold" id="suggestListCopy" type="button">💡 Suggest from my list</button></div>
+    <div id="listCopyChoices" class="hidden">
+      <small>Choose an intro:</small><div class="forge-suggestions" id="listIntroChoices"></div>
+      <small style="display:block;margin-top:8px">Choose a comment prompt:</small><div class="forge-suggestions" id="listOutroChoices"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -189,6 +194,7 @@ input[type=file]{padding:6px}
 </div>
 <div id="toast"></div>
 
+<script src="forge-script-suggestions.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -253,6 +259,15 @@ $('presetPills').addEventListener('click', e=>{
 
 $('introEnabled').addEventListener('change', ()=>{ $('introText').classList.toggle('hidden', !$('introEnabled').checked); });
 $('outroEnabled').addEventListener('change', ()=>{ $('outroText').classList.toggle('hidden', !$('outroEnabled').checked); });
+$('suggestListCopy').addEventListener('click',()=>{
+  const title=$('timelineTitle').value.trim();
+  const choices=window.ForgeScriptSuggestions.build($('script').value,title,'general');
+  window.ForgeScriptSuggestions.render('listIntroChoices',choices.intro,'introText');
+  window.ForgeScriptSuggestions.render('listOutroChoices',choices.outro,'outroText');
+  $('introEnabled').checked=true; $('introText').classList.remove('hidden');
+  $('outroEnabled').checked=true; $('outroText').classList.remove('hidden');
+  $('listCopyChoices').classList.remove('hidden');
+});
 
 $('soundType').addEventListener('change', ()=>{
   $('ambientFile').classList.toggle('hidden', $('soundType').value!=='upload');

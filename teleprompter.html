@@ -143,6 +143,8 @@ ol.hint{margin:0;padding-left:20px}
       <div><div class="label">Title</div><input type="text" id="scriptName" placeholder="e.g. The benefit of being a Muslim"></div>
     </div>
     <textarea id="script" placeholder="Type or paste what you will say. Leave an empty line between paragraphs.&#10;&#10;Notes for yourself go in [square brackets], e.g. [smile] or [pause]: they are shown in blue and never read as words.&#10;&#10;Arabic and English can be mixed: each paragraph is shown in the right direction."></textarea>
+    <div class="row"><button class="btn" type="button" id="sampleScriptBtn">🎲 Load next sample script</button></div>
+    <div class="hint">Click again to rotate through short, ready-to-read examples. Your saved scripts are not changed.</div>
     <div class="row">
       <button class="btn" id="saveBtn">💾 Save</button>
       <button class="btn" id="newBtn">＋ New</button>
@@ -319,8 +321,25 @@ function openScript(id){
 }
 function wordInfo(){
   const n=($('script').value.replace(/\[[^\]]*\]/g,' ').match(/\S+/g)||[]).length;
-  $('wordInfo').textContent=n ? n+' words · about '+Math.max(1,Math.round(n/140*10)/10)+' minutes at a normal speaking pace' : '';
+  const minutes=Math.max(1,Math.round(n/140*10)/10);
+  $('wordInfo').textContent=n ? n+' words · about '+minutes+' minute'+(minutes===1?'':'s')+' at a normal speaking pace' : '';
 }
+const SAMPLE_SCRIPTS=[
+  {name:'Start before you feel ready',text:'You do not need a perfect plan to begin. Choose one small step you can finish today. When it is done, decide what comes next. Progress is often quieter than motivation, but it lasts longer. What is one small step you will take today? Tell me below.'},
+  {name:'The ten-minute reset',text:'When your to-do list feels like it has started its own family, pause for ten minutes. Pick one task, put your phone away, and work only on that. A little focus can beat a whole afternoon of worrying about the list. Which task are you tackling first? Share it in the comments.'},
+  {name:'Make practice easier',text:'Want to build a habit? Make the first step so small that it is hard to avoid. Read one page, take a short walk, or practise for five minutes. Repeating a small action is more useful than waiting for a perfect day. What habit are you making easier this week?'}
+];
+let nextSampleScript=0;
+$('sampleScriptBtn').addEventListener('click',()=>{
+  if($('script').value.trim()&&!confirm('Replace the current unsaved text with a sample? Saved scripts will stay untouched.')) return;
+  const sample=SAMPLE_SCRIPTS[nextSampleScript];
+  nextSampleScript=(nextSampleScript+1)%SAMPLE_SCRIPTS.length;
+  $('scriptSel').value='';
+  $('script').value=sample.text;
+  $('scriptName').value=sample.name;
+  wordInfo();
+  toast('Loaded "'+sample.name+'" · click again to rotate');
+});
 $('scriptSel').addEventListener('change',()=>openScript(currentId()));
 $('saveBtn').onclick=()=>saveScript();
 $('newBtn').onclick=()=>{ fillScripts(''); openScript(''); $('script').focus(); };
