@@ -4,7 +4,7 @@
 // v14: the hook headline always shows alone (no card can appear under it in the first 3.7 seconds).
 // v13: 🔎 settings finder, colourful key words in titles, cleaner blending.
 // v12: face finder keeps text off your face, smart zoom towards your face, light wrap, brightness matching.
-// v11: channel profiles + logo, clean voice, sound effects, smart zoom, progress bar, hook headline, halal nature sounds.
+// v11: channel profiles + logo, clean voice, sound effects, smart zoom, progress bar, hook headline, nature ambience.
 // Used by autovideo.html (Video / audio mode). Must sit in the same folder as autovideo.html.
 
 const THEMES={
@@ -257,7 +257,7 @@ function addNatureButton(){
   const sa=document.getElementById('soundAdd'); if(!sa || document.getElementById('peNature')) return;
   const lab=sa.closest('label') || sa;
   const b=document.createElement('button'); b.id='peNature'; b.type='button'; b.className='mini';
-  b.textContent='🌿 Add halal nature sounds (rain, ocean, wind, birds, crickets, fire, studio air)';
+  b.textContent='🌿 Add nature sounds (rain, ocean, wind, birds, crickets, fire, studio air)';
   lab.insertAdjacentElement('afterend',b);
   b.addEventListener('click',()=>addNatureSounds(b));
 }
@@ -327,7 +327,7 @@ export function mountUI(){
   if(firstTime) applyKind(kind.value); else syncUI();
 }
 
-/* ---------- halal nature sounds, made by code (no instruments, no copyright, no internet) ---------- */
+/* ---------- nature ambience, made by code (no instruments, no copyright, no internet) ---------- */
 const NATURE=[['rain','Nature · Soft rain'],['ocean','Nature · Ocean waves'],['wind','Nature · Gentle wind'],['forest','Nature · Forest birds'],['night','Nature · Night crickets'],['fire','Nature · Crackling fire'],['room','Business · Quiet studio air']];
 function natureSound(kind,R,secs){
   const X=Math.round(R*3), L=Math.round(R*secs), n=L+X, a=new Float32Array(n);

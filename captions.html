@@ -27,11 +27,11 @@
 </header>
 <main class="split">
 <aside>
-  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden><div class="drop-icon">🎙️</div><strong>Drop your video here</strong><span>or click to choose · MP4, MOV, WebM</span></label>
+  <label class="drop" id="drop"><input type="file" id="fileInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba" hidden><div class="drop-icon">🎙️</div><strong>Drop your video or audio here</strong><span>Transcribe either source; burning captions requires video.</span></label>
   <small style="display:block;margin:8px 0;color:var(--muted)">Try a 36-second generated English narration: <a href="sample-assets/forge-demo-video.webm" download style="color:var(--accent)">download the sample video</a>, then choose it above.</small>
-  <div class="file-info" id="fileInfo">No video selected</div>
+  <div class="file-info" id="fileInfo">No media selected</div>
 
-  <div><div class="label">Language spoken in the video</div>
+  <div><div class="label">Language spoken in the recording</div>
     <select id="lang">
       <option value="auto" selected>Detect automatically</option>
       <option value="quran">Arabic: Quran recitation (special AI)</option>
@@ -79,9 +79,9 @@
 </aside>
 
 <section class="out">
-  <div class="out-head"><span id="hint">Your video appears here</span><button class="mini hidden" id="addLineBtn">+ Add caption line here</button></div>
+  <div class="out-head"><span id="hint">Your video or audio appears here</span><button class="mini hidden" id="addLineBtn">+ Add caption line here</button></div>
   <div class="stage">
-    <div class="empty" id="empty">🎙️<br>Open a video to start</div>
+    <div class="empty" id="empty">🎙️<br>Open a video or audio file to start</div>
     <div class="wrap hidden" id="wrap"><video id="video" controls playsinline preload="auto"></video><canvas id="cap"></canvas></div>
   </div>
   <div class="segs" id="segs"><div class="muted">Your captions will appear here after step 1. You can fix any word before burning them in.</div></div>
@@ -101,7 +101,7 @@ const QURAN_MODEL='iqbalaesthetic/Basira';
 const RTL=/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 const AR_FONT='"Amiri","Noto Naskh Arabic","Segoe UI",Arial,sans-serif';
 
-let file=null, url=null, segs=[], shown=[], busy=false, conv=null, cancelled=false;
+let file=null, fileKind='video', url=null, segs=[], shown=[], busy=false, conv=null, cancelled=false;
 let asr=null, asrModel='', asrDevice='', resultUrl=null, resultBlob=null, wakeLock=null, token=0, lastIdx=-1;
 document.fonts.load('700 40px Amiri').catch(()=>{}); document.fonts.load('700 40px "Noto Naskh Arabic"').catch(()=>{});
 
@@ -194,7 +194,7 @@ function renderCap(){
 ['seeked','timeupdate','loadeddata'].forEach(ev=>video.addEventListener(ev,renderCap));
 ['look','pos','wpc','size','upper'].forEach(id=>$(id).addEventListener('input',()=>{ refreshShown(); renderCap(); }));
 
-/* ---------- loading a video ---------- */
+/* ---------- loading a recording ---------- */
 const drop=$('drop');
 $('fileInput').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
 drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
@@ -202,24 +202,26 @@ drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
 drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
 function loadFile(f){
   if(!f || busy) return;
-  if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name)) return toast('Please choose a video file');
-  file=f; token++; lastIdx=-1;
+  const isVideo=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);
+  const isAudio=f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(f.name);
+  if(!isVideo && !isAudio) return toast('Please choose a video or audio file');
+  file=f; fileKind=isVideo?'video':'audio'; token++; lastIdx=-1;
   if(url) URL.revokeObjectURL(url);
   url=URL.createObjectURL(f);
   segs=[]; refreshShown(); renderSegs();
   ['note','prog','doneBox','styleBox','burnBtn','dlRow','addLineBtn'].forEach(hide);
-  $('fileInfo').textContent='Opening '+f.name+'…';
+  $('fileInfo').textContent='Opening '+(fileKind==='video'?'video':'audio')+' '+f.name+'…';
   video.src=url; $('transcribeBtn').disabled=false; loadMB().catch(()=>{});
 }
 video.addEventListener('loadedmetadata',()=>{
   hide('empty'); show('wrap');
   $('fileInfo').textContent=file.name+' · '+fmtSize(file.size)+' · '+fmtClock(video.duration)+(video.videoWidth?' · '+video.videoWidth+'×'+video.videoHeight:'');
-  $('hint').textContent='Choose the language, then click "1. Create captions"';
+  $('hint').textContent=fileKind==='video'?'Choose the language, then click "1. Create captions"':'Audio ready · choose the language, then click "1. Create captions"';
   const tk=token;
   if('requestVideoFrameCallback' in HTMLVideoElement.prototype){ const loop=()=>{ if(tk!==token) return; renderCap(); video.requestVideoFrameCallback(loop); }; video.requestVideoFrameCallback(loop); }
   renderCap();
 });
-video.addEventListener('error',()=>{ if(file){ show('note'); showNote('Your browser cannot open this video. Try converting it to MP4 first (use the Video Toolkit).'); } });
+video.addEventListener('error',()=>{ if(file){ show('note'); showNote('Your browser cannot open this media file. For video, try converting it to MP4 first (use the Video Toolkit).'); } });
 
 /* ---------- speech to text ---------- */
 async function getAudio16k(f){
@@ -277,17 +279,17 @@ $('cancelBtn').onclick=async()=>{ cancelled=true; $('ptext').textContent='Stoppi
 $('transcribeBtn').onclick=async()=>{
   if(!file || busy) return;
   video.pause(); cancelled=false; setBusy(true);
-  hide('note'); hide('doneBox'); show('prog'); setP(0,'Reading the sound from your video…');
+  hide('note'); hide('doneBox'); show('prog'); setP(0,'Reading the sound from your recording…');
   try{
-    const audio=await getAudio16k(file).catch(()=>{ throw new Error('could not read the sound in this video (does it have sound?)'); });
-    if(!audio.length) throw new Error('this video has no sound');
+    const audio=await getAudio16k(file).catch(()=>{ throw new Error('could not read the sound in this file'); });
+    if(!audio.length) throw new Error('this file has no sound');
     const lang=$('lang').value, quran=lang==='quran', total=audio.length, t0=performance.now();
     setP(0,'Loading the AI listener…');
     let pipe=await getASR(quran ? QURAN_MODEL : $('model').value);
     segs=[];
     if(quran){
       const parts=splitBySilence(audio);
-      if(!parts.length) throw new Error('no recitation was found in this video');
+      if(!parts.length) throw new Error('no recitation was found in this recording');
       for(let k=0;k<parts.length;k++){
         if(cancelled) break;
         const [s,e]=parts[k], chunk=audio.subarray(s,e);
@@ -321,10 +323,12 @@ $('transcribeBtn').onclick=async()=>{
         await new Promise(r=>setTimeout(r,20));
       }
     }
-    if(!segs.length) throw new Error(cancelled ? 'stopped before any speech was found' : 'no speech was found in this video');
-    show('styleBox'); show('burnBtn'); show('dlRow'); show('addLineBtn');
-    $('hint').textContent='Check the captions below the video and fix any wrong words';
-    show('note'); showNote((cancelled?'Stopped early. ':'')+'Captions ready: '+segs.length+' lines. Read through them below the video, fix any mistakes, then burn them in or download a subtitle file.','ok');
+    if(!segs.length) throw new Error(cancelled ? 'stopped before any speech was found' : 'no speech was found in this recording');
+    show('dlRow'); show('addLineBtn');
+    if(fileKind==='video'){ show('styleBox'); show('burnBtn'); }
+    $('hint').textContent='Check the captions below and fix any wrong words';
+    show('note');
+    showNote((cancelled?'Stopped early. ':'')+'Captions ready: '+segs.length+' lines. Read through them below, fix any mistakes, then '+(fileKind==='video'?'burn them into the video or':'')+' download a subtitle file.','ok');
   }catch(err){ show('note'); showNote('Could not create captions: '+(err.message||err)+'.'); }
   finally{ setBusy(false); }
 };
@@ -369,7 +373,7 @@ $('txtBtn').onclick=()=>{ saveText(segs.map(s=>s.text.trim()).join('\n')+'\n', b
 
 /* ---------- burn captions into the video ---------- */
 $('burnBtn').onclick=async()=>{
-  if(!file || busy || !segs.length) return;
+  if(!file || fileKind!=='video' || busy || !segs.length) return;
   if(!('VideoEncoder' in window)){ show('note'); return showNote('Burning captions needs Google Chrome or Microsoft Edge on a computer. You can still download the .srt file.'); }
   video.pause(); cancelled=false; setBusy(true);
   hide('note'); hide('doneBox'); show('prog'); setP(0,'Loading the video engine…');

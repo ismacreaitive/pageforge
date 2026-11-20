@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<!-- quiz-card.html — v2.0 — StoryForge Formats · Pack 1 · ❓ Islamic Quiz Card.
+<!-- quiz-card.html — v2.1 — StoryForge Formats · Pack 1 · ❓ Islamic Quiz Card.
+v2.1: Auto mode now advances to the next question after the answer reveal; Tap mode remains manual.
+Removed the synthetic drone option and vocals-only nasheed recommendation; silence remains the default,
+with optional nature ambience and user-selected audio.
 v2.0: (1) Added Square 1:1 shape (Instagram/Facebook post) — the Q&A body already auto-fits to whatever
 height is available, so no change was needed there; only the header/intro/outro chrome text needed its own
 sizing (previously a binary tall/wide check, which would have sized square's header off Wide's ratios —
@@ -99,7 +102,7 @@ input[type=range]{padding:0;height:38px;accent-color:var(--accent)}
 <body>
 
 <div id="setup">
-  <header><div class="logo">❓</div><div><b>Quiz Card <span class="ver">v2.0</span></b><small>Intro + outro pages · kid-friendly · 5 pages total</small></div><a href="index.html">← All tools</a></header>
+  <header><div class="logo">❓</div><div><b>Quiz Card <span class="ver">v2.1</span></b><small>Intro + outro pages · kid-friendly · 5 pages total</small></div><a href="index.html">← All tools</a></header>
 
   <div class="card">
     <h2>📚 Question source</h2>
@@ -181,11 +184,10 @@ input[type=range]{padding:0;height:38px;accent-color:var(--accent)}
       <div class="p" data-v="ocean">🌊 Ocean</div>
       <div class="p" data-v="rain">🌧 Rain</div>
       <div class="p" data-v="wind">🌬 Wind</div>
-      <div class="p" data-v="mihrab">🕌 Mihrab (soft drone)</div>
     </div>
     <input type="file" id="fileIn" accept="audio/*">
     <div><div class="label">Volume: <span id="volLbl">40%</span></div><input type="range" id="vol" min="0" max="100" value="40"></div>
-    <div class="hint"><b>Best engagement: use a vocals-only nasheed loop.</b> Free sources: <a href="https://pixabay.com/music/search/nasheed/" target="_blank">Pixabay</a>, <a href="https://muslimcentral.com/" target="_blank">Muslim Central</a>, <a href="https://www.islamway.net/collection?id=49" target="_blank">Islamway Anasheed</a>.</div>
+    <div class="hint">Silent is the default. Ocean, rain and wind are optional generated ambience; you can also choose your own audio.</div>
   </div>
 
   <div class="card">
@@ -388,7 +390,8 @@ function bindPills(id,key){
     if(key==='amb') setAmbient(settings.amb);
   });
   const v=localStorage.getItem(KEY+key);
-  if(v){ [...box.children].forEach(c=>c.classList.toggle('on',c.dataset.v===v)); settings[key]=key==='nQ'?+v:v; }
+  if(v && [...box.children].some(c=>c.dataset.v===v)){ [...box.children].forEach(c=>c.classList.toggle('on',c.dataset.v===v)); settings[key]=key==='nQ'?+v:v; }
+  else if(key==='amb'){ settings.amb='silent'; localStorage.setItem(KEY+'amb','silent'); }
 }
 bindPills('src','src'); bindPills('nQ','nQ'); bindPills('rvl','rvl'); bindPills('cnt','cnt'); bindPills('amb','amb');
 bindPills('introHold','introHold'); bindPills('outroDelay','outroDelay'); bindPills('outroHold','outroHold'); bindPills('cntStyle','cntStyle'); bindPills('cntStyle','cntStyle'); bindPills('cntStyle','cntStyle');
@@ -448,12 +451,6 @@ function setAmbient(kind){
     const n=makeNoiseBuffer(10,'pink'); const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=600; f.Q.value=2.2;
     const lfo=actx.createOscillator(); lfo.frequency.value=.08; const lg=actx.createGain(); lg.gain.value=400;
     lfo.connect(lg).connect(f.frequency); n.connect(f).connect(g); lfo.start(); n.start(); ambientSources.push(n,lfo);
-  } else if(kind==='mihrab'){
-    const o1=actx.createOscillator(); o1.type='sine'; o1.frequency.value=110; const g1=actx.createGain(); g1.gain.value=.35; o1.connect(g1).connect(g);
-    const o2=actx.createOscillator(); o2.type='sine'; o2.frequency.value=165; const g2=actx.createGain(); g2.gain.value=.22; o2.connect(g2).connect(g);
-    const o3=actx.createOscillator(); o3.type='sine'; o3.frequency.value=220; const g3=actx.createGain(); g3.gain.value=.08; o3.connect(g3).connect(g);
-    const lfo=actx.createOscillator(); lfo.frequency.value=.25; const lg=actx.createGain(); lg.gain.value=.05; lfo.connect(lg).connect(g3.gain);
-    o1.start(); o2.start(); o3.start(); lfo.start(); ambientSources.push(o1,o2,o3,lfo);
   }
   g.connect(masterGain);
 }
@@ -808,6 +805,7 @@ function sizeCanvas(){ const [cw,ch]=currentShape(); cv.width=cw; cv.height=ch; 
 function loop(t){ rafId=requestAnimationFrame(loop); if(!lastT) lastT=t; const dt=Math.min(0.08,(t-lastT)/1000); lastT=t;
   if(state.phase==='intro' && settings.introHold!=='manual'){ state.introLeft-=dt; if(state.introLeft<=0) startQuiz(); }
   else if(state.phase==='q' && settings.rvl==='auto'){ state.timeLeft-=dt; if(state.timeLeft<=0) revealNow(); }
+  else if(state.phase==='r' && settings.rvl==='auto' && state.qi<questions.length-1){ state.timeLeft-=dt; if(state.timeLeft<=0) advance(); }
   else if(state.phase==='r' && settings.outroDelay!=='manual' && state.qi===questions.length-1){ state.timeLeft-=dt; if(state.timeLeft<=0) goToOutro(); }
   else if(state.phase==='outro' && settings.outroHold!=='manual'){ state.outroLeft-=dt; }
   if(ctx) drawFrame(ctx,W,H,dt);
@@ -816,7 +814,7 @@ function startQuiz(){ state.phase='q'; state.qi=0; state.timeLeft=questionDurati
 function revealNow(){
   state.phase='r';
   if(state.qi===questions.length-1 && settings.outroDelay!=='manual') state.timeLeft=+settings.outroDelay||3;
-  else state.timeLeft=0;
+  else state.timeLeft=settings.rvl==='auto'?1.8:0;
 }
 function goToOutro(){
   state.phase='outro';

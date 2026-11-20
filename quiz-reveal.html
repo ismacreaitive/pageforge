@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<!-- quiz-reveal.html — v1.1 — StoryForge Pack 2 · ❓ Quiz Reveal.
+<!-- quiz-reveal.html — v1.2 — StoryForge Pack 2 · ❓ Quiz Reveal.
 Renamed from quiz-card.html to sit alongside the Islamic Quiz Card (the richer, curated+Qur'an-API-sourced
 tool) without any filename collision. This one is the manual/offline counterpart: no live data source, you
 type or paste in any topic's questions yourself (including the copy-prompt-paste-back AI flow), and it works
 for any subject, not just Islamic content.
+v1.2: added explicit Quran, Hadith, Islamic history, and random quiz modes to AI prompt generation;
+source-reference and accuracy checks are required for religious questions. Background audio now defaults
+to silence with optional nature ambience or a user-selected file; the synthesized musical pad was removed.
 v1.1: audit pass, two real fixes before first use.
 (1) Option boxes/grid now auto-fit and vertically centre within the space left after the question and
 timer ring — previously a fixed cap meant short questions or 2-option (True/False) questions left dead
@@ -81,12 +84,18 @@ input,select{background:var(--panel2);border:1px solid var(--line);color:var(--t
 
   <div class="card">
     <h2>✨ Generate with any AI</h2>
-    <small>No key, no setup. Describe a topic, copy the prompt, paste it into ChatGPT, Gemini, Claude — whichever you already use — then bring the answer back here.</small>
+    <small>No key or setup. Choose a subject, copy the prompt into an AI chat, then review every answer and reference before using the quiz.</small>
 
     <div class="step">
       <div class="num">1</div>
       <div class="body">
-        <textarea id="genTopic" style="min-height:50px" placeholder="e.g. Quiz on the Companions of the Prophet"></textarea>
+        <select id="quizType" aria-label="Quiz subject">
+          <option value="random" selected>🎲 Random mix: Quran, Hadith &amp; Islamic history</option>
+          <option value="quran">📖 Quran</option>
+          <option value="hadith">📚 Hadith</option>
+          <option value="history">🏛️ Islamic history</option>
+        </select>
+        <textarea id="genTopic" style="min-height:50px;margin-top:8px" placeholder="Optional focus, e.g. the Hijrah or patience in the Quran"></textarea>
         <div class="row">
           <select id="genCount">
             <option value="3">3 questions</option>
@@ -96,6 +105,7 @@ input,select{background:var(--panel2);border:1px solid var(--line);color:var(--t
           </select>
           <button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button>
         </div>
+        <small style="display:block;margin-top:8px">AI drafts can be wrong. Check Quran references, hadith grading/collection details, and historical facts yourself before publishing.</small>
       </div>
     </div>
 
@@ -182,8 +192,8 @@ Correct: C</textarea>
     </div>
     <div class="row" style="margin-top:8px">
       <select id="soundType">
-        <option value="none">🔇 Silent</option>
-        <option value="pad">🎵 Soft pad (synthesized)</option>
+        <option value="none">🔇 Silent (default)</option>
+        <option value="rain">🌧️ Soft rain ambience</option>
         <option value="upload">⬆ Upload your own</option>
       </select>
       <input type="file" id="ambientFile" accept="audio/*" class="hidden">
@@ -515,8 +525,27 @@ $('soundType').addEventListener('change', ()=>{
 function buildPrompt(){
   const topic=$('genTopic').value.trim();
   const count=+$('genCount').value;
-  if(!topic){ return null; }
-  return `You are drafting a multiple-choice quiz about: "${topic}"
+  const modes={
+    random:{
+      label:'a random Islamic quiz',
+      rules:'Choose a balanced mix of Quran, Hadith, and well-established Islamic history questions; distribute the topics as evenly as the question count allows.'
+    },
+    quran:{
+      label:'a Quran quiz',
+      rules:'Use Quran-only questions. Cite the Surah and ayah for each answer. Avoid disputed tafsir and do not invent a verse reference.'
+    },
+    hadith:{
+      label:'a Hadith quiz',
+      rules:'Use Hadith-only questions. Prefer authentic (Sahih or Hasan) narrations; cite the collection and number only when certain. Never invent a narration, grading, narrator, or reference.'
+    },
+    history:{
+      label:'an Islamic history quiz',
+      rules:'Use well-established Islamic history only. Cite a reputable source or clearly identified historical reference for each answer; avoid disputed dates and claims.'
+    }
+  };
+  const mode=modes[$('quizType').value]||modes.random;
+  const subject=topic ? `${mode.label}, focused on "${topic}"` : mode.label;
+  return `You are drafting ${count} multiple-choice questions for ${subject}.
 
 Rules — follow exactly:
 1. Write exactly ${count} questions.
@@ -527,11 +556,13 @@ B: [option]
 C: [option]
 D: [option]
 Correct: [the single correct letter, A, B, C or D]
-3. Use only widely-agreed, well-established facts. Do not invent statistics, dates, or figures you are not confident about.
-4. Make the questions mature, clear and engaging for teens or adults: one unambiguous answer, plausible distractors, no trick wording, and short options with matching grammar.
-5. Light, friendly humor is welcome when it fits; never mock a faith, a person or a group. If the topic is religious, keep it respectful, do not quote Qur'an or hadith wording, and do not present a genuinely debated ruling as settled fact.
-6. Do not invent statistics, dates, quotations or facts. Keep each question and option to one line.
-7. No intro, explanation, comment prompt, markdown or extra numbering — output only the Q/A/B/C/D/Correct blocks. The editor adds an optional comment prompt in the outro.`;
+Source: [specific citation for the answer]
+3. ${mode.rules}
+4. Use only well-established facts; do not invent dates, quotations, source details, or references. If a fact or citation cannot be verified confidently, replace that question with one that can.
+5. Make the questions mature, clear and engaging for teens or adults: one unambiguous answer, plausible distractors, no trick wording, and short options with matching grammar.
+6. Keep religious content respectful. Do not present a genuinely debated ruling as settled fact, and do not quote long passages from the Quran or Hadith.
+7. Light, friendly humor is welcome only when it fits; never mock a faith, person, or group. Keep each question and option to one line.
+8. No intro, explanation, comment prompt, markdown, or extra numbering — output only the Q/A/B/C/D/Correct/Source blocks. The editor adds an optional comment prompt in the outro.`;
 }
 async function copyText(text){
   try{ await navigator.clipboard.writeText(text); return true; }
@@ -548,7 +579,6 @@ async function copyText(text){
 }
 $('copyPromptBtn').onclick=async ()=>{
   const prompt=buildPrompt();
-  if(!prompt){ toast('Describe a topic first'); return; }
   const ok=await copyText(prompt);
   toast(ok ? '✓ Copied — paste it into any AI chat' : 'Could not copy automatically — select and copy manually');
   if(!ok){
@@ -641,16 +671,16 @@ function roundRectPath(ctx,x,y,w,h,r){
   ctx.closePath();
 }
 
-/* ===== ambient sound + reveal chime ===== */
-let audioCtx=null, ambientGain=null, mediaStreamDest=null, padOscillators=[], uploadedAudioEl=null, uploadedSource=null;
+/* ===== optional ambient sound ===== */
+let audioCtx=null, ambientGain=null, mediaStreamDest=null, ambientSources=[], uploadedAudioEl=null, uploadedSource=null;
 function ensureAmbientGraph(){
   if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   if(!ambientGain){ ambientGain=audioCtx.createGain(); ambientGain.gain.value=0.6; ambientGain.connect(audioCtx.destination); }
   if(!mediaStreamDest){ mediaStreamDest=audioCtx.createMediaStreamDestination(); ambientGain.connect(mediaStreamDest); }
 }
 function stopAmbient(){
-  padOscillators.forEach(o=>{ try{o.stop();}catch(err){} });
-  padOscillators=[];
+  ambientSources.forEach(source=>{ try{source.stop();}catch(err){} });
+  ambientSources=[];
   if(uploadedAudioEl){ uploadedAudioEl.pause(); }
 }
 function startAmbient(){
@@ -658,15 +688,14 @@ function startAmbient(){
   ensureAmbientGraph();
   if(audioCtx.state==='suspended') audioCtx.resume();
   const type=$('soundType').value;
-  if(type==='pad'){
-    const freqs=[110,164.81,220];
-    freqs.forEach((f,i)=>{
-      const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
-      const g=audioCtx.createGain(); g.gain.value=0;
-      o.connect(g); g.connect(ambientGain); o.start();
-      g.gain.linearRampToValueAtTime(0.16/(i+1), audioCtx.currentTime+2);
-      padOscillators.push(o);
-    });
+  if(type==='rain'){
+    const rate=audioCtx.sampleRate, buffer=audioCtx.createBuffer(1,rate*4,rate), data=buffer.getChannelData(0);
+    let brown=0;
+    for(let i=0;i<data.length;i++){ brown=(brown+0.02*(Math.random()*2-1))/1.02; data[i]=brown*3.5; }
+    const source=audioCtx.createBufferSource(), filter=audioCtx.createBiquadFilter(), level=audioCtx.createGain();
+    source.buffer=buffer; source.loop=true; filter.type='lowpass'; filter.frequency.value=1800; level.gain.value=0.08;
+    source.connect(filter); filter.connect(level); level.connect(ambientGain); source.start();
+    ambientSources.push(source);
   } else if(type==='upload' && uploadedAudioEl){
     uploadedAudioEl.currentTime=0; uploadedAudioEl.loop=true;
     uploadedAudioEl.play().catch(()=>{});
@@ -682,20 +711,6 @@ $('ambientFile').addEventListener('change', e=>{
   uploadedSource.connect(ambientGain);
   toast('✓ Ambient track loaded');
 });
-function playRevealChime(){
-  if(!audioCtx || !ambientGain) return;
-  const now=audioCtx.currentTime;
-  [784,988].forEach((f,i)=>{
-    const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
-    const g=audioCtx.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.2/(i+1), now+0.03);
-    g.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
-    o.connect(g); g.connect(ambientGain);
-    o.start(now); o.stop(now+0.55);
-  });
-}
-
 /* ===== intro/outro card + 3-2-1 countdown (same proven pattern as top-countdown) ===== */
 const FADE_CARD=300;
 function drawTitleCard(localT, th, text){
@@ -970,7 +985,7 @@ function buildQuestionTimeline(questions, timerMs){
   return { durations, offsets, total:acc, revealHoldMs, fadeOutMs };
 }
 
-let cv,ctx,W,H,rafId,startTs=null,questions=[],PH=null,QT=null,TIMER_MS=6000,lastSoundKey='';
+let cv,ctx,W,H,rafId,startTs=null,questions=[],PH=null,QT=null,TIMER_MS=6000;
 let mr,chunks=[],blob,pngBlob;
 
 function draw(ts){
@@ -1002,9 +1017,6 @@ function draw(ts){
     const timerFrac=revealed?0:Math.max(0,1-localT/TIMER_MS);
     const secondsLeft=revealed?0:Math.max(0,Math.ceil((TIMER_MS-localT)/1000));
 
-    const soundKey='reveal'+qi;
-    if(revealed && revealT<120 && lastSoundKey!==soundKey){ playRevealChime(); lastSoundKey=soundKey; }
-
     const shapeKey=$('shape').value, motionStyle=$('motion').value;
     if(shapeKey==='wide') drawQuizWide(th, questions[qi], qi, questions.length, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts);
     else if(shapeKey==='square') drawQuizSquare(th, questions[qi], qi, questions.length, revealed, timerFrac, secondsLeft, alpha, motionStyle, ts);
@@ -1022,7 +1034,7 @@ $('openBtn').onclick=()=>{
   if(!questions.length){ toast('Add at least one valid question block (needs Q, at least 2 options, and a matching Correct letter)'); return; }
   if(parsed.skipped>0){ toast(parsed.skipped+' block(s) skipped — check Q/options/Correct are all present'); }
   TIMER_MS=+$('timerLen').value;
-  startTs=null; lastSoundKey='';
+  startTs=null;
   PH=computePhases();
   QT=buildQuestionTimeline(questions, TIMER_MS);
   cv=$('cv'); ctx=cv.getContext('2d');

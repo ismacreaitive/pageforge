@@ -129,7 +129,7 @@ Ahmad: > "The first thing a person will be asked about on the Day of Judgment is
     <h2>Timing &amp; sound</h2>
     <div id="estLine" style="font-size:13px;color:var(--muted);margin-bottom:8px">Estimated length: —</div>
     <div class="row">
-      <select id="shape"><option value="tall">Tall 9:16</option><option value="wide">Wide 16:9</option></select>
+      <select id="shape"><option value="tall">Tall 9:16 — TikTok, Reels, Status</option><option value="square">Square 1:1 — Instagram, Facebook</option><option value="wide">Wide 16:9 — YouTube</option></select>
       <select id="speed"><option value="1800">Normal</option><option value="1200">Fast</option><option value="2600">Slow</option></select>
     </div>
     <div class="row" style="margin-top:8px">
@@ -334,7 +334,7 @@ function parseScript(){
     return { from: name===right?'right':'left', text, name, voice, quote };
   }).filter(Boolean);
 }
-function shapeWH(){ return $('shape').value==='tall'?[1080,1920]:[1920,1080]; }
+function shapeWH(){ const s=$('shape').value; return s==='tall'?[1080,1920]:s==='square'?[1080,1080]:[1920,1080]; }
 
 /* ===== auto-generate (Gemini) ===== */
 const LS_KEY='sf_gemini_key';

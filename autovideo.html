@@ -41,6 +41,7 @@ aside>*,.box>*{flex-shrink:0}
 .cardbox textarea[dir=rtl]{font-family:Amiri,"Traditional Arabic",serif;font-size:20px;line-height:1.7}
 .s-sfx{width:auto;max-width:170px;padding:5px 6px;font-size:12px}
 .mini.on{border-color:var(--accent);color:var(--accent)}
+.source-preview{display:block;width:100%;max-height:260px;border-radius:8px;background:#000}
 #photoPrev{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;border:2px solid #e9c46a}
 .sc-time{color:var(--muted);font-variant-numeric:tabular-nums}
 .ayah{font-family:Amiri,"Traditional Arabic",serif;font-size:21px;line-height:1.8;color:var(--text)}
@@ -73,6 +74,17 @@ aside>*,.box>*{flex-shrink:0}
     <label class="drop" id="mediaDrop"><input type="file" id="mediaInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" hidden><div class="drop-icon">🎙️</div><strong>Drop your video or audio here</strong><span>Only the sound is kept, unless you tick "Keep my video picture" below.</span></label>
     <div class="ptext">Try the <a href="sample-assets/forge-demo-video.webm" download>generated spoken sample clip</a> to test listening and scene creation.</div>
     <div class="file-info" id="mediaInfo">No file chosen yet</div>
+    <div class="box" id="directRecordBox">
+      <div class="label" style="margin:0">Or record directly for Whiteboard</div>
+      <div class="ptext" style="margin:0">Record voice only on a blank board, or record with your camera and microphone. Either recording becomes the source for the spoken-word Whiteboard; no separate upload is needed.</div>
+      <video id="sourcePreview" class="source-preview hidden" muted playsinline></video>
+      <div class="row">
+        <button class="mini" id="recordVoiceBtn" type="button">🎙️ Record voice only</button>
+        <button class="mini" id="recordCameraBtn" type="button">📹 Record camera + voice</button>
+        <button class="mini" id="stopSourceBtn" type="button" disabled>■ Stop recording</button>
+      </div>
+      <div class="file-info" id="recordSourceStatus" role="status" aria-live="polite">Ready. Your browser will ask for microphone access, and camera access if selected.</div>
+    </div>
     <div class="row">
       <div><div class="label">Language spoken</div><select id="mlang"><option value="auto">Detect</option><option value="quran">Quran recitation (exact text)</option><option value="english" selected>English</option><option value="arabic">Arabic</option><option value="french">French</option><option value="spanish">Spanish</option><option value="portuguese">Portuguese</option><option value="german">German</option><option value="yoruba">Yoruba</option><option value="hausa">Hausa</option><option value="swahili">Swahili</option><option value="hindi">Hindi</option><option value="urdu">Urdu</option><option value="chinese">Chinese</option></select></div>
       <div id="mmodelBox"><div class="label">Listening</div><select id="mmodel"><option value="Xenova/whisper-tiny">Fast</option><option value="Xenova/whisper-base" selected>Balanced</option><option value="Xenova/whisper-small">Most accurate (250 MB)</option></select></div>
@@ -472,6 +484,104 @@ $('mediaInput').onchange=e=>{ loadMedia(e.target.files[0]); e.target.value=''; }
 mdrop.addEventListener('dragover',e=>{ e.preventDefault(); mdrop.classList.add('over'); });
 mdrop.addEventListener('dragleave',()=>mdrop.classList.remove('over'));
 mdrop.addEventListener('drop',e=>{ e.preventDefault(); mdrop.classList.remove('over'); loadMedia(e.dataTransfer.files[0]); });
+let sourceCapture=null, sourceRecorder=null, sourceChunks=[], sourceStartedAt=0, sourceClock=null, sourceCanvas=null, sourceCanvasTimer=null, sourceRecordingMode='';
+function stopSourceTracks(){
+  clearInterval(sourceCanvasTimer); sourceCanvasTimer=null;
+  if(sourceCapture){ sourceCapture.getTracks().forEach(track=>track.stop()); sourceCapture=null; }
+  sourceCanvas=null; $('sourcePreview').srcObject=null; hide('sourcePreview');
+}
+async function startSourceRecording(withCamera){
+  if(busy || sourceRecorder) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    toast('Direct recording needs a browser with microphone recording support, such as Chrome or Edge.');
+    return;
+  }
+  $('recordVoiceBtn').disabled=true; $('recordCameraBtn').disabled=true;
+  $('recordSourceStatus').textContent=withCamera?'Requesting camera and microphone access…':'Requesting microphone access…';
+  try{
+    let stream;
+    if(withCamera){
+      stream=await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ ideal:'user' }, width:{ ideal:1280 }, height:{ ideal:720 } },
+        audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }
+      });
+    }else{
+      const audioStream=await navigator.mediaDevices.getUserMedia({audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }});
+      sourceCapture=audioStream;
+      sourceCanvas=document.createElement('canvas');
+      const [width,height]=FORMATS[$('format').value]||FORMATS['9:16'];
+      sourceCanvas.width=width; sourceCanvas.height=height;
+      const boardCtx=sourceCanvas.getContext('2d');
+      boardCtx.fillStyle='#FBFBF8'; boardCtx.fillRect(0,0,width,height);
+      let boardStream=sourceCanvas.captureStream(0);
+      const boardTrack=boardStream.getVideoTracks()[0];
+      if(boardTrack && typeof boardTrack.requestFrame==='function'){
+        boardTrack.requestFrame(); sourceCanvasTimer=setInterval(()=>boardTrack.requestFrame(),200);
+      }else{
+        boardStream.getTracks().forEach(track=>track.stop());
+        boardStream=sourceCanvas.captureStream(5);
+      }
+      stream=new MediaStream([...boardStream.getVideoTracks(),...audioStream.getAudioTracks()]);
+    }
+    sourceCapture=stream;
+    $('sourcePreview').srcObject=stream; show('sourcePreview');
+    $('sourcePreview').play().catch(()=>{});
+    const mimeType=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+    sourceRecorder=mimeType ? new MediaRecorder(stream,{mimeType}) : new MediaRecorder(stream);
+    sourceChunks=[];
+    sourceRecorder.ondataavailable=e=>{ if(e.data && e.data.size) sourceChunks.push(e.data); };
+    sourceRecorder.onerror=e=>{
+      const message=e.error && e.error.message ? e.error.message : 'The browser could not continue recording.';
+      $('recordSourceStatus').textContent=message;
+      toast('Recording failed: '+message,5000);
+    };
+    sourceRecorder.onstop=async()=>{
+      const recorder=sourceRecorder, parts=sourceChunks;
+      const voiceOnly=sourceRecordingMode==='voice';
+      sourceRecordingMode='';
+      sourceRecorder=null; clearInterval(sourceClock); sourceClock=null;
+      stopSourceTracks();
+      $('recordVoiceBtn').disabled=false; $('recordCameraBtn').disabled=false; $('stopSourceBtn').disabled=true;
+      const type=recorder.mimeType||'video/webm';
+      const blob=new Blob(parts,{type});
+      if(!blob.size){ $('recordSourceStatus').textContent='No recording data was produced. Please try again.'; toast('The recording was empty. Please try again.'); return; }
+      const ext=/mp4/i.test(type)?'mp4':'webm';
+      const file=new File([blob],'whiteboard-recording-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+ext,{type});
+      $('recordSourceStatus').textContent='Preparing your recording for the Whiteboard…';
+      await loadMedia(file);
+      if(media && media.file===file){
+        const keepPic=$('keepPic');
+        if(keepPic && !keepPic.checked){ keepPic.checked=true; keepPic.dispatchEvent(new Event('change',{bubbles:true})); }
+        const board=$('peBoard');
+        let boardMode=board && ['off','some','all'].includes(board.value)?board.value:'some';
+        if(voiceOnly) boardMode='all';
+        else if(boardMode==='off') boardMode='some';
+        if(board && board.value!==boardMode){ board.value=boardMode; board.dispatchEvent(new Event('change',{bubbles:true})); }
+        $('recordSourceStatus').textContent=voiceOnly?'Voice recording ready. Whiteboard drawings are set for the whole video. Make your video when ready.':'Recording ready. Choose Whiteboard drawings below, then make your video.';
+      }else{
+        $('recordSourceStatus').textContent='The recording could not be prepared. You can try again or choose a saved file.';
+      }
+    };
+    sourceRecorder.start(250);
+    sourceRecordingMode=withCamera?'camera':'voice';
+    sourceStartedAt=Date.now();
+    $('stopSourceBtn').disabled=false;
+    $('recordSourceStatus').textContent='Recording… 0:00';
+    sourceClock=setInterval(()=>{
+      const elapsed=Math.floor((Date.now()-sourceStartedAt)/1000);
+      $('recordSourceStatus').textContent='Recording… '+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0');
+    },500);
+  }catch(err){
+    stopSourceTracks(); sourceRecorder=null;
+    sourceRecordingMode=''; $('recordVoiceBtn').disabled=false; $('recordCameraBtn').disabled=false; $('stopSourceBtn').disabled=true;
+    const message=err && err.message ? err.message : 'Check camera and microphone permissions.';
+    $('recordSourceStatus').textContent='Camera/microphone access was not available.';
+    toast('Could not start recording: '+message,5000);
+  }
+}
+$('recordVoiceBtn').addEventListener('click',()=>startSourceRecording(false));
+$('recordCameraBtn').addEventListener('click',()=>startSourceRecording(true));
+$('stopSourceBtn').addEventListener('click',()=>{ if(sourceRecorder && sourceRecorder.state==='recording') sourceRecorder.stop(); });
 async function loadMedia(f){
   if(!f || busy) return;
   const isV=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);

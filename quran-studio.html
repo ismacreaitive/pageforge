@@ -18,9 +18,11 @@
 #view{display:block;max-width:100%;max-height:calc(100vh - 140px);border-radius:10px;background:#000;margin:0 auto}
 .units{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto}
 .unit{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel);font-size:12px;display:flex;gap:6px;align-items:center}
+.unit.low{border-color:var(--warn,#d89a27)}
 .unit .ar{font-family:"Amiri Quran",Amiri,serif;font-size:17px;direction:rtl;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px}
 .unit b{color:var(--accent);white-space:nowrap}
 .unit .tm{color:var(--muted);font-variant-numeric:tabular-nums}
+.unit .confidence{color:var(--warn,#d89a27);white-space:nowrap;font-size:11px}
 .unit .mini{flex:none;padding:3px 7px}
 .unit.on{border-color:var(--accent)}
 .tapbig{font-size:24px;padding:22px;width:100%;font-weight:800}
@@ -91,7 +93,7 @@
       </div>
     </details>
     <label class="check"><input type="checkbox" id="qAudh"> I said A'udhu billah first</label>
-    <label class="check"><input type="checkbox" id="qBism" checked> I recited Bismillah first</label>
+    <label class="check"><input type="checkbox" id="qBism"> I recited Bismillah first</label>
     <div><div class="label">Translation</div><select id="qTr"></select></div>
     <button class="primary" id="loadBtn">📖 Get the ayat and line them up with my voice</button>
   </div>
@@ -156,13 +158,13 @@
     </div>
     <div><div class="label">Long ayat</div><select id="txtSplit">
       <option value="auto">Auto: phrase by phrase when the ayah is long</option>
-      <option value="phrase">Always phrase by phrase (at the waqf signs and my pauses)</option>
+      <option value="phrase">Always phrase by phrase (match the Arabic mushaf pauses)</option>
       <option value="whole">Whole ayah (turns pages by lines)</option>
     </select></div>
     <div><div class="label">English translation timing</div><select id="trSplit">
       <option value="phrase">Match translated clauses to the Arabic mushaf pauses (recommended)</option>
       <option value="whole">Show the whole translation for each ayah</option>
-    </select><div class="ptext">Phrase timing follows the Quranic stop marks, not recitation pauses. English wording is kept in order and split only at punctuation; if a clean match is unavailable, the clause stays together.</div></div>
+    </select><div class="ptext">English follows the same Arabic portions. Small stop groups are combined, wording stays in order, and audio pauses alone never split a phrase.</div></div>
     <div><div class="label">Text position</div><select id="txtPos"><option value="auto">Auto</option><option value="up">Higher</option><option value="mid">Middle</option><option value="low">Lower</option></select></div>
     <label class="slider">Text size <input type="range" id="txtSize" min="80" max="130" step="5" value="100"><b id="sizeVal">100%</b></label>
     <label class="check"><input type="checkbox" id="melOn" checked> 🎼 Melody line (the rise and fall of my voice)</label>
@@ -1123,9 +1125,14 @@ function rebuild(){
     return autoWords(u,S.Bn[i],S.Bn[i+1]);
   });
   LAYOUT.clear();
-  const nw=Object.keys(S.man.w).length, eng=ai && ai.eng==='ctc' ? 'the exact aligner' : 'the Quran AI';
-  const src=mb ? '✓ Using <b>your tapped ayah timing</b>' : aiB ? '✓ Using <b>'+eng+' timing</b> ('+Math.round((ai.rate||0)*100)+'% of the words were very clear)' : 'Using <b>automatic timing from the sound only</b>';
-  $('syncInfo').innerHTML=src+(nw ? ' · '+nw+' ayah'+(nw>1 ? 's' : '')+' with tapped word timing' : '')
+  const ayat=S.units.filter(u=>u.kind==='ayah'), loaded=ayat.length
+    ? 'Loaded '+(ayat.length===1 ? 'Ayah '+ayat[0].num : 'Ayat '+ayat[0].num+'–'+ayat[ayat.length-1].num)+' from Surah '+S.surah.n+'. '
+    : '';
+  const nw=Object.keys(S.man.w).length, eng=ai && ai.eng==='ctc' ? 'the exact aligner' : 'the Quran AI', pct=Math.round((ai && ai.rate||0)*100);
+  const src=mb ? '✓ Using <b>your tapped ayah timing</b>' : aiB
+    ? (pct<85 ? '⚠ Review <b>'+eng+' timing</b> ('+pct+'% of words matched clearly)' : '✓ Using <b>'+eng+' timing</b> ('+pct+'% of words matched clearly)')
+    : 'Using <b>automatic timing from the sound only</b>';
+  $('syncInfo').innerHTML=loaded+src+(nw ? ' · '+nw+' ayah'+(nw>1 ? 's' : '')+' with tapped word timing' : '')
     +'.<br>Press ▶ to check. '+(aiB ? 'If one ayah is still not right, press ✋ on it (Half speed makes it easy).' : 'For the best result press <b>🎧 Let the Quran AI listen</b> above.');
 }
 function unitAt(t){
@@ -1166,6 +1173,7 @@ async function loadAyat(){
     S.autoB=alignUnits(units,S.A);
     S.sig=[S.file.name,S.file.size,s,a,b,$('qAudh').checked ? 1 : 0,bism ? 1 : 0].join('|');
     loadMan(); rebuild(); renderUnits(); fillPart(); renderMq(); updatePost();
+    if(bism && a>1) showNote('Bismillah is included before Ayah '+a+'. Keep this selected only if those words are audible at the start; otherwise uncheck it and press "Get the ayat" again so later ayat are timed against the right words.');
     if(!S.pitch){ setHint('Reading the melody of your voice…'); await tick(); try{ S.pitch=await computePitch(); }catch(e){ console.warn(e); S.pitch=null; } }
     await prepareBackground();
     restoreVis();
@@ -1391,8 +1399,10 @@ function ctcAlignAll(logp,T,V){
   const lastW=W[W.length-1], endT=Math.min(dur,(isNaN(lastW.en) ? lastW.st+0.8 : lastW.en+0.5));
   b.push(Math.max(endT,b[N-1]+0.5));
   for(let i=1;i<b.length;i++) if(b[i]<b[i-1]+0.3) b[i]=b[i-1]+0.3;
-  const ok=W.filter(x=>x.ok).length;
-  return { b, w, rate:ok/W.length, eng:'ctc' };
+  const ok=W.filter(x=>x.ok).length, unitOk=Array(N).fill(0), unitTotal=Array(N).fill(0);
+  W.forEach(x=>{ unitTotal[x.i]++; if(x.ok) unitOk[x.i]++; });
+  const unitRate=unitTotal.map((count,i)=>count ? unitOk[i]/count : 0);
+  return { b, w, rate:ok/W.length, unitRate, eng:'ctc' };
 }
 async function exactAlign(say){
   const ort=await loadOrt();
@@ -1516,10 +1526,11 @@ async function aiSync(){
     if(!res) throw new Error('the listener could not follow the recitation. Check that the selected ayat are exactly what you recited');
     S.man.ai=res; S.man.b=null; S.man.w={}; saveMan(); rebuild(); renderUnits(); staleCovers();
     const pct=Math.round(res.rate*100);
+    const weakUnits=(res.unitRate||[]).map((rate,i)=>rate<0.75 ? S.units[i].label : '').filter(Boolean);
     say(res.eng==='ctc'
-      ? '✓ Done: the exact aligner followed every letter ('+pct+'% of the words were very clear). Press ▶ Preview.'
+      ? 'Timing saved. The exact aligner matched '+pct+'% of words clearly; review the ayah timings before export.'
       : '✓ Done: '+pct+'% of the words were heard clearly'+(ASR && ASR.quran ? '' : ' (smaller general listener)')+'. The rest are placed smoothly between them. Press ▶ Preview.');
-    if(pct<40) showNote('Only '+pct+'% of the words were very clear. Check that the selected ayat are exactly what you recited (and A\'udhu / Bismillah). You can fix any ayah with ✋ at half speed.');
+    if(pct<85 || weakUnits.length) showNote('The timing is uncertain for '+(weakUnits.length ? weakUnits.join(', ') : 'some words')+' ('+pct+'% of words matched clearly). Check that A\'udhu and Bismillah match your recording, preview before export, and use ✋ or ⏪ / ⏩ to correct timing.');
     else toast('✓ AI timing saved for this recording');
     S.lastT=Math.max(0,S.Bn[0]+0.3); seekStatic(S.lastT);
   }catch(e){ console.error(e); say('The AI could not finish: '+e.message+'.'); showNote('The AI could not finish: '+e.message+'. Your current timing is unchanged.'); }
@@ -2620,29 +2631,18 @@ function breakLines(items,gap,maxW){
   return lines;
 }
 function linePages(L,maxLines){ const pages=[]; for(let k=0;k<L.lines.length;k+=maxLines) pages.push(L.lines.slice(k,k+maxLines)); return pages; }
-/* phrase by phrase: split at the waqf signs of the mushaf and at the places where you paused */
+/* Keep Arabic and English on the same meaning-sized mushaf portions. */
 function phrasePages(i,fs,maxW,maxLines,L){
   const key='ph|'+i+'|'+Math.round(fs)+'|'+Math.round(maxW)+'|'+maxLines;
   if(LAYOUT.has(key)) return LAYOUT.get(key);
-  const items=L.lines.flatMap(l=>l.items), ends=new Set(), wt=S.WT && S.WT[i];
-  items.forEach((it,k)=>{ if(!it.tk.num && WAQF.test(it.tk.text)) ends.add(k); });
-  if(wt){
-    for(let k=0;k<items.length-1;k++){
-      const a=items[k].tk, b=items[k+1].tk; if(a.num || b.num) continue;
-      const t0=wt[a.wi], t1=wt[b.wi]; if(t0==null || t1==null) continue;
-      if(silentRun(t0+0.15,t1)>=0.35) ends.add(k);
-    }
-  }
+  const items=L.lines.flatMap(l=>l.items), ends=new Set();
+  translationPages(i).slice(0,-1).forEach(page=>{
+    const last=page.flatMap(line=>line.items).slice(-1)[0];
+    if(last) ends.add(last.tk);
+  });
   let phrases=[], cur=[];
-  items.forEach((it,k)=>{ cur.push(it); if(ends.has(k) && k<items.length-1){ phrases.push(cur); cur=[]; } });
+  items.forEach(it=>{ cur.push(it); if(ends.has(it.tk)){ phrases.push(cur); cur=[]; } });
   if(cur.length) phrases.push(cur);
-  const words=ph=>ph.filter(it=>!it.tk.num).length;
-  for(let k=0;k<phrases.length;k++){
-    if(phrases.length>1 && words(phrases[k])<2){
-      if(k<phrases.length-1){ phrases[k+1]=phrases[k].concat(phrases[k+1]); phrases.splice(k,1); k--; }
-      else{ phrases[k-1]=phrases[k-1].concat(phrases[k]); phrases.splice(k,1); }
-    }
-  }
   const pages=[];
   for(const ph of phrases){ const lines=breakLines(ph,L.gap,maxW); for(let k=0;k<lines.length;k+=maxLines) pages.push(lines.slice(k,k+maxLines)); }
   LAYOUT.set(key,pages); return pages;
@@ -2675,31 +2675,22 @@ function splitTranslation(text,pages){
   if(pages.length===1) return [source];
   let clauses=translationClauses(source,false);
   if(clauses.length<pages.length) clauses=translationClauses(source,true);
+  if(clauses.length<pages.length) return [source,...Array(pages.length-1).fill('')];
   const weights=pages.map(p=>Math.max(1,p.flatMap(l=>l.items).filter(it=>!it.tk.num).length));
   const totalArabic=weights.reduce((a,b)=>a+b,0), clauseWeights=clauses.map(c=>Math.max(1,(c.match(/\S+/g)||[]).length));
   const prefix=[0]; clauseWeights.forEach(w=>prefix.push(prefix[prefix.length-1]+w));
   const totalEnglish=prefix[prefix.length-1], chunks=[];
-  if(clauses.length>=pages.length){
-    let start=0, usedArabic=0;
-    for(let i=0;i<pages.length;i++){
-      usedArabic+=weights[i];
-      if(i===pages.length-1){ chunks.push(clauses.slice(start).join(' ')); break; }
-      const max=clauses.length-(pages.length-i-1), target=totalEnglish*usedArabic/totalArabic;
-      let cut=start+1, diff=Infinity;
-      for(let k=cut;k<=max;k++){
-        const nextDiff=Math.abs(prefix[k]-target);
-        if(nextDiff<diff){ cut=k; diff=nextDiff; }
-      }
-      chunks.push(clauses.slice(start,cut).join(' ')); start=cut;
+  let start=0, usedArabic=0;
+  for(let i=0;i<pages.length;i++){
+    usedArabic+=weights[i];
+    if(i===pages.length-1){ chunks.push(clauses.slice(start).join(' ')); break; }
+    const max=clauses.length-(pages.length-i-1), target=totalEnglish*usedArabic/totalArabic;
+    let cut=start+1, diff=Infinity;
+    for(let k=cut;k<=max;k++){
+      const nextDiff=Math.abs(prefix[k]-target);
+      if(nextDiff<diff){ cut=k; diff=nextDiff; }
     }
-    return chunks;
-  }
-  let usedArabic=0;
-  for(const weight of weights){
-    const target=totalEnglish*(usedArabic+weight/2)/totalArabic;
-    let clause=0;
-    while(clause<clauses.length-1 && target>prefix[clause+1]) clause++;
-    chunks.push(clauses[clause]); usedArabic+=weight;
+    chunks.push(clauses.slice(start,cut).join(' ')); start=cut;
   }
   return chunks;
 }
@@ -2707,7 +2698,7 @@ function splitTranslation(text,pages){
 function translationPages(i){
   const u=S.units[i]; if(!u) return [];
   if(TR_PAGES.has(u)) return TR_PAGES.get(u);
-  const groups=[]; let cur=[];
+  let groups=[]; let cur=[];
   for(const tk of u.tokens){
     if(tk.num) continue;
     cur.push(tk);
@@ -2715,7 +2706,24 @@ function translationPages(i){
   }
   if(cur.length) groups.push(cur);
   if(!groups.length) groups.push(u.tokens.filter(tk=>!tk.num));
-  const pages=groups.map(group=>[{ items:group.map(tk=>({tk})) }]);
+  const totalWords=groups.reduce((sum,group)=>sum+group.length,0);
+  let clauses=translationClauses(u.tr||'',false);
+  const lengthLimit=Math.max(1,Math.ceil(totalWords/12));
+  if(clauses.length<Math.min(groups.length,lengthLimit)) clauses=translationClauses(u.tr||'',true);
+  const pageCount=Math.max(1,Math.min(groups.length,lengthLimit,clauses.length||1));
+  const prefix=[0]; groups.forEach(group=>prefix.push(prefix[prefix.length-1]+group.length));
+  const merged=[]; let start=0;
+  for(let i=0;i<pageCount;i++){
+    if(i===pageCount-1){ merged.push(groups.slice(start).flat()); break; }
+    const max=groups.length-(pageCount-i-1), target=totalWords*(i+1)/pageCount;
+    let end=start+1, diff=Infinity;
+    for(let k=end;k<=max;k++){
+      const nextDiff=Math.abs(prefix[k]-target);
+      if(nextDiff<diff){ end=k; diff=nextDiff; }
+    }
+    merged.push(groups.slice(start,end).flat()); start=end;
+  }
+  const pages=merged.map(group=>[{ items:group.map(tk=>({tk})) }]);
   TR_PAGES.set(u,pages); return pages;
 }
 function translationPage(text,pages,cw,wt,tt,num){
@@ -3012,11 +3020,15 @@ function highlightUnit(t){ if(!S.units.length || !S.Bn) return; const i=unitAt(t
 
 /* ---------- the ayat list: play, nudge, tap words ---------- */
 function renderUnits(){
-  const B=S.Bn; lastHl=-1;
-  $('unitList').innerHTML=S.units.map((u,i)=>'<div class="unit" data-i="'+i+'"><b>'+esc(u.label)+'</b><span class="tm">'+fmt(B[i])+'</span><span class="ar">'+esc(u.ar)+'</span>'
+  const B=S.Bn, unitRate=S.man.ai && S.man.ai.unitRate; lastHl=-1;
+  $('unitList').innerHTML=S.units.map((u,i)=>{
+    const rate=unitRate && Number.isFinite(unitRate[i]) ? unitRate[i] : null;
+    const confidence=rate==null ? '' : '<span class="confidence" title="Words matched clearly by the aligner">'+Math.round(rate*100)+'% clear</span>';
+    return '<div class="unit'+(rate!=null && rate<0.75 ? ' low' : '')+'" data-i="'+i+'"><b>'+esc(u.label)+'</b><span class="tm">'+fmt(B[i])+'</span>'+confidence+'<span class="ar">'+esc(u.ar)+'</span>'
     +'<button class="mini" data-a="play" title="Play from this ayah">▶</button>'
     +(i>0 ? '<button class="mini" data-a="early" title="Starts too late: move earlier">⏪</button><button class="mini" data-a="late" title="Starts too early: move later">⏩</button>' : '')
-    +'<button class="mini" data-a="words" title="Tap the words of this ayah">✋</button></div>').join('');
+    +'<button class="mini" data-a="words" title="Tap the words of this ayah">✋</button></div>';
+  }).join('');
 }
 $('unitList').addEventListener('click',e=>{
   const b=e.target.closest('button'), row=e.target.closest('.unit'); if(!b || !row) return;
