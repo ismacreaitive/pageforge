@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- quran-studio.html — v13 — StoryForge Quran Studio: chosen cover saved inside the MP4 as the video's picture (folder, gallery, WhatsApp) + on screen only a quick blink (0.1 s, or none, or 0.7 s), cover choice never erased, phrase-by-phrase long ayat, background changes after each scene, exact aligner, meaning visuals, golden icons -->
+<!-- quran-studio.html — v15 — StoryForge Quran Studio: chosen cover saved inside the MP4 as the video's picture (folder, gallery, WhatsApp) + on screen only a quick blink (0.1 s, or none, or 0.7 s), cover choice never erased, phrase-by-phrase long ayat, background changes after each scene, exact aligner, meaning visuals, golden icons -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -160,9 +160,9 @@
       <option value="whole">Whole ayah (turns pages by lines)</option>
     </select></div>
     <div><div class="label">English translation timing</div><select id="trSplit">
-      <option value="phrase">Follow the Arabic phrases and pauses (recommended)</option>
+      <option value="phrase">Match translated clauses to the Arabic mushaf pauses (recommended)</option>
       <option value="whole">Show the whole translation for each ayah</option>
-    </select><div class="ptext">The wording stays unchanged and in order. Phrase boundaries are estimated because translations are supplied by ayah, not phrase.</div></div>
+    </select><div class="ptext">Phrase timing follows the Quranic stop marks, not recitation pauses. English wording is kept in order and split only at punctuation; if a clean match is unavailable, the clause stays together.</div></div>
     <div><div class="label">Text position</div><select id="txtPos"><option value="auto">Auto</option><option value="up">Higher</option><option value="mid">Middle</option><option value="low">Lower</option></select></div>
     <label class="slider">Text size <input type="range" id="txtSize" min="80" max="130" step="5" value="100"><b id="sizeVal">100%</b></label>
     <label class="check"><input type="checkbox" id="melOn" checked> 🎼 Melody line (the rise and fall of my voice)</label>
@@ -440,15 +440,79 @@ async function idbPut(store,rec){
   try{ await new Promise((res,rej)=>{ const t=db.transaction(store,'readwrite'); t.objectStore(store).put(rec); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('storage full')); }); }
   finally{ db.close(); }
 }
+function openStudioDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('forge-quran-session',1);
+    r.onupgradeneeded=()=>{
+      const db=r.result;
+      for(const name of ['files','states','outputs']) if(!db.objectStoreNames.contains(name)) db.createObjectStore(name,{ keyPath:'id' });
+    };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function readStudioSession(){
+  const db=await openStudioDB();
+  try{
+    return await new Promise((res,rej)=>{
+      const t=db.transaction(['files','states','outputs'],'readonly');
+      const file=t.objectStore('files').get('current'), state=t.objectStore('states').get('current'), output=t.objectStore('outputs').get('current');
+      let f=null,s=null,o=null;
+      file.onsuccess=()=>{ f=file.result||null; }; state.onsuccess=()=>{ s=state.result||null; }; output.onsuccess=()=>{ o=output.result||null; };
+      t.oncomplete=()=>res({ file:f, state:s, output:o });
+      t.onerror=()=>rej(t.error||new Error('could not read saved session')); t.onabort=()=>rej(t.error||new Error('could not read saved session'));
+    });
+  }finally{ db.close(); }
+}
+async function saveStudioFile(file){
+  const db=await openStudioDB();
+  try{
+    await new Promise((res,rej)=>{
+      const t=db.transaction(['files','states','outputs'],'readwrite');
+      t.objectStore('files').put({ id:'current', blob:file, name:file.name, type:file.type, lastModified:file.lastModified });
+      t.objectStore('states').put({ id:'current', ayatReady:false });
+      t.objectStore('outputs').delete('current');
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error||new Error('could not save the recitation')); t.onabort=()=>rej(t.error||new Error('could not save the recitation'));
+    });
+  }finally{ db.close(); }
+}
+async function saveStudioProgress(state){
+  const db=await openStudioDB();
+  try{
+    await new Promise((res,rej)=>{
+      const t=db.transaction('states','readwrite'); t.objectStore('states').put(state);
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error||new Error('could not save session progress')); t.onabort=()=>rej(t.error||new Error('could not save session progress'));
+    });
+  }finally{ db.close(); }
+}
+async function saveStudioOutput(blob,name){
+  const db=await openStudioDB();
+  try{
+    await new Promise((res,rej)=>{
+      const t=db.transaction('outputs','readwrite'); t.objectStore('outputs').put({ id:'current', blob, name });
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error||new Error('could not save the video')); t.onabort=()=>rej(t.error||new Error('could not save the video'));
+    });
+  }finally{ db.close(); }
+}
+async function clearStudioSession(){
+  const db=await openStudioDB();
+  try{
+    await new Promise((res,rej)=>{
+      const t=db.transaction(['files','states','outputs'],'readwrite');
+      t.objectStore('files').delete('current'); t.objectStore('states').delete('current'); t.objectStore('outputs').delete('current');
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error||new Error('could not clear the saved session')); t.onabort=()=>rej(t.error||new Error('could not clear the saved session'));
+    });
+  }finally{ db.close(); }
+}
 
 /* ---------- saved settings (only in this browser) ---------- */
 const SET=['qAudh','qBism','qTr','format','quality','meMode','pName','bgChange','textMode','txtStyle','txtSplit','trSplit','txtPos','txtSize','hlMode','hlLead','tapRate','aiQ','melOn','hdrOn','safeOn','zonesOn','barOn','denoise','smooth','tune','coughOn','echo','echoType','chan','range','micLang','mvOn','icOn','mvSrc','mvLen','mvFreq','mvMe','cvFirst','cvHold','cvTitle'];
 { const ver=localStorage.getItem('forge:qs:ver');
-  if(!['8','9','10','11','12','13'].includes(ver)){ localStorage.setItem('forge:qs:set:hlMode','quick'); localStorage.setItem('forge:qs:set:mvLen','alt'); }
-  if(!['10','11','12','13'].includes(ver)) localStorage.setItem('forge:qs:set:aiQ','align');
-  if(!['12','13'].includes(ver)) localStorage.setItem('forge:qs:set:cvFirst','1');
-  if(ver!=='13') localStorage.setItem('forge:qs:set:cvHold','blink');
-  localStorage.setItem('forge:qs:ver','13'); }
+  if(!['8','9','10','11','12','13','14','15'].includes(ver)){ localStorage.setItem('forge:qs:set:hlMode','quick'); localStorage.setItem('forge:qs:set:mvLen','alt'); }
+  if(!['10','11','12','13','14','15'].includes(ver)) localStorage.setItem('forge:qs:set:aiQ','align');
+  if(!['12','13','14','15'].includes(ver)) localStorage.setItem('forge:qs:set:cvFirst','1');
+  if(ver==='14' && localStorage.getItem('forge:qs:set:trSplit')==='whole') localStorage.setItem('forge:qs:set:trSplit','phrase');
+  if(!['13','14','15'].includes(ver)) localStorage.setItem('forge:qs:set:cvHold','blink');
+  localStorage.setItem('forge:qs:ver','15'); }
 const PROF_KEY='forge:pe:profiles';
 function loadProfiles(){ let P=null; try{ P=JSON.parse(localStorage.getItem(PROF_KEY)||'null'); }catch{} if(!P || !Array.isArray(P.list) || !P.list.length) P={ cur:'ummah', list:[{ id:'edge', name:'CreAItive EDGE', logo:'', settings:{} },{ id:'ummah', name:'Ummah Digital', logo:'', settings:{} }] }; return P; }
 function fillSelects(){
@@ -895,16 +959,18 @@ function silentRun(t0,t1){
   for(let f=f0;f<f1;f++){ if(A.env[f]<=A.thr){ run++; if(run>best) best=run; } else run=0; }
   return best*A.fr;
 }
+let fileLoadVersion=0, studioAyatReady=false;
 const drop=$('drop');
 $('fileIn').onchange=e=>{ loadFile(e.target.files[0]); e.target.value=''; };
 drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
 drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
 drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
-async function loadFile(f){
+async function loadFile(f,restoring=false){
   if(!f || S.busy) return;
   const isV=f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name);
   const isA=f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|weba)$/i.test(f.name);
   if(!isV && !isA) return toast('Please choose a video or an audio file');
+  const loadVersion=++fileLoadVersion;
   stopPreview();
   $('fileInfo').textContent='Reading the sound from '+f.name+'…';
   try{
@@ -913,7 +979,11 @@ async function loadFile(f){
     if(!buf || buf.duration<1) throw new Error('no sound');
     $('fileInfo').textContent='Analyzing the sound from '+f.name+'…';
     const A=await analyse(buf);
+    if(loadVersion!==fileLoadVersion) return false;
     S.file=f; S.isVideo=isV; S.raw=buf; procVersion++; S.proc=null; S.procKey=''; S.A=A; S.pitch=null; S.units=[]; S.Bn=null; S.WT=null; S.a16=null; S.used.clear();
+    studioAyatReady=false;
+    if(S.resultUrl) URL.revokeObjectURL(S.resultUrl);
+    S.resultUrl=''; S.resultName=''; $('doneBox').classList.add('hidden');
     clearVis(); clearCovers();
     if(S.url) URL.revokeObjectURL(S.url);
     S.url=URL.createObjectURL(f);
@@ -923,9 +993,21 @@ async function loadFile(f){
     setHint('Now search the ayah you recited (step 2), then press "Get the ayat".');
     if(isV && $('meMode').value==='cut') ensureSeg().catch(()=>{});
     redraw();
+    if(!restoring){
+      try{ await saveStudioFile(f); $('fileInfo').textContent+=' · saved on this device'; }
+      catch(e){
+        console.error('Could not save this recitation for recovery',e);
+        try{ await clearStudioSession(); }catch(clearError){ console.error('Could not clear the previous saved Quran session',clearError); }
+        $('fileInfo').textContent+=' · not saved for recovery';
+        showNote('Your recording is open, but this browser could not save it for recovery. Keep the original file safe and download your finished video before closing this tab. '+e.message+'.');
+      }
+    }
+    return true;
   }catch(e){
+    if(loadVersion!==fileLoadVersion) return false;
     $('fileInfo').textContent='No file chosen yet';
     showNote('Could not read the sound in '+f.name+'. Make sure it has sound, or convert it to MP4 or MP3 first.');
+    return false;
   }
 }
 
@@ -1030,6 +1112,7 @@ function loadMan(){
 function saveMan(){ try{ localStorage.setItem('forge:qs:sync:'+S.sig,JSON.stringify(S.man)); }catch{} }
 const LAYOUT=new Map();
 const TR_LAYOUT=new WeakMap();
+const TR_PAGES=new WeakMap();
 function rebuild(){
   const N=S.units.length, mb=S.man.b, ai=S.man.ai;
   const aiB=ai && Array.isArray(ai.b) && ai.b.length===N+1 ? ai.b : null;
@@ -1088,10 +1171,65 @@ async function loadAyat(){
     restoreVis();
     setHint(S.man.ai ? '✓ Ready, with your saved AI timing. Press ▶ Preview to check.' : '✓ Ready. Press 🎧 "Let the Quran AI listen" in step 3 for exact word timing.');
     S.lastT=Math.max(0,S.Bn[0]+0.6); seekStatic(S.lastT);
+    studioAyatReady=true; persistStudioProgress();
   }catch(e){ showNote('Could not get the ayat ready: '+e.message+'.'); setHint('Something needs fixing, see the note on the left.'); }
   finally{ S.busy=false; }
 }
 $('loadBtn').onclick=loadAyat;
+function persistStudioProgress(){
+  if(!S.file || !studioAyatReady || !S.surah) return;
+  const state={
+    id:'current', ayatReady:true,
+    selection:{ surah:S.surah.n, from:S.surah.a, to:S.surah.b, translation:$('qTr').value, audh:$('qAudh').checked, bism:$('qBism').checked },
+    range:{ mode:$('range').value, from:+$('pFrom').value||0, to:+$('pTo').value||0 }
+  };
+  saveStudioProgress(state).catch(e=>{
+    console.error('Could not save Quran Studio progress',e);
+    showNote('Your work is ready, but the latest session changes could not be saved for recovery. Keep this tab open and download your video before closing. '+e.message+'.');
+  });
+}
+async function restoreStudioSession(surahsReady){
+  const initialVersion=fileLoadVersion;
+  let saved;
+  try{ saved=await readStudioSession(); }
+  catch(e){ console.error('Could not read the saved Quran Studio session',e); showNote('Could not check for a saved Quran Studio session: '+e.message+'.'); return; }
+  if(fileLoadVersion!==initialVersion || S.file || !saved.file || !saved.file.blob) return;
+  const rec=saved.file, f=new File([rec.blob],rec.name||'recitation', { type:rec.type||rec.blob.type, lastModified:rec.lastModified||Date.now() });
+  $('fileInfo').textContent='Restoring your previous recitation…';
+  const loaded=await loadFile(f,true), restoreVersion=fileLoadVersion;
+  if(!loaded || fileLoadVersion!==restoreVersion || S.file!==f) return;
+  $('fileInfo').textContent+=' · restored from this device';
+  await surahsReady;
+  if(fileLoadVersion!==restoreVersion || S.file!==f) return;
+  const state=saved.state||{};
+  studioAyatReady=!!state.ayatReady;
+  if(studioAyatReady && state.selection && surahs){
+    const q=state.selection;
+    $('qSurah').value=String(q.surah);
+    $('qFrom').value=String(q.from);
+    $('qTo').value=String(q.to);
+    $('qAudh').checked=!!q.audh; $('qBism').checked=!!q.bism;
+    if([...$('qTr').options].some(o=>o.value===q.translation)) $('qTr').value=q.translation;
+    await loadAyat();
+    if(S.surah && S.Bn && state.range){
+      $('range').value=['all','part'].includes(state.range.mode) ? state.range.mode : 'all';
+      partUI();
+      const last=Math.max(0,S.units.length-1);
+      $('pFrom').value=String(clamp(+state.range.from||0,0,last));
+      $('pTo').value=String(clamp(+state.range.to||last,+$('pFrom').value,last));
+      persistStudioProgress();
+    }
+  }
+  if(saved.output && saved.output.blob){
+    if(S.resultUrl) URL.revokeObjectURL(S.resultUrl);
+    S.resultName=saved.output.name||'quran-video.mp4';
+    S.resultUrl=URL.createObjectURL(saved.output.blob);
+    $('doneBox').classList.remove('hidden');
+    showNote('✓ Your previous exported video is restored. Press "Download video" to save it again.',true);
+  }else if(!S.Bn) toast('Your previous recitation was restored. Press "Get the ayat" to continue.');
+  else toast('Your previous Quran Studio session was restored.');
+}
+['range','pFrom','pTo'].forEach(id=>$(id).addEventListener('change',persistStudioProgress));
 
 /* ---------- your recording at 16 kHz (what the listeners need) ---------- */
 async function audio16(){
@@ -1951,7 +2089,7 @@ function visPrompt(chunk){
   +'For each ayah you get: how long it is recited, the Arabic words (numbered), a translation, and the explanation from Tafsir al-Muyassar (Arabic).\n'
   +'Rules:\n'
   +'1. Choose by the MEANING explained in the tafsir, never by the literal word alone. Example: in Surah al-An\'am 6:82 the word "ẓulm" means shirk (associating partners with Allah), so choose visuals about misguidance or shirk, not about social oppression.\n'
-  +'2. "scenes": a list of scene ids from SCENES that fit the meaning, all different from each other, in the order the meaning unfolds in the ayah. How many: 3 for an ayah recited 25 seconds or longer, 2 for 12 to 25 seconds, 1 for shorter. '+(most ? 'Give scenes to most ayat.' : 'Give scenes to about half of the ayat, only where visuals truly help; give [] to the others.')+'\n'
+  +'2. "scenes": a list of scene ids from SCENES that fit the meaning, all different from each other, in the order the meaning unfolds in the ayah. Maximum: 3 for an ayah recited 25 seconds or longer, 2 for 12 to 25 seconds, 1 for shorter. Choose fewer rather than adding a weak or generic match; use [] if none clearly fit. '+(most ? 'Give scenes to most ayat, but only when a listed scene genuinely fits.' : 'Give scenes to about half of the ayat, only where visuals truly help; give [] to the others.')+'\n'
   +'3. "icon": one id from ICONS, or "". Use an icon only when the ayah clearly speaks about that thing or meaning (journey → road, the Hour → clock, prayer → mosque or kaaba). About one ayah in three.\n'
   +'4. "iconWord": the number of the Arabic word where that thing is mentioned (from the numbered list), or 0.\n'
   +'5. "meaning": one short plain-English line (at most 14 words) saying what the ayah is about according to the tafsir. It is only shown to the reciter for checking. Never quote the ayah.\n'
@@ -2035,8 +2173,7 @@ const vertical=()=>$('format').value==='9:16';
 async function fromPixVideo(sc){
   const hits=await pixSearch('vid',sc.q,'');
   const valid=h=>(sc.crowd || !PEOPLE.test(h.tags)) && h.v && h.v.medium && h.v.medium.url;
-  let list=hits.filter(h=>!S.used.has('pv'+h.id) && valid(h));
-  if(!list.length){ for(const h of hits) S.used.delete('pv'+h.id); list=hits.filter(valid); }
+  const list=hits.filter(h=>!S.used.has('pv'+h.id) && valid(h));
   if(vertical()) list.sort((a,b)=>(b.v.medium.height>b.v.medium.width ? 1 : 0)-(a.v.medium.height>a.v.medium.width ? 1 : 0));
   for(const h of list.slice(0,6)){
     try{
@@ -2053,8 +2190,7 @@ async function fromPixPhoto(sc){
   const orient=$('format').value==='9:16' ? 'vertical' : $('format').value==='16:9' ? 'horizontal' : '';
   const hits=await pixSearch('img',sc.q,orient);
   const valid=h=>(sc.crowd || !PEOPLE.test(h.tags)) && h.url;
-  let list=hits.filter(h=>!S.used.has('pp'+h.id) && valid(h));
-  if(!list.length){ for(const h of hits) S.used.delete('pp'+h.id); list=hits.filter(valid); }
+  const list=hits.filter(h=>!S.used.has('pp'+h.id) && valid(h));
   for(const h of list.slice(0,6)){
     try{
       S.used.add('pp'+h.id);
@@ -2200,13 +2336,13 @@ function visSegs(i,cfg){
 function visLayers(t,cfg){
   if(!cfg.mvOn || !S.vis.length || !S.Bn || !S.units.length) return null;
   const i=unitAt(t), segs=visSegs(i,cfg); if(!segs.length) return null;
-  const k=segs.findIndex(g=>t>=g.st && t<=g.en); if(k<0) return null;
+  const k=segs.findIndex((g,j)=>t>=g.st && (t<g.en || (j===segs.length-1 && t<=g.en))); if(k<0) return null;
   const g=segs[k], cont=cfg.mvLen==='cont', out=[];
   const mk=(x,a)=>({ item:x.sl.item, st:x.st, a, p:clamp((t-x.st)/Math.max(0.1,x.en-x.st),0,1), seed:i*3+x.k });
   let a;
   if(cont){
     if(k>0 && t-g.st<0.6) out.push(mk(segs[k-1],1));
-    const fin=k===0 || t-g.st<0.6 ? clamp((t-g.st)/0.6,0,1) : 1, fout=k===segs.length-1 ? clamp((g.en-t)/0.6,0,1) : 1;
+    const fin=clamp((t-g.st)/0.6,0,1), fout=k===segs.length-1 ? clamp((g.en-t)/0.6,0,1) : 1;
     a=Math.min(fin,fout);
   }else a=clamp(Math.min((t-g.st)/0.6,(g.en-t)/0.6),0,1);
   out.push(mk(g,a));
@@ -2518,30 +2654,69 @@ function fitLines(ctx,text,fs0,maxW,maxLines,cfg,weight){
   for(;;){ ctx.font=trFont(cfg,fs,weight); lines=wrap(ctx,text,maxW); if(lines.length<=maxLines || fs<=fs0*0.7) break; fs=Math.max(fs0*0.7,fs*0.93); }
   return { fs, lines };
 }
+function translationClauses(text,soft){
+  const out=[]; let start=0;
+  const breaks=soft ? /[.!?;,:—–،؛؟۔…]/ : /[.!?؟۔…]/, closing=/["')\]}”’]/;
+  for(let i=0;i<text.length;i++){
+    if(!breaks.test(text[i])) continue;
+    let end=i+1;
+    while(end<text.length && closing.test(text[end])) end++;
+    if(end<text.length && !/\s/.test(text[end])) continue;
+    const part=text.slice(start,end).trim(); if(part) out.push(part);
+    while(end<text.length && /\s/.test(text[end])) end++;
+    start=end; i=end-1;
+  }
+  const tail=text.slice(start).trim(); if(tail) out.push(tail);
+  return out.length ? out : [text];
+}
 function splitTranslation(text,pages){
-  const words=String(text||'').trim().split(/\s+/).filter(Boolean);
-  if(!pages.length || !words.length) return pages.map(()=> '');
-  if(words.length<pages.length){
-    const chunks=pages.map(()=> '');
-    if(words.length===1) chunks[pages.length-1]=words[0];
-    else words.forEach((word,i)=>{ chunks[Math.round(i*(pages.length-1)/(words.length-1))]=word; });
+  const source=String(text||'').trim();
+  if(!pages.length || !source) return pages.map(()=> '');
+  if(pages.length===1) return [source];
+  let clauses=translationClauses(source,false);
+  if(clauses.length<pages.length) clauses=translationClauses(source,true);
+  const weights=pages.map(p=>Math.max(1,p.flatMap(l=>l.items).filter(it=>!it.tk.num).length));
+  const totalArabic=weights.reduce((a,b)=>a+b,0), clauseWeights=clauses.map(c=>Math.max(1,(c.match(/\S+/g)||[]).length));
+  const prefix=[0]; clauseWeights.forEach(w=>prefix.push(prefix[prefix.length-1]+w));
+  const totalEnglish=prefix[prefix.length-1], chunks=[];
+  if(clauses.length>=pages.length){
+    let start=0, usedArabic=0;
+    for(let i=0;i<pages.length;i++){
+      usedArabic+=weights[i];
+      if(i===pages.length-1){ chunks.push(clauses.slice(start).join(' ')); break; }
+      const max=clauses.length-(pages.length-i-1), target=totalEnglish*usedArabic/totalArabic;
+      let cut=start+1, diff=Infinity;
+      for(let k=cut;k<=max;k++){
+        const nextDiff=Math.abs(prefix[k]-target);
+        if(nextDiff<diff){ cut=k; diff=nextDiff; }
+      }
+      chunks.push(clauses.slice(start,cut).join(' ')); start=cut;
+    }
     return chunks;
   }
-  const weights=pages.map(p=>Math.max(1,p.flatMap(l=>l.items).filter(it=>!it.tk.num).length));
-  const total=weights.reduce((a,b)=>a+b,0), chunks=[]; let start=0, used=0;
-  for(let i=0;i<pages.length;i++){
-    used+=weights[i];
-    if(i===pages.length-1){ chunks.push(words.slice(start).join(' ')); break; }
-    const remaining=pages.length-i-1, target=Math.round(words.length*used/total);
-    const min=Math.min(words.length-remaining,Math.max(start+1,target-1));
-    const max=words.length-remaining;
-    let cut=clamp(target,min,max);
-    const punctuation=[];
-    for(let k=min;k<=max;k++) if(/[,;:.!?…。]$/.test(words[k-1])) punctuation.push(k);
-    if(punctuation.length) cut=punctuation.reduce((best,k)=>Math.abs(k-target)<Math.abs(best-target) ? k : best,punctuation[0]);
-    chunks.push(words.slice(start,cut).join(' ')); start=cut;
+  let usedArabic=0;
+  for(const weight of weights){
+    const target=totalEnglish*(usedArabic+weight/2)/totalArabic;
+    let clause=0;
+    while(clause<clauses.length-1 && target>prefix[clause+1]) clause++;
+    chunks.push(clauses[clause]); usedArabic+=weight;
   }
   return chunks;
+}
+// Audio pauses can split meaning mid-clause, so translation follows only mushaf stop marks.
+function translationPages(i){
+  const u=S.units[i]; if(!u) return [];
+  if(TR_PAGES.has(u)) return TR_PAGES.get(u);
+  const groups=[]; let cur=[];
+  for(const tk of u.tokens){
+    if(tk.num) continue;
+    cur.push(tk);
+    if(WAQF.test(tk.text)){ groups.push(cur); cur=[]; }
+  }
+  if(cur.length) groups.push(cur);
+  if(!groups.length) groups.push(u.tokens.filter(tk=>!tk.num));
+  const pages=groups.map(group=>[{ items:group.map(tk=>({tk})) }]);
+  TR_PAGES.set(u,pages); return pages;
 }
 function translationPage(text,pages,cw,wt,tt,num){
   let chunks=TR_LAYOUT.get(pages);
@@ -2572,12 +2747,13 @@ function drawCard(ctx,W,H,m,t,i,cfg,G){
   if(cfg.text==='tr'){
     let txt=(u.tr||'')+(u.num ? '  ('+u.num+')' : ''), alpha=1;
     if(cfg.trSplit==='phrase' && u.tr){
-      const fs=m*(vert ? 0.07 : 0.066)*cfg.size*(G.small ? 0.85 : 1), L=layoutFor(ctx,i,fs,maxW);
-      const pages=phrasePages(i,fs,maxW,vert ? (cfg.safe ? 3 : 4) : 3,L), wt=S.WT[i], tt=t+cfg.lead;
+      const fs=m*(vert ? 0.07 : 0.066)*cfg.size*(G.small ? 0.85 : 1);
+      const pages=translationPages(i), wt=S.WT[i], tt=t+cfg.lead;
       let cw=-1; if(wt) for(let j=0;j<wt.length;j++){ if(tt>=wt[j]) cw=j; else break; }
       const current=translationPage(u.tr,pages,cw,wt,tt,u.num); txt=current.text; alpha=current.alpha;
     }
-    const T=fitLines(ctx,txt,m*0.06*cfg.size,maxW,cfg.trSplit==='whole' ? 12 : 6,cfg,'500'), lh=T.fs*1.4, blockH=T.lines.length*lh;
+    const phrasePagesNow=cfg.trSplit==='phrase' ? translationPages(i).length : 0;
+    const T=fitLines(ctx,txt,m*0.06*cfg.size,maxW,cfg.trSplit==='whole' || phrasePagesNow===1 ? 12 : 6,cfg,'500'), lh=T.fs*1.4, blockH=T.lines.length*lh;
     const top=placeBlock(H,m,G,cfg,blockH);
     LASTCARD={ top:top-m*0.035, bot:top+blockH+m*0.03 };
     if(!classic){ ctx.save(); ctx.globalAlpha=boxA; rr(ctx,cx-maxW/2-m*0.045,top-m*0.035,maxW+m*0.09,blockH+m*0.06,m*0.03); ctx.fillStyle='#000'; ctx.fill(); ctx.restore(); }
@@ -2607,10 +2783,11 @@ function drawCard(ctx,W,H,m,t,i,cfg,G){
   const aa=a*(0.2+0.8*pa);
   let trText=u.tr||'', trAlpha=pa;
   if(cfg.trSplit==='phrase' && trText){
-    const trPages=phrasePages(i,fs,maxW,maxLines,L), current=translationPage(trText,trPages,cw,wt,tt,u.num);
+    const trPages=translationPages(i), current=translationPage(trText,trPages,cw,wt,tt,u.num);
     trText=current.text; trAlpha=current.alpha;
   }
-  const T=cfg.text==='both' && trText ? fitLines(ctx,trText,m*(classic ? 0.046 : 0.043)*cfg.size*(G.small ? 0.9 : 1),maxW,cfg.trSplit==='whole' ? 12 : 4,cfg) : null;
+  const phrasePagesNow=cfg.trSplit==='phrase' ? translationPages(i).length : 0;
+  const T=cfg.text==='both' && trText ? fitLines(ctx,trText,m*(classic ? 0.046 : 0.043)*cfg.size*(G.small ? 0.9 : 1),maxW,cfg.trSplit==='whole' || phrasePagesNow===1 ? 12 : 4,cfg) : null;
   const gapTr=classic ? m*0.06 : m*0.035;
   const lh=fs*1.9, trH=T ? gapTr+T.lines.length*T.fs*1.45 : 0, blockH=lines.length*lh+trH;
   const top=placeBlock(H,m,G,cfg,blockH);
@@ -3084,10 +3261,13 @@ async function makeVideo(){
     S.resultUrl=URL.createObjectURL(blob);
     const ua=S.units[a], ub=S.units[b];
     S.resultName=('Surah-'+s.en.replace(/[^A-Za-z]/g,'')+'-'+(ua.num||s.a)+'-'+(ub.num||s.b)+'-'+$('format').value.replace(':','x')+'.mp4');
+    let outputSaved=true;
+    try{ await saveStudioOutput(blob,S.resultName); }
+    catch(e){ outputSaved=false; console.error('Your video could not be saved for session recovery',e); }
     setP(1,'✓ Done: '+(blob.size/1048576).toFixed(1)+' MB');
     $('doneBox').classList.remove('hidden');
     const cvMsg=coverC ? ' Cover '+(coverIdx+1)+(coverSaved ? ' is the video\'s picture' : ' is used')+(lead>0 ? ' and '+(lead<0.3 ? 'blinks at the very start' : 'opens the video') : '')+'.' : '';
-    showNote('✓ Your Quran video is ready. Press "Download video".'+cvMsg+' Your covers are above (⬇ to save one), and your title, description and hashtags are in step 7.',true);
+    showNote('✓ Your Quran video is ready. Press "Download video".'+cvMsg+' Your covers are above (⬇ to save one), and your title, description and hashtags are in step 7.'+(!outputSaved ? ' This browser could not save the export for recovery; download it before closing this tab.' : ''),true);
   }catch(e){
     if(output){ try{ await output.cancel(); }catch{} }
     if(e.message==='cancelled'){ setP(0,'Cancelled'); toast('Cancelled'); }
@@ -3102,7 +3282,8 @@ $('cancelBtn').onclick=()=>{ S.cancel=true; };
 $('dlBtn').onclick=()=>{ if(!S.resultUrl) return; const a=document.createElement('a'); a.href=S.resultUrl; a.download=S.resultName||'quran-video.mp4'; document.body.appendChild(a); a.click(); a.remove(); };
 
 /* ---------- start ---------- */
-fillSelects(); persist(); partUI(); sizeView(); loadMq(); renderMq(); loadSurahs(); initKeys(); renderCovers();
+fillSelects(); persist(); partUI(); sizeView(); loadMq(); renderMq(); const surahsReady=loadSurahs(); initKeys(); renderCovers();
+restoreStudioSession(surahsReady).catch(e=>{ console.error('Could not restore the Quran Studio session',e); showNote('Could not restore your previous Quran Studio session: '+e.message+'.'); });
 setTheme(localStorage.getItem('forge:qs:theme')||'dark');
 $('echoVal').textContent=$('echo').value+'%';
 loadPhoto().then(()=>{ meUI(); redraw(); });
