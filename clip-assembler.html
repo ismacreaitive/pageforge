@@ -1,33 +1,32 @@
 <!DOCTYPE html>
-<!-- clip-assembler.html — v3.5 — StoryForge Pack 2 · 🎬 Auto Video Assembler.
-v3.5: Four fixes from review.
-(1) LIP-SYNC DRIFT / VIDEO ENDING BEFORE AUDIO: most likely root cause identified — v3.4's cut-transition
-compositing ran on EVERY cut, including every pause-removal sub-window join (now far more frequent than
-clip-to-clip cuts), adding real per-frame draw cost that can make the canvas-captured video track fall
-behind the continuously-playing audio track over a long build, producing growing lip-sync drift and,
-eventually, the video track ending before the audio track (video freezes, audio keeps going). Two concrete
-load-reduction fixes: (a) the full transition blend (TRANSITION_PRESETS) now only plays at true segment-to-
-segment boundaries (wi===0 of each segment's subWindows) — pause-removal's internal joins are now a fast,
-near-zero-cost join (audio still click-faded via the existing floor, but no canvas compositing overhead);
-(b) caption text wrapping, previously recomputed via wrapText() on every single rAF frame, is now cached
-per unique (font+maxW+text) via a build-scoped capCache Map passed into drawCaption(), so it's computed once
-per distinct caption rather than ~30×/sec. This is an empirical browser-timing issue, not something provably
-fixed from code alone — stated plainly in chat, with a request to retest.
-(2) B-ROLL: root-caused — b-roll only ever populated via a separate manual "Auto-find b-roll for all" click,
-and its completion toast always said "done" even when zero photos were actually found (pexelsFindPhoto
-failures were silent). Fixed: Build now automatically fetches b-roll for any included segment that has a
-visualQuery but no image yet, whenever a Pexels key is present in the field — no separate click required —
-and reports an accurate "Found X of Y" or a clear failure toast. autoFindAllBtn's own completion toast was
-also corrected to report real success/failure counts instead of an unconditional "done".
-(3) QUIET BUILD: ensureAudioGraph() no longer unconditionally wires voiceGain to audioCtx.destination (the
-literal reason builds were audible). New #previewDuringBuild checkbox (default OFF) controls both the canvas
-staying visible and voiceGain being (dis)connected from destination at build start, via a small inline
-toggle in the build handler. #processingPanel gets a .quiet class when preview is off — canvas hidden,
-panel shrinks, label reads "Building quietly…" — progress bar/label (text-only) remain either way so
-cancellation and progress are still visible without sound or a live frame feed.
-v3.4: visual cut-transition system (now scoped down per above). v3.3: auto pause-removal, independent
-caption text/box color + 4 fonts, code-level repetition dedupe, audio-only cut fade. v3.2/v3.1/v3/v2.x/v1:
-see prior version history. -->
+<!-- clip-assembler.html — v3.6 — StoryForge Pack 2 · 🎬 Auto Video Assembler.
+v3.6: Added Groq as a second automatic-analysis engine, alongside Gemini — a real fallback for when Gemini's
+quota is exhausted, verified against Groq's current docs (confirmed: Whisper transcription models
+whisper-large-v3 / whisper-large-v3-turbo at /audio/transcriptions, OpenAI-compatible; text chat model
+llama-3.3-70b-versatile at /chat/completions; NO native video-understanding model — Groq cannot "watch" a
+video the way Gemini does). Honest architecture difference stated to the user: the Groq path transcribes the
+audio with Whisper, then feeds that transcript to Groq's fast text model using the EXACT SAME clip-selection
+prompt the manual paste-into-AI-chat flow already uses (buildPrompt() refactored into buildPromptFromText()
+so both paths share one prompt, including REPEAT_RULE) — so it can't catch a purely visual moment with no
+distinctive speech, since it never sees the picture.
+New UI: #analysisEngine select (Gemini / Groq) toggles #geminiFields vs #groqFields. Groq fields: license
+key, whisper model select (default whisper-large-v3-turbo), chat model select (default
+llama-3.3-70b-versatile, + Custom fallback, same UX pattern as the existing Gemini model select).
+New pipeline: ensureDecodedAudio()'s downsample target raised from 8kHz to 16kHz (Whisper's native rate;
+also reused for pause-detection, which works fine at the higher rate too — avoids a second full decode pass)
+→ chunkAudioForGroq() splits the full decoded buffer into ~10-minute windows (safely under Groq's 25MB
+per-file limit) → encodeWavFromFloat32() writes each window out as a standard 16-bit PCM WAV Blob →
+groqTranscribeChunk() posts each to /audio/transcriptions with response_format=verbose_json and offsets the
+returned segment timestamps by the chunk's start time → all segments merged/sorted into the same `cues`
+array captions already use → merged transcript fed into buildPromptFromText() → POST to /chat/completions →
+reply parsed with the EXISTING shortBlocks/parseAiClipList() regex (zero new parsing code needed, since the
+prompt format is identical to the manual flow's) → dedupeAcrossEdits() → same geminiEdits/renderEditPicker/
+loadEdit pipeline Gemini already uses, so everything downstream (b-roll, pause removal, transitions, quiet
+build) is untouched and shared.
+v3.5: lip-sync drift fix (transition compositing scoped to real cuts only, caption wrap caching), automatic
+b-roll during build with honest found/not-found reporting, quiet-by-default build (opt-in live preview).
+v3.4: visual cut-transition system. v3.3: auto pause-removal, independent caption styling, code-level
+repetition dedupe. v3.2/v3.1/v3/v2.x/v1: see prior version history. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -101,32 +100,63 @@ input[type=file]{width:100%;color:var(--muted);font-size:12px}
 </head>
 <body>
 <div id="setup">
-  <h1>🎬 Clip Assembler <small>v3.5</small></h1>
-  <small>Upload a long video — Gemini finds several separate, postable shorts automatically, pulling moments from anywhere in the video, even non-sequentially</small>
+  <h1>🎬 Clip Assembler <small>v3.6</small></h1>
+  <small>Upload a long video — pick an analysis engine below to find several separate, postable shorts automatically.</small>
 
   <div class="card">
     <h2>1. Your video</h2>
     <input type="file" id="videoFile" accept="video/*">
+    <small style="display:block;margin-top:8px;color:var(--muted)">Try the <a href="sample-assets/forge-demo-video.webm" download style="color:var(--accent)">36-second narrated sample</a> to test analysis and clip selection.</small>
     <small id="videoInfo" style="display:block;margin-top:6px"></small>
   </div>
 
   <div class="card">
-    <h2>✨ 2. Analyze automatically (Gemini)</h2>
-    <small>Uses your own Gemini API key. It watches/listens to the video directly — no separate transcript needed.</small>
-    <div class="row" style="margin-top:8px">
-      <input type="password" id="geminiKey" placeholder="Gemini API key">
+    <h2>✨ 2. Analyze automatically</h2>
+    <select id="analysisEngine" style="margin-bottom:8px">
+      <option value="gemini" selected>Gemini — watches the video directly (picture + sound)</option>
+      <option value="groq">Groq — fast fallback, works from the transcript only (no picture)</option>
+    </select>
+
+    <div id="geminiFields">
+      <small>Uses your own Gemini API key. It watches/listens to the video directly — no separate transcript needed.</small>
+      <div class="row" style="margin-top:8px">
+        <input type="password" id="geminiKey" placeholder="Gemini API key">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="geminiModelSelect">
+          <option value="gemini-3.8-flash" selected>gemini-3.8-flash (current default)</option>
+          <option value="gemini-3.8-pro">gemini-3.8-pro</option>
+          <option value="gemini-flash-latest">gemini-flash-latest</option>
+          <option value="gemini-pro-latest">gemini-pro-latest</option>
+          <option value="custom">Custom — type below…</option>
+        </select>
+        <input type="text" id="geminiModelCustom" placeholder="Custom model name" class="hidden">
+      </div>
+      <div class="checkrow"><input type="checkbox" id="rememberKey"><label for="rememberKey">Remember key on this device</label></div>
     </div>
-    <div class="row" style="margin-top:8px">
-      <select id="geminiModelSelect">
-        <option value="gemini-3.8-flash" selected>gemini-3.8-flash (current default)</option>
-        <option value="gemini-3.8-pro">gemini-3.8-pro</option>
-        <option value="gemini-flash-latest">gemini-flash-latest</option>
-        <option value="gemini-pro-latest">gemini-pro-latest</option>
-        <option value="custom">Custom — type below…</option>
-      </select>
-      <input type="text" id="geminiModelCustom" placeholder="Custom model name" class="hidden">
+
+    <div id="groqFields" class="hidden">
+      <small>Uses your own Groq API key. Groq has no video-understanding model, so this transcribes the audio with Whisper first, then has a fast Groq text model pick the clips from the transcript — the same approach as the manual "paste into AI chat" flow below, just automatic. It can't notice a purely visual moment with no distinctive speech, since it never sees the picture.</small>
+      <div class="row" style="margin-top:8px">
+        <input type="password" id="groqKey" placeholder="Groq API key">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="groqWhisperModel">
+          <option value="whisper-large-v3-turbo" selected>whisper-large-v3-turbo (fast transcription)</option>
+          <option value="whisper-large-v3">whisper-large-v3 (slower, slightly more accurate)</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="groqChatModel">
+          <option value="llama-3.3-70b-versatile" selected>llama-3.3-70b-versatile (current default)</option>
+          <option value="custom">Custom — type below…</option>
+        </select>
+        <input type="text" id="groqChatModelCustom" placeholder="Custom model name" class="hidden">
+      </div>
+      <div class="checkrow"><input type="checkbox" id="rememberGroqKey"><label for="rememberGroqKey">Remember key on this device</label></div>
+      <small style="display:block;margin-top:6px">Long videos are transcribed in ~10-minute chunks to stay under Groq's per-file size limit — this means a few sequential requests, so it can take a minute or two for a long video.</small>
     </div>
-    <div class="checkrow"><input type="checkbox" id="rememberKey"><label for="rememberKey">Remember key on this device</label></div>
+
     <div class="row" style="margin-top:8px">
       <select id="numEdits">
         <option value="1">1 short</option>
@@ -145,7 +175,7 @@ input[type=file]{width:100%;color:var(--muted);font-size:12px}
     </div>
     <div class="row" style="margin-top:8px"><button class="btn gold" id="analyzeBtn" type="button">🎬 Analyze video automatically</button></div>
     <small id="analyzeStatus"></small>
-    <small style="display:block;margin-top:8px">Your key stays in this page/browser — only sent to Google's API. Each short is independent — drawn from wherever in the video it's strongest.</small>
+    <small style="display:block;margin-top:8px">Your key stays in this page/browser — only sent to the chosen provider's API. Each short is independent — drawn from wherever in the video/transcript it's strongest.</small>
   </div>
 
   <div id="editPicker" class="card hidden"></div>
@@ -160,7 +190,7 @@ input[type=file]{width:100%;color:var(--muted);font-size:12px}
 
   <div class="card">
     <h2>Alternative: paste from any AI chat (no API key needed)</h2>
-    <small>Same no-key flow as your other tools — fallback if you'd rather not use the Gemini key, or if automatic analysis fails.</small>
+    <small>Same no-key flow as your other tools — fallback if you'd rather not use an API key, or if automatic analysis fails.</small>
     <div class="step">
       <div class="num">1</div>
       <div class="body"><div class="row"><button class="btn gold" id="copyPromptBtn" type="button">📋 Copy prompt</button></div></div>
@@ -405,7 +435,7 @@ let videoFile=null, videoURL=null, videoDuration=0, video=null;
 $('videoFile').addEventListener('change', e=>{
   const f=e.target.files && e.target.files[0]; if(!f) return;
   videoFile=f; videoURL=URL.createObjectURL(f);
-  analysisBuffer=null; decodingPromise=null; /* new video → old pause-analysis is stale */
+  analysisBuffer=null; decodingPromise=null; /* new video → old decoded-audio cache is stale */
   video=document.createElement('video');
   video.src=videoURL; video.preload='metadata'; video.muted=false; video.playsInline=true;
   video.onloadedmetadata=()=>{
@@ -417,8 +447,16 @@ $('videoFile').addEventListener('change', e=>{
 
 $('musicType').addEventListener('change', ()=>{ $('musicFile').classList.toggle('hidden', $('musicType').value!=='upload'); });
 
+/* ===== v3.6: engine toggle ===== */
+$('analysisEngine').addEventListener('change', ()=>{
+  const g=$('analysisEngine').value==='groq';
+  $('geminiFields').classList.toggle('hidden', g);
+  $('groqFields').classList.toggle('hidden', !g);
+});
+
 (function(){
   const k=localStorage.getItem('sf_gemini_key'); if(k){ $('geminiKey').value=k; $('rememberKey').checked=true; }
+  const gk=localStorage.getItem('sf_groq_key'); if(gk){ $('groqKey').value=gk; $('rememberGroqKey').checked=true; }
   const pk=localStorage.getItem('sf_pexels_key'); if(pk){ $('pexelsKey').value=pk; }
   const savedModel=localStorage.getItem('sf_gemini_model');
   if(savedModel){
@@ -426,8 +464,15 @@ $('musicType').addEventListener('change', ()=>{ $('musicFile').classList.toggle(
     if(opt){ $('geminiModelSelect').value=savedModel; }
     else { $('geminiModelSelect').value='custom'; $('geminiModelCustom').classList.remove('hidden'); $('geminiModelCustom').value=savedModel; }
   }
+  const savedGroqModel=localStorage.getItem('sf_groq_chat_model');
+  if(savedGroqModel){
+    const opt2=[...$('groqChatModel').options].find(o=>o.value===savedGroqModel);
+    if(opt2){ $('groqChatModel').value=savedGroqModel; }
+    else { $('groqChatModel').value='custom'; $('groqChatModelCustom').classList.remove('hidden'); $('groqChatModelCustom').value=savedGroqModel; }
+  }
 })();
 $('geminiModelSelect').addEventListener('change', ()=>{ $('geminiModelCustom').classList.toggle('hidden', $('geminiModelSelect').value!=='custom'); });
+$('groqChatModel').addEventListener('change', ()=>{ $('groqChatModelCustom').classList.toggle('hidden', $('groqChatModel').value!=='custom'); });
 $('pexelsKey').addEventListener('change', ()=>{ localStorage.setItem('sf_pexels_key', $('pexelsKey').value.trim()); });
 function getSelectedModel(){
   const sel=$('geminiModelSelect').value;
@@ -435,8 +480,14 @@ function getSelectedModel(){
   localStorage.setItem('sf_gemini_model', resolved);
   return resolved;
 }
+function getSelectedGroqChatModel(){
+  const sel=$('groqChatModel').value;
+  const resolved = sel==='custom' ? ($('groqChatModelCustom').value.trim()||'llama-3.3-70b-versatile') : sel;
+  localStorage.setItem('sf_groq_chat_model', resolved);
+  return resolved;
+}
 
-/* ===== repeated-statement rule text (shared by both prompts) ===== */
+/* ===== repeated-statement rule text (shared by every prompt) ===== */
 const REPEAT_RULE = "CRITICAL — repeated statements: speakers often restate the same point 2-4 times, sometimes word-for-word, sometimes reworded, sometimes minutes apart (e.g. \"as I said earlier\", or just repeating the same sentence for emphasis). Actively watch for this. When you detect it, select only the SINGLE clearest, most concise instance of that point — never include more than one instance of the same idea, even across different parts of the video or different shorts.";
 
 /* ===== code-level repetition safety net ===== */
@@ -483,12 +534,10 @@ function dedupeAcrossEdits(edits){
   return { edits:newEdits, removed };
 }
 
-/* ===== manual AI prompt build + paste-back parse ===== */
-function buildPrompt(){
-  const transcript=$('transcriptText').value.trim();
-  if(!transcript) return null;
-  const len=$('targetLen').value;
-  const numShorts=+$('numEdits').value;
+/* ===== v3.6: shared clip-selection prompt — used by the manual copy-button AND the Groq auto flow,
+   so both paths get identical instructions (including REPEAT_RULE) with zero duplication ===== */
+function buildPromptFromText(transcript, numShorts, len){
+  if(!transcript || !transcript.trim()) return null;
   return `Here is a timestamped transcript of a long video. I want ${numShorts} SEPARATE, INDEPENDENT short${numShorts>1?'s':''} out of it — each one its own standalone video ready to post (YouTube Shorts / Instagram / TikTok), not stylistic variations of the same highlights.
 
 TRANSCRIPT:
@@ -508,6 +557,12 @@ SHORT 1:
 SHORT 2:
 1. ...
 Use mm:ss or h:mm:ss timestamps matching the transcript. No other text before or after the lists.`;
+}
+function buildPrompt(){
+  const transcript=$('transcriptText').value.trim();
+  const len=$('targetLen').value;
+  const numShorts=+$('numEdits').value;
+  return buildPromptFromText(transcript, numShorts, len);
 }
 async function copyText(text){
   try{ await navigator.clipboard.writeText(text); return true; }
@@ -546,24 +601,25 @@ function parseAiClipList(text){
   });
   return { segs:out, skipped };
 }
+function parseMultiShortReply(text){
+  const shortBlocks=[...text.matchAll(/SHORT\s*(\d+)\s*:\s*\n([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/gi)];
+  return shortBlocks.map(m=>{
+    const {segs}=parseAiClipList(m[2]||'');
+    return { title:'Short '+m[1], segments:segs };
+  }).filter(e=>e.segments.length);
+}
 $('usePasteBtn').onclick=()=>{
   const text=$('aiPaste').value.trim();
   if(!text){ toast("Paste the AI's reply first"); return; }
-  const shortBlocks=[...text.matchAll(/SHORT\s*(\d+)\s*:\s*\n([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/gi)];
-  if(shortBlocks.length>1){
-    const parsedShorts=shortBlocks.map(m=>{
-      const {segs}=parseAiClipList(m[2]||'');
-      return { title:'Short '+m[1], segments:segs };
-    }).filter(e=>e.segments.length);
-    if(parsedShorts.length){
-      const {edits:dedupedShorts, removed}=dedupeAcrossEdits(parsedShorts);
-      geminiEdits=dedupedShorts;
-      renderEditPicker();
-      loadEdit(0);
-      toast('✓ '+dedupedShorts.length+' shorts loaded'+(removed?' ('+removed+' repeated clip(s) removed)':'')+' — pick one below to review');
-      updateBuildEnabled();
-      return;
-    }
+  const parsedShorts=parseMultiShortReply(text);
+  if(parsedShorts.length>1 || (parsedShorts.length===1 && /SHORT\s*\d+\s*:/i.test(text))){
+    const {edits:dedupedShorts, removed}=dedupeAcrossEdits(parsedShorts);
+    geminiEdits=dedupedShorts;
+    renderEditPicker();
+    loadEdit(0);
+    toast('✓ '+dedupedShorts.length+' shorts loaded'+(removed?' ('+removed+' repeated clip(s) removed)':'')+' — pick one below to review');
+    updateBuildEnabled();
+    return;
   }
   const {segs, skipped}=parseAiClipList(text);
   if(!segs.length){ toast('Could not find any clips in that — check the format matches the example'); return; }
@@ -620,11 +676,7 @@ function parseGeminiAnalysis(text){
   const transcriptMatch=text.match(/TRANSCRIPT:([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/i);
   const transcriptText=transcriptMatch?transcriptMatch[1].trim():'';
   const parsedCues=parsePlainTimestamped(transcriptText);
-  const shortBlocks=[...text.matchAll(/SHORT\s*(\d+)\s*:\s*\n([\s\S]*?)(?=SHORT\s*\d+\s*:|$)/gi)];
-  const edits=shortBlocks.map(m=>{
-    const {segs}=parseAiClipList(m[2]||'');
-    return { title:'Short '+m[1], segments:segs };
-  }).filter(e=>e.segments.length);
+  const edits=parseMultiShortReply(text);
   return { cues:parsedCues, edits };
 }
 function fileToBase64(file){
@@ -652,6 +704,11 @@ function loadEdit(i){
   renderSegList(); updateBuildEnabled();
 }
 $('analyzeBtn').onclick=async ()=>{
+  if($('analysisEngine').value==='groq') return analyzeWithGroq();
+  return analyzeWithGemini();
+};
+
+async function analyzeWithGemini(){
   const apiKey=$('geminiKey').value.trim();
   const model=getSelectedModel();
   if(!apiKey){ toast('Paste your Gemini API key first'); return; }
@@ -744,17 +801,41 @@ $('analyzeBtn').onclick=async ()=>{
   }catch(err){
     console.error(err);
     let msg='Analysis failed — ';
-    if(err.message==='UPLOAD_URL_BLOCKED') msg+="browser blocked reading Gemini's upload address. Use the manual flow below.";
-    else if(err.message==='PROCESS_FAILED') msg+='Gemini took too long to process the file. Try a shorter clip, or use the manual flow below.';
-    else if(err.message==='EMPTY_RESPONSE') msg+='Gemini returned nothing. Try again, or use the manual flow below.';
-    else if(err.message==='NO_EDITS_PARSED') msg+="Gemini's reply didn't match the expected format. Try again, or use the manual flow below.";
-    else msg+=err.message;
+    if(err.message==='UPLOAD_URL_BLOCKED') msg+="browser blocked reading Gemini's upload address. Use the manual flow below, or try Groq.";
+    else if(err.message==='PROCESS_FAILED') msg+='Gemini took too long to process the file. Try a shorter clip, Groq, or the manual flow below.';
+    else if(err.message==='EMPTY_RESPONSE') msg+='Gemini returned nothing. Try again, Groq, or the manual flow below.';
+    else if(err.message==='NO_EDITS_PARSED') msg+="Gemini's reply didn't match the expected format. Try again, Groq, or the manual flow below.";
+    else msg+=err.message+' — try Groq above, or the manual flow below.';
     $('analyzeStatus').textContent=msg;
     toast('Analysis failed — see note under the button');
   }finally{
     $('analyzeBtn').disabled=false;
   }
-};
+}
+
+/* ===== v3.6: WAV encoding — turns a slice of decoded PCM into a standard 16-bit mono WAV Blob for Groq ===== */
+function encodeWavFromFloat32(samples, sampleRate){
+  const numSamples=samples.length;
+  const bytesPerSample=2;
+  const blockAlign=bytesPerSample;
+  const byteRate=sampleRate*blockAlign;
+  const dataSize=numSamples*bytesPerSample;
+  const buffer=new ArrayBuffer(44+dataSize);
+  const view=new DataView(buffer);
+  function writeStr(offset,str){ for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+  writeStr(0,'RIFF'); view.setUint32(4, 36+dataSize, true); writeStr(8,'WAVE');
+  writeStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,1,true); view.setUint32(24,sampleRate,true); view.setUint32(28,byteRate,true);
+  view.setUint16(32,blockAlign,true); view.setUint16(34,16,true);
+  writeStr(36,'data'); view.setUint32(40,dataSize,true);
+  let off=44;
+  for(let i=0;i<numSamples;i++){
+    let s=Math.max(-1,Math.min(1,samples[i]));
+    view.setInt16(off, s<0?s*0x8000:s*0x7FFF, true);
+    off+=2;
+  }
+  return new Blob([buffer], {type:'audio/wav'});
+}
 
 /* ===== Pexels real-photo b-roll ===== */
 function shapeOrientationParam(){ const s=$('shape').value; if(s==='tall') return 'portrait'; if(s==='square') return 'square'; return 'landscape'; }
@@ -878,7 +959,6 @@ function wrapText(ctx,text,maxW,font){
   for(const w of words){ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t; }
   if(cur) lines.push(cur); return lines;
 }
-/* v3.5: cached lookup so a cue's wrapping is computed once, not every rAF frame */
 function getWrappedLines(ctx, text, maxW, font, cache){
   const key=font+'||'+maxW+'||'+text;
   if(cache && cache.has(key)) return cache.get(key);
@@ -948,8 +1028,6 @@ let audioCtx=null, mediaStreamDest=null, videoSourceNode=null, voiceGain=null, m
 function ensureAudioGraph(){
   if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   if(!mediaStreamDest) mediaStreamDest=audioCtx.createMediaStreamDestination();
-  /* v3.5: voiceGain is NOT connected to audioCtx.destination here anymore — that was the literal reason
-     builds were always audible. Monitoring to speakers is now opt-in, wired per-build in the build handler. */
   if(!voiceGain){ voiceGain=audioCtx.createGain(); voiceGain.gain.value=1; voiceGain.connect(mediaStreamDest); }
   if(!musicGain){ musicGain=audioCtx.createGain(); musicGain.gain.value=+($('musicVol').value||0.25); musicGain.connect(mediaStreamDest); }
   if(!videoSourceNode && video){ videoSourceNode=audioCtx.createMediaElementSource(video); videoSourceNode.connect(voiceGain); }
@@ -974,7 +1052,8 @@ $('musicFile').addEventListener('change', e=>{
   toast('✓ Background music loaded');
 });
 
-/* ===== auto pause-removal ===== */
+/* ===== decoded audio cache — used by pause-removal AND (v3.6) by Groq transcription.
+   Raised to 16kHz (Whisper's native rate) from the old 8kHz, so both features share one decode pass. ===== */
 let analysisBuffer=null, decodingPromise=null;
 async function ensureDecodedAudio(){
   if(analysisBuffer) return analysisBuffer;
@@ -985,7 +1064,7 @@ async function ensureDecodedAudio(){
       if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const arrBuf=await videoFile.arrayBuffer();
       const fullBuf=await audioCtx.decodeAudioData(arrBuf);
-      const targetSr=8000;
+      const targetSr=16000;
       const offlineCtx=new OfflineAudioContext(1, Math.max(1,Math.ceil(fullBuf.duration*targetSr)), targetSr);
       const src=offlineCtx.createBufferSource();
       src.buffer=fullBuf;
@@ -1056,7 +1135,100 @@ function computeSpeakingWindows(buf, start, end, params){
   return final.length?final:[[start,end]];
 }
 
-/* ===== cut transitions — v3.5: only applied at real segment-to-segment boundaries now (see build loop) ===== */
+/* ===== v3.6: Groq automatic analysis — transcribe with Whisper, then pick clips with a fast Groq text
+   model using the SAME prompt the manual flow uses ===== */
+function chunkAudioForGroq(buf){
+  const chunkSec=600; /* 10 min → ~18.3MB WAV at 16kHz/16-bit mono, safely under Groq's 25MB limit */
+  const chunks=[];
+  for(let t=0; t<buf.duration; t+=chunkSec){
+    chunks.push([t, Math.min(buf.duration, t+chunkSec)]);
+  }
+  return chunks.length?chunks:[[0,buf.duration]];
+}
+async function groqTranscribeChunk(buf, startSec, endSec, apiKey, whisperModel){
+  const sr=buf.sampleRate;
+  const data=buf.getChannelData(0);
+  const startIdx=Math.max(0,Math.floor(startSec*sr)), endIdx=Math.min(data.length, Math.ceil(endSec*sr));
+  const slice=data.slice(startIdx, endIdx);
+  const wavBlob=encodeWavFromFloat32(slice, sr);
+  const form=new FormData();
+  form.append('file', wavBlob, 'chunk.wav');
+  form.append('model', whisperModel);
+  form.append('response_format', 'verbose_json');
+  const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+    method:'POST',
+    headers:{ 'Authorization':'Bearer '+apiKey },
+    body: form
+  });
+  const json=await res.json().catch(()=>({}));
+  if(!res.ok || json.error) throw new Error((json.error && (json.error.message||json.error)) || ('Transcription failed — HTTP '+res.status));
+  const segs=(json.segments||[]).map(s=>({ start: startSec+s.start, end: startSec+s.end, text:(s.text||'').trim() })).filter(s=>s.text);
+  return segs.length?segs:(json.text? [{start:startSec,end:endSec,text:json.text.trim()}] : []);
+}
+async function analyzeWithGroq(){
+  const apiKey=$('groqKey').value.trim();
+  if(!apiKey){ toast('Paste your Groq API key first'); return; }
+  if(!videoFile){ toast('Upload a video first'); return; }
+  if($('rememberGroqKey').checked) localStorage.setItem('sf_groq_key', apiKey); else localStorage.removeItem('sf_groq_key');
+
+  const whisperModel=$('groqWhisperModel').value;
+  const chatModel=getSelectedGroqChatModel();
+  const numShorts=+$('numEdits').value;
+  const lenText=$('targetLen').value;
+
+  $('analyzeBtn').disabled=true;
+  $('analyzeStatus').textContent='Decoding audio…';
+
+  try{
+    const buf=await ensureDecodedAudio();
+    if(!buf) throw new Error('Could not read the audio from this video file.');
+
+    const chunks=chunkAudioForGroq(buf);
+    let allSegs=[];
+    for(let i=0;i<chunks.length;i++){
+      $('analyzeStatus').textContent='Transcribing part '+(i+1)+' of '+chunks.length+'…';
+      const segs=await groqTranscribeChunk(buf, chunks[i][0], chunks[i][1], apiKey, whisperModel);
+      allSegs=allSegs.concat(segs);
+    }
+    allSegs.sort((a,b)=>a.start-b.start);
+    if(!allSegs.length) throw new Error('Transcription came back empty — try again, or use Gemini/the manual flow.');
+
+    const transcriptText=allSegs.map(s=>'['+secToClock(s.start)+'] '+s.text).join('\n');
+    const prompt=buildPromptFromText(transcriptText, numShorts, lenText);
+
+    $('analyzeStatus').textContent='Picking clips…';
+    const chatRes=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+apiKey, 'Content-Type':'application/json' },
+      body: JSON.stringify({ model: chatModel, messages:[{role:'user', content: prompt}] })
+    });
+    const chatJson=await chatRes.json().catch(()=>({}));
+    if(!chatRes.ok || chatJson.error) throw new Error((chatJson.error && (chatJson.error.message||chatJson.error)) || ('Clip selection failed — HTTP '+chatRes.status));
+
+    let text=(chatJson.choices && chatJson.choices[0] && chatJson.choices[0].message && chatJson.choices[0].message.content) || '';
+    text=text.replace(/^```[a-z]*\n?/i,'').replace(/```\s*$/,'').trim();
+    if(!text) throw new Error('Groq returned nothing — try again, or use the manual flow.');
+
+    const edits=parseMultiShortReply(text);
+    if(!edits.length) throw new Error("Groq's reply didn't match the expected format — try again, or use the manual flow.");
+
+    cues=allSegs;
+    const {edits:dedupedEdits, removed}=dedupeAcrossEdits(edits);
+    geminiEdits=dedupedEdits;
+    renderEditPicker();
+    loadEdit(0);
+    $('analyzeStatus').textContent='✓ Done — '+dedupedEdits.length+' short(s) ready'+(removed?' ('+removed+' repeated clip(s) removed)':'')+', loaded the first one below';
+    toast('✓ Groq analysis complete');
+  }catch(err){
+    console.error(err);
+    $('analyzeStatus').textContent='Analysis failed — '+(err.message||'something went wrong')+' — try Gemini above, or the manual flow below.';
+    toast('Analysis failed — see note under the button');
+  }finally{
+    $('analyzeBtn').disabled=false;
+  }
+}
+
+/* ===== cut transitions ===== */
 const TRANSITION_PRESETS={
   none:{style:'none', ms:0},
   quickCross:{style:'cross', ms:140},
@@ -1064,7 +1236,7 @@ const TRANSITION_PRESETS={
   blackFade:{style:'black', ms:420}
 };
 
-/* ===== build / render pipeline — non-blocking corner panel, no forced watching ===== */
+/* ===== build / render pipeline ===== */
 function seekVideoTo(v, t){
   return new Promise(resolve=>{
     function onSeeked(){ v.removeEventListener('seeked', onSeeked); resolve(); }
@@ -1085,14 +1257,13 @@ $('buildBtn').onclick=async ()=>{
     ensureAudioGraph();
     if(audioCtx.state==='suspended') await audioCtx.resume();
 
-    /* v3.5: quiet-by-default build. Monitoring to speakers + visible canvas are opt-in. */
     const previewOn=$('previewDuringBuild').checked;
     $('processingPanel').classList.toggle('quiet', !previewOn);
     $('procHeadLabel').textContent = previewOn ? 'Building…' : 'Building (quiet)…';
     try{
       if(previewOn) voiceGain.connect(audioCtx.destination);
       else voiceGain.disconnect(audioCtx.destination);
-    }catch(err){ /* fine if it wasn't connected */ }
+    }catch(err){}
 
     const cv=$('cv'), ctx=cv.getContext('2d');
     const [W,H]=shapeWH(); cv.width=W; cv.height=H;
@@ -1120,7 +1291,7 @@ $('buildBtn').onclick=async ()=>{
     const captionsOn=$('captionsOn').checked;
     const capSettings={ style:$('capStyle').value, position:$('capPosition').value, textColor:$('capTextColor').value, boxColor:$('capBoxColor').value, fontKey:$('capFont').value };
     const displayCues = captionsOn ? buildDisplayCues(+$('capWords').value||4) : [];
-    const capCache=new Map(); /* v3.5: avoids recomputing text wrapping every frame */
+    const capCache=new Map();
 
     const autoPauseOn=$('autoPauseOn').checked;
     let analysisBuf=null;
@@ -1131,8 +1302,6 @@ $('buildBtn').onclick=async ()=>{
     }
     const pauseParams=PAUSE_PRESETS[$('pauseSensitivity').value]||PAUSE_PRESETS.medium;
 
-    /* v3.5: automatic b-roll fetch during build, with accurate reporting — fixes "entered the key but got
-       nothing" by removing the separate manual-click requirement and the previously misleading toast. */
     const pexKey=$('pexelsKey').value.trim();
     if(pexKey && !cancelRequested){
       const needBroll=included.filter(s=>!s.brollImg && (s.visualQuery||'').trim());
@@ -1162,9 +1331,6 @@ $('buildBtn').onclick=async ()=>{
         const win=subWindows[wi];
         const wStart=win[0], wEnd=win[1];
         const winDurMs=(wEnd-wStart)*1000;
-        /* v3.5: only the FIRST sub-window of a segment (a real cut-to-a-new-clip boundary) gets the full
-           visual blend; internal pause-removal joins (wi>0) skip the heavy compositing entirely — this is
-           the direct fix for the reported sync drift / early-ending video. */
         const isSegBoundary = (wi===0);
         const effTransMs = (isSegBoundary && transitionParams.style!=='none') ? Math.max(0, Math.min(transitionParams.ms, winDurMs*0.4)) : 0;
         const audioFadeSec = effTransMs>0 ? Math.min(effTransMs/1000,0.3) : 0.015;
